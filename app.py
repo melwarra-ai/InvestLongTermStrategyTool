@@ -1618,8 +1618,6 @@ else:  # Portfolio Manager
                 y=daily_val,
                 name='Actual Portfolio',
                 line=dict(color='#3b82f6', width=3),
-                fill='tozeroy',
-                fillcolor='rgba(59, 130, 246, 0.1)',
                 hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
                              '<b>Portfolio Value:</b> $%{y:,.2f}<br>' +
                              '<b>Performance:</b> Actual<br>' +
@@ -1657,16 +1655,18 @@ else:  # Portfolio Manager
                         bench_return = ((float(benchmark_normalized.iloc[-1]) / start_val) - 1) * 100
                         bench_final_value = float(benchmark_normalized.iloc[-1])
                         
+                        # Add benchmark trace LAST so it appears on top
                         fig.add_trace(go.Scatter(
                             x=benchmark_data.index,
                             y=benchmark_normalized,
                             name=f'100% {benchmark_ticker} Benchmark ({bench_return:+.1f}%)',
-                            line=dict(color='#f59e0b', width=2.5, dash='dashdot'),
+                            line=dict(color='#ff4500', width=4, dash='dot'),  # Bright orange-red, very thick, dotted
+                            mode='lines',
                             hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
-                                         '<b>Value if 100% in Benchmark:</b> $%{y:,.2f}<br>' +
-                                         f'<b>Benchmark:</b> {benchmark_ticker}<br>' +
+                                         '<b>Benchmark Value:</b> $%{y:,.2f}<br>' +
+                                         f'<b>Ticker:</b> {benchmark_ticker}<br>' +
                                          f'<b>Total Return:</b> {bench_return:+.1f}%<br>' +
-                                         f'<b>Assumption:</b> 100% principal invested at profile start<br>' +
+                                         f'<b>Assumption:</b> 100% invested at start<br>' +
                                          '<extra></extra>'
                         ))
                         
@@ -1682,15 +1682,10 @@ else:  # Portfolio Manager
                     st.caption(f"⚠️ Could not load benchmark {benchmark_ticker}")
             
             fig.update_layout(
-                title=dict(
-                    text='Portfolio Performance Comparison',
-                    font=dict(size=18, color='#1e293b'),
-                    x=0.5,
-                    xanchor='center'
-                ),
                 hovermode='x unified',
                 plot_bgcolor='white',
-                height=600,
+                height=550,
+                showlegend=True,
                 hoverlabel=dict(
                     bgcolor="white",
                     font_size=14,
@@ -1714,16 +1709,16 @@ else:  # Portfolio Manager
                 ),
                 legend=dict(
                     orientation="h",
-                    yanchor="bottom",
-                    y=1.05,
+                    yanchor="top",
+                    y=-0.15,
                     xanchor="center",
                     x=0.5,
-                    font=dict(size=13),
+                    font=dict(size=12),
                     bgcolor='rgba(255, 255, 255, 0.9)',
                     bordercolor='#e2e8f0',
                     borderwidth=1
                 ),
-                margin=dict(l=70, r=40, t=80, b=60)
+                margin=dict(l=70, r=40, t=20, b=80)
             )
             
             st.plotly_chart(fig, use_container_width=True)
@@ -1739,20 +1734,21 @@ else:  # Portfolio Manager
                 🟢 **Goal Path (Green dashed line)**  
                 Your target growth trajectory based on your yearly goal percentage. This shows where you *want* to be.
                 
-                🟠 **Benchmark (Orange dash-dot line)** *(if selected)*  
-                Shows what would happen if you invested 100% of your principal in the selected market index at profile creation date. This provides a "buy and hold" comparison baseline.
+                🟠 **Benchmark (Orange dotted line)** *(if selected)*  
+                Shows what would happen if you invested 100% of your principal in the selected market index at profile creation date.  
+                **Key Assumption:** This assumes you invested all your money on day 1 (perfect timing, lump sum).
                 
                 **How to use this:**
                 - **Above goal path?** 🎉 You're outperforming your target!
                 - **Below goal path?** 📉 May need to adjust strategy or goals
                 - **Above benchmark?** ✨ Your allocation is beating the market
-                - **Below benchmark?** 🤔 Consider if active management is worth it
+                - **Below benchmark?** 🤔 Consider if active management adds value vs. passive index investing
                 
                 **Tips:**
                 - Short-term fluctuations are normal - focus on long-term trends
-                - If consistently below benchmark, passive investing (100% in benchmark) might be simpler
+                - If consistently below benchmark, passive investing (100% in index) might be simpler
                 - If above benchmark, your diversification strategy is working!
-                - Benchmark assumes 100% invested from day 1 (unrealistic but useful comparison)
+                - Benchmark shows "perfect timing" (100% invested from day 1) - most people can't do this
                 """)
             
             # Show benchmark comparison if available
