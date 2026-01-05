@@ -344,7 +344,7 @@ def calculate_drift_status(p_data, prices):
     if recently_rebalanced:
         return False, []
     
-    # Check drift for each asset that is 100% deployed
+    # Check drift for each asset that has units
     drift_details = []
     for t in p_assets:
         allocated_pct = p_assets[t].get("allocated_pct", 0)
@@ -354,15 +354,11 @@ def calculate_drift_status(p_data, prices):
         if allocated_pct == 0 and cur_units > 0:
             allocated_pct = 100.0
         
-        # Skip if asset not deployed
-        if allocated_pct < 100.0 and cur_units == 0:
+        # Skip if asset not deployed (no units)
+        if cur_units == 0:
             continue
         
-        # Skip if never rebalanced and at initial deployment
-        if not has_rebalanced and cur_units > 0:
-            continue
-        
-        # Check drift for this 100% deployed asset
+        # Check drift for this deployed asset (regardless of rebalance history)
         actual_pct = float((p_assets[t]["units"] * prices.get(t, 0) / curr_v * 100))
         target_pct = float(p_assets[t]["target"])
         drift = abs(actual_pct - target_pct)
@@ -1177,29 +1173,32 @@ if view_mode == "🏠 Global Dashboard":
                 for asset in p_assets.values()
             ) if p_assets else False
             
-            # Determine status
-            if not all_deployed and len(p_assets) > 0:
+            # Determine status - Check drift/rebalance need FIRST
+            if recently_rebalanced:
+                # Just rebalanced - show balanced
+                tile_class = "profile-tile-optimized"
+                status_badge = '<span class="success-badge">✅ Balanced</span>'
+            elif needs_rebal:
+                # Drift detected - SHOW REBALANCE REQUIRED
+                tile_class = "profile-tile-warning"
+                status_badge = '<span class="drift-badge">🚨 REBALANCE REQUIRED</span>'
+            elif has_rebalanced:
+                # Previously rebalanced, no drift - balanced
+                tile_class = "profile-tile-optimized"
+                status_badge = '<span class="success-badge">✅ Balanced</span>'
+            elif not all_deployed and len(p_assets) > 0:
                 # Assets exist but not fully deployed
                 tile_class = "profile-tile"
                 deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
                 status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">📥 Deploying ({deployed_count}/{len(p_assets)})</span>'
-            elif all_deployed and not has_rebalanced:
-                # 100% deployed but never rebalanced = perfect initial state
+            elif all_deployed:
+                # All deployed but never rebalanced
                 tile_class = "profile-tile-optimized"
                 status_badge = '<span class="success-badge">✅ Deployed</span>'
-            elif not has_rebalanced:
-                # No assets or other edge case
+            else:
+                # No assets or new profile
                 tile_class = "profile-tile"
                 status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
-            elif recently_rebalanced:
-                tile_class = "profile-tile-optimized"
-                status_badge = '<span class="success-badge">✅ Balanced</span>'
-            elif needs_rebal:
-                tile_class = "profile-tile-warning"
-                status_badge = '<span class="drift-badge">🚨 REBALANCE REQUIRED</span>'
-            else:
-                tile_class = "profile-tile-optimized"
-                status_badge = '<span class="success-badge">✅ Balanced</span>'
             
             with cols[i % 2]:
                 # Clickable title button
@@ -1466,9 +1465,7 @@ else:  # Portfolio Manager
             needs_rebalance = False
             drift_assets = []
             
-            # Check drift for each asset that is deployed
-            has_rebalanced = prof.get("last_rebalanced") is not None
-            
+            # Check drift for each asset that has units
             if not recently_rebalanced and curr_v > 0:
                 for t in v_t:
                     # Get allocated_pct with fallback
@@ -1483,13 +1480,11 @@ else:  # Portfolio Manager
                     if allocated_pct < 100.0 and cur_units == 0:
                         continue
                     
-                    # Skip initial deployment (never rebalanced)
-                    # But only if this asset is truly at initial state
-                    if not has_rebalanced and cur_units > 0:
-                        # Never rebalanced but has units = initial perfect balance
+                    # If asset has no units at all, skip
+                    if cur_units == 0:
                         continue
                     
-                    # Now check drift for this deployed asset
+                    # Now check drift for this deployed asset (regardless of rebalance history)
                     actual_pct = float((asset_dict[t]["units"] * data[t].iloc[-1] / curr_v * 100))
                     target_pct = float(asset_dict[t]["target"])
                     drift = float(abs(actual_pct - target_pct))
@@ -1526,20 +1521,25 @@ else:  # Portfolio Manager
                 
                 st.divider()
             
-            # Determine status badge
+            # Determine status badge - Check drift FIRST
             has_rebalanced = prof.get("last_rebalanced") is not None
             has_assets = len(asset_dict) > 0
             
-            if not has_rebalanced and has_assets:
-                alert_html = '<span class="drift-badge">🚨 REBALANCE REQUIRED</span>'
-            elif not has_rebalanced:
-                alert_html = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ Not Rebalanced</span>'
-            elif recently_rebalanced:
+            if recently_rebalanced:
+                # Just rebalanced - show balanced
                 alert_html = '<span class="success-badge">✅ Balanced</span>'
             elif needs_rebalance:
+                # Drift detected - SHOW REBALANCE REQUIRED
                 alert_html = '<span class="drift-badge">🚨 REBALANCE REQUIRED</span>'
-            else:
+            elif has_rebalanced:
+                # Previously rebalanced, no drift now - balanced
                 alert_html = '<span class="success-badge">✅ Balanced</span>'
+            elif has_assets:
+                # Has assets but never rebalanced - deployed/monitoring
+                alert_html = '<span style="background: #3b82f6; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">📊 Monitoring</span>'
+            else:
+                # No assets yet
+                alert_html = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
             
             # Header
             st.markdown(f"""
