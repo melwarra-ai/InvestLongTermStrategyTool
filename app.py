@@ -577,9 +577,46 @@ with st.sidebar:
                 st.progress(deployment_progress)
             
             if not deployable_assets:
+                # All assets 100% deployed
                 st.success("✅ **All assets 100% deployed!**")
                 st.caption("Portfolio-level drift monitoring is now active.")
+                
+                # Show deployment history
+                with st.expander("✏️ View Deployment History", expanded=False):
+                    st.markdown("""
+                    Review your deployment history for each asset. All assets are fully deployed.
+                    """)
+                    
+                    for ticker, asset_data in assets.items():
+                        fund_name = asset_data.get("fund_name", ticker)
+                        purchases = asset_data.get("purchases", [])
+                        allocated_pct = asset_data.get("allocated_pct", 0)
+                        avg_cost = calculate_average_cost(asset_data)
+                        
+                        st.markdown(f"### {ticker} - {fund_name}")
+                        st.caption(f"✅ {allocated_pct:.1f}% deployed | Avg Cost: ${avg_cost:.2f}" if avg_cost else f"✅ {allocated_pct:.1f}% deployed")
+                        
+                        if purchases:
+                            # Create deployment history table
+                            history_data = []
+                            for p in purchases:
+                                history_data.append({
+                                    "Date": p.get("date", "N/A"),
+                                    "Deploy %": f"{p.get('deploy_pct', 0):.1f}%",
+                                    "Amount": f"${p.get('amount', 0):,.2f}",
+                                    "Price": f"${p.get('price', 0):.2f}",
+                                    "Quantity": f"{p.get('quantity', 0):.4f}"
+                                })
+                            
+                            df_history = pd.DataFrame(history_data)
+                            st.dataframe(df_history, use_container_width=True, hide_index=True)
+                        else:
+                            st.caption("No deployment history recorded")
+                        
+                        st.markdown("---")
+                        
             else:
+                # Some assets still need deployment
                 # Deployment form
                 with st.expander("➕ Record Asset Deployment", expanded=False):
                     st.markdown("""
@@ -616,6 +653,13 @@ with st.sidebar:
                             • **Currently Deployed:** {current_allocated:.1f}% of this asset's target  
                             • **Remaining:** {remaining_pct:.1f}% of this asset's target
                         """)
+                        
+                        # Show existing deployments if any
+                        existing_purchases = asset_data.get("purchases", [])
+                        if existing_purchases:
+                            st.markdown("**Previous Deployments:**")
+                            for idx, p in enumerate(existing_purchases, 1):
+                                st.caption(f"{idx}. {p.get('date')}: {p.get('deploy_pct', 0):.1f}% (${p.get('amount', 0):,.2f} @ ${p.get('price', 0):.2f})")
                         
                         st.divider()
                         
@@ -741,13 +785,12 @@ with st.sidebar:
                                                 st.balloons()
                                                 st.success(f"🎉 {selected_ticker} is now 100% deployed! Average cost will be calculated.")
                                             
-                                            # Reload page to update UI
+                                            # Reload page to update UI immediately
                                             st.rerun()
                             
                             except Exception as e:
                                 st.error(f"❌ Error recording deployment: {str(e)}")
                                 st.caption("Please check your internet connection and ticker symbol.")
-        
         st.divider()
         
         # Asset Allocation
@@ -1238,7 +1281,8 @@ else:  # Portfolio Manager
                     else:
                         st.metric("Status", "Active", delta="Monitoring", delta_color="off")
                 else:
-                    st.metric("Status", "⚪ New", delta="Needs Rebalance", delta_color="off")
+                    # All assets deployed but never rebalanced
+                    st.metric("Status", "✅ Deployed", delta="Ready to Monitor", delta_color="normal")
             else:
                 st.metric("Status", "⚙️ Setup", delta="Add assets", delta_color="off")
     
@@ -1248,15 +1292,88 @@ else:  # Portfolio Manager
     tickers = list(asset_dict.keys())
     
     if not tickers:
-        st.info("👈 **Add your first asset using the sidebar** to start tracking your portfolio")
+        st.info("👈 **Add your first asset using the sidebar** to start building your portfolio")
+        
+        st.markdown("---")
+        st.markdown("### 🚀 Quick Start Guide: Building Your Investment Strategy")
+        
         st.markdown("""
-        ### 📝 Quick Start Guide:
-        1. Enter a ticker symbol (e.g., AAPL, MSFT, VTI)
-        2. Set your target allocation percentage
-        3. See the **buying guide** showing exact units needed
-        4. Enter units you currently own
-        5. Click **Save Asset**
+        Follow these steps to set up your complete investment workflow:
         """)
+        
+        # Step 1
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
+            <h4 style="margin-top: 0; color: white;">📋 Step 1: Define Your Asset Mix</h4>
+            <p style="margin-bottom: 0;">
+                • Go to the <strong>🎯 Asset Allocation</strong> section in the sidebar<br>
+                • Enter ticker symbols (e.g., SPXL, IAU, BIL, DBMF)<br>
+                • Set target allocation % for each asset<br>
+                • <strong>Important:</strong> Total allocations must equal 100%<br>
+                • The system will auto-fetch fund names and current prices
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Step 2
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                    color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
+            <h4 style="margin-top: 0; color: white;">🔒 Step 2: Lock Your Asset Mix</h4>
+            <p style="margin-bottom: 0;">
+                • Once all assets total 100%, go to <strong>🔒 Asset Mix Status</strong><br>
+                • Click the <strong>"🔒 Lock Asset Mix"</strong> button<br>
+                • This finalizes your asset list and enables deployment tracking<br>
+                • <strong>Note:</strong> You cannot add new assets after locking
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Step 3
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                    color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
+            <h4 style="margin-top: 0; color: white;">💰 Step 3: Deploy Capital Into Assets</h4>
+            <p style="margin-bottom: 0;">
+                • Go to <strong>💰 Asset Deployment</strong> section<br>
+                • Select an asset to deploy capital into<br>
+                • Enter the % of that asset's target you want to deploy<br>
+                • Choose the deployment date (historical prices will be fetched)<br>
+                • Click <strong>"📥 Record Deployment"</strong><br>
+                • Repeat for each asset until all reach 100%
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Step 4
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); 
+                    color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
+            <h4 style="margin-top: 0; color: white;">📊 Step 4: Monitor & Rebalance</h4>
+            <p style="margin-bottom: 0;">
+                • Once all assets reach 100% deployment, drift monitoring activates<br>
+                • Average cost is calculated for each asset<br>
+                • Portfolio drift is measured against target allocations<br>
+                • When drift exceeds tolerance, rebalance to restore targets<br>
+                • Track performance against benchmarks (SPY, QQQ, etc.)
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("""
+        ### 💡 Pro Tips
+        - **Diversify:** Spread investments across different asset classes
+        - **Deploy Gradually:** Use multiple deployment events to dollar-cost average
+        - **Track History:** All deployments and rebalances are logged for your records
+        - **Benchmark:** Compare your strategy against market indexes
+        - **Stay Disciplined:** Rebalance when drift exceeds your tolerance threshold
+        """)
+        
+        st.markdown("---")
+        st.success("👈 **Ready to start?** Add your first asset in the sidebar!")
+        
         st.stop()
     
     # Fetch data and analyze
