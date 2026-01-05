@@ -1640,9 +1640,10 @@ else:  # Portfolio Manager
                              '<extra></extra>'
             ))
             
-            # Benchmark comparison (100% invested in benchmark)
+            # Benchmark comparison (100% invested in benchmark) - fetch first
             benchmark_ticker = prof.get('benchmark')
             benchmark_comparison_msg = None
+            benchmark_trace = None
             
             if benchmark_ticker:
                 try:
@@ -1655,20 +1656,26 @@ else:  # Portfolio Manager
                         bench_return = ((float(benchmark_normalized.iloc[-1]) / start_val) - 1) * 100
                         bench_final_value = float(benchmark_normalized.iloc[-1])
                         
-                        # Add benchmark trace LAST so it appears on top
-                        fig.add_trace(go.Scatter(
+                        # Store benchmark trace to add LAST (renders on top)
+                        benchmark_trace = go.Scatter(
                             x=benchmark_data.index,
                             y=benchmark_normalized,
                             name=f'100% {benchmark_ticker} Benchmark ({bench_return:+.1f}%)',
-                            line=dict(color='#ff4500', width=4, dash='dot'),  # Bright orange-red, very thick, dotted
+                            line=dict(
+                                color='#FF6600',  # Bright orange
+                                width=4,
+                                dash='longdash'  # Long dash pattern (very visible)
+                            ),
                             mode='lines',
+                            visible=True,
+                            connectgaps=False,
                             hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
                                          '<b>Benchmark Value:</b> $%{y:,.2f}<br>' +
                                          f'<b>Ticker:</b> {benchmark_ticker}<br>' +
                                          f'<b>Total Return:</b> {bench_return:+.1f}%<br>' +
                                          f'<b>Assumption:</b> 100% invested at start<br>' +
                                          '<extra></extra>'
-                        ))
+                        )
                         
                         # Prepare comparison message
                         portfolio_vs_bench = curr_v - bench_final_value
@@ -1679,7 +1686,7 @@ else:  # Portfolio Manager
                     else:
                         st.caption(f"⚠️ No benchmark data available for {benchmark_ticker}")
                 except Exception as e:
-                    st.caption(f"⚠️ Could not load benchmark {benchmark_ticker}")
+                    st.caption(f"⚠️ Could not load benchmark {benchmark_ticker}: {str(e)}")
             
             fig.update_layout(
                 hovermode='x unified',
@@ -1721,6 +1728,10 @@ else:  # Portfolio Manager
                 margin=dict(l=70, r=40, t=20, b=80)
             )
             
+            # Add benchmark trace LAST (after layout) so it renders on top
+            if benchmark_trace:
+                fig.add_trace(benchmark_trace)
+            
             st.plotly_chart(fig, use_container_width=True)
             
             # Chart Legend Explanation
@@ -1734,7 +1745,7 @@ else:  # Portfolio Manager
                 🟢 **Goal Path (Green dashed line)**  
                 Your target growth trajectory based on your yearly goal percentage. This shows where you *want* to be.
                 
-                🟠 **Benchmark (Orange dotted line)** *(if selected)*  
+                🟠 **Benchmark (Orange long-dash line)** *(if selected)*  
                 Shows what would happen if you invested 100% of your principal in the selected market index at profile creation date.  
                 **Key Assumption:** This assumes you invested all your money on day 1 (perfect timing, lump sum).
                 
@@ -1749,6 +1760,7 @@ else:  # Portfolio Manager
                 - If consistently below benchmark, passive investing (100% in index) might be simpler
                 - If above benchmark, your diversification strategy is working!
                 - Benchmark shows "perfect timing" (100% invested from day 1) - most people can't do this
+                - **Look for the ORANGE line** - it should be clearly visible on the chart
                 """)
             
             # Show benchmark comparison if available
