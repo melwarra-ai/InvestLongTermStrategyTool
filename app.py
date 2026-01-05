@@ -326,9 +326,8 @@ def calculate_average_cost(asset_data):
 
 def calculate_drift_status(p_data, prices):
     """
-    Two-phase drift detection:
-    Phase 1: Asset-level drift activates when asset is 100% allocated
-    Phase 2: Portfolio-level drift activates when ALL assets are 100%
+    Per-asset drift detection:
+    Check drift for ANY asset that is 100% deployed
     """
     p_assets = p_data.get("assets", {})
     if not p_assets:
@@ -338,30 +337,27 @@ def calculate_drift_status(p_data, prices):
     if curr_v == 0:
         return False, []
     
-    # Check if ALL assets are 100% allocated
-    all_assets_deployed = all(
-        a.get("allocated_pct", 0) >= 100.0 
-        for a in p_assets.values()
-    )
-    
-    # Portfolio drift only active when all assets deployed
-    if not all_assets_deployed:
-        return False, []
-    
     has_rebalanced = p_data.get("last_rebalanced") is not None
     recently_rebalanced = check_recently_rebalanced(p_data.get("last_rebalanced"))
-    
-    # Never rebalanced but 100% deployed = perfectly balanced, no drift
-    if not has_rebalanced:
-        return False, []
     
     # Recently rebalanced = don't check drift yet
     if recently_rebalanced:
         return False, []
     
-    # Check portfolio-level drift
+    # Check drift for each asset that is 100% deployed
     drift_details = []
     for t in p_assets:
+        allocated_pct = p_assets[t].get("allocated_pct", 0)
+        
+        # Skip if asset not fully deployed
+        if allocated_pct < 100.0:
+            continue
+        
+        # Skip if never rebalanced and at initial deployment
+        if not has_rebalanced:
+            continue
+        
+        # Check drift for this 100% deployed asset
         actual_pct = float((p_assets[t]["units"] * prices.get(t, 0) / curr_v * 100))
         target_pct = float(p_assets[t]["target"])
         drift = abs(actual_pct - target_pct)
@@ -575,6 +571,17 @@ with st.sidebar:
             # Progress bar
             if total_assets > 0:
                 deployment_progress = fully_deployed_count / total_assets
+                
+                # Green progress bar when 100% complete
+                if deployment_progress >= 1.0:
+                    st.markdown("""
+                        <style>
+                        div[data-testid="stProgress"] > div > div > div {
+                            background-color: #10b981 !important;
+                        }
+                        </style>
+                    """, unsafe_allow_html=True)
+                
                 st.progress(deployment_progress)
             
             if not deployable_assets:
@@ -1449,24 +1456,26 @@ else:  # Portfolio Manager
             prof_years = max((date.today() - prof_start_date.date()).days / 365.25, 0.01)
             profile_cagr = ((curr_v / start_val) ** (1 / prof_years) - 1) * 100 if start_val > 0 else 0
             
-            # Drift detection
+            # Drift detection - Check ANY asset that is 100% deployed
             recently_rebalanced = check_recently_rebalanced(prof.get("last_rebalanced"))
             needs_rebalance = False
             drift_assets = []
             
-            # Check if all assets are 100% deployed
-            all_assets_deployed = all(
-                asset_dict[t].get("allocated_pct", 0) >= 100.0 
-                for t in asset_dict
-            )
-            
-            # Only check drift if: (1) all assets deployed, (2) not recently rebalanced, (3) portfolio has value
-            # If never rebalanced but 100% deployed = perfectly balanced, no drift check needed
+            # Check drift for each asset that is 100% deployed
             has_rebalanced = prof.get("last_rebalanced") is not None
             
-            if all_assets_deployed and has_rebalanced and not recently_rebalanced and curr_v > 0:
+            if not recently_rebalanced and curr_v > 0:
                 for t in v_t:
-                    # Safe division - check curr_v is not zero
+                    # Only check drift if this asset is 100% deployed
+                    allocated_pct = asset_dict[t].get("allocated_pct", 0)
+                    
+                    # Skip if asset not fully deployed OR never rebalanced and at initial deployment
+                    if allocated_pct < 100.0:
+                        continue
+                    if allocated_pct >= 100.0 and not has_rebalanced:
+                        continue  # Initial deployment = perfect balance
+                    
+                    # Check drift for this 100% deployed asset
                     actual_pct = float((asset_dict[t]["units"] * data[t].iloc[-1] / curr_v * 100))
                     target_pct = float(asset_dict[t]["target"])
                     drift = float(abs(actual_pct - target_pct))
@@ -1923,12 +1932,12 @@ else:  # Portfolio Manager
                 st.markdown("#### 📋 Current Status")
                 if recently_rebalanced:
                     st.success("✅ **Balanced** (within 24 hours)")
-                elif not needs_rebalance:
-                    st.success("✅ **Balanced** (all assets within tolerance)")
                 elif needs_rebalance:
-                    st.warning("⚠️ **Rebalancing needed**")
+                    st.warning("⚠️ **Rebalancing needed** (drift detected)")
+                elif has_rebalanced:
+                    st.success("✅ **Balanced** (all assets within tolerance)")
                 else:
-                    st.info("⚪ **Not yet rebalanced**")
+                    st.info("📊 **Deployed** (monitoring for drift)")
                 
                 st.divider()
                 
