@@ -351,9 +351,9 @@ def calculate_drift_status(p_data, prices):
     has_rebalanced = p_data.get("last_rebalanced") is not None
     recently_rebalanced = check_recently_rebalanced(p_data.get("last_rebalanced"))
     
-    # Never rebalanced = needs rebalance
+    # Never rebalanced but 100% deployed = perfectly balanced, no drift
     if not has_rebalanced:
-        return True, []
+        return False, []
     
     # Recently rebalanced = don't check drift yet
     if recently_rebalanced:
@@ -511,11 +511,11 @@ with st.sidebar:
         
         benchmark_options = {
             "None": None,
-            "S&P 500 (SPY)": "SPY",
-            "NASDAQ-100 (QQQ)": "QQQ",
-            "Total Market (VTI)": "VTI",
-            "Russell 2000 (IWM)": "IWM",
-            "Dow Jones (DIA)": "DIA"
+            "S&P 500 (SPY) - Large Cap US Stocks": "SPY",
+            "NASDAQ-100 (QQQ) - Tech-Heavy Large Cap": "QQQ",
+            "Total Market (VTI) - All US Stocks": "VTI",
+            "Russell 2000 (IWM) - Small Cap US": "IWM",
+            "Dow Jones (DIA) - 30 Blue Chip Stocks": "DIA"
         }
         
         current_benchmark = prof.get('benchmark')
@@ -526,10 +526,11 @@ with st.sidebar:
                 break
         
         selected_benchmark = st.selectbox(
-            "Select Benchmark",
+            "Select Benchmark for Comparison",
             options=list(benchmark_options.keys()),
             index=benchmark_index,
-            key="benchmark_select"
+            key="benchmark_select",
+            help="Choose a market index to compare your portfolio's performance. The chart will show what would happen if you invested 100% in this benchmark."
         )
         
         if st.button("💾 Save Benchmark", use_container_width=True, key="save_benchmark"):
@@ -1158,13 +1159,26 @@ if view_mode == "🏠 Global Dashboard":
             
             p_flag = "🇺🇸" if p_data.get("currency") == "USD" else "🇨🇦"
             
+            # Check if all assets are 100% deployed
+            all_deployed = all(
+                asset.get("allocated_pct", 0) >= 100.0 
+                for asset in p_assets.values()
+            ) if p_assets else False
+            
             # Determine status
-            if not has_rebalanced and len(p_assets) > 0:
-                tile_class = "profile-tile-warning"
-                status_badge = '<span class="drift-badge">🚨 REBALANCE REQUIRED</span>'
-            elif not has_rebalanced:
+            if not all_deployed and len(p_assets) > 0:
+                # Assets exist but not fully deployed
                 tile_class = "profile-tile"
-                status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ Not Rebalanced</span>'
+                deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
+                status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">📥 Deploying ({deployed_count}/{len(p_assets)})</span>'
+            elif all_deployed and not has_rebalanced:
+                # 100% deployed but never rebalanced = perfect initial state
+                tile_class = "profile-tile-optimized"
+                status_badge = '<span class="success-badge">✅ Deployed</span>'
+            elif not has_rebalanced:
+                # No assets or other edge case
+                tile_class = "profile-tile"
+                status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
             elif recently_rebalanced:
                 tile_class = "profile-tile-optimized"
                 status_badge = '<span class="success-badge">✅ Balanced</span>'
@@ -1667,6 +1681,32 @@ else:  # Portfolio Manager
             )
             
             st.plotly_chart(fig, use_container_width=True)
+            
+            # Chart Legend Explanation
+            with st.expander("📊 Understanding This Chart", expanded=False):
+                st.markdown("""
+                **What the lines represent:**
+                
+                🔵 **Actual Portfolio (Blue solid line)**  
+                Your portfolio's real performance based on actual asset prices and your holdings.
+                
+                🟢 **Goal Path (Green dashed line)**  
+                Your target growth trajectory based on your yearly goal percentage. This shows where you *want* to be.
+                
+                🟠 **Benchmark (Orange dotted line)** *(if selected)*  
+                Shows what would happen if you invested 100% in the selected market index (SPY, QQQ, etc.) instead of your custom allocation.
+                
+                **How to use this:**
+                - **Above goal path?** 🎉 You're outperforming your target!
+                - **Below goal path?** 📉 May need to adjust strategy or goals
+                - **Above benchmark?** ✨ Your allocation is beating the market
+                - **Below benchmark?** 🤔 Consider if active management is worth it
+                
+                **Tips:**
+                - Short-term fluctuations are normal - focus on long-term trends
+                - If consistently below benchmark, passive investing (100% in benchmark) might be simpler
+                - If above benchmark, your diversification strategy is working!
+                """)
             
             # Show benchmark comparison if available
             if benchmark_comparison_msg:
