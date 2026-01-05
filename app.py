@@ -9,7 +9,7 @@ import os
 
 # ===== CONFIGURATION =====
 st.set_page_config(
-    page_title="AlphaStream Wealth Master",
+    page_title="Long Term Strategy Optimizer",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -377,8 +377,8 @@ if "active_profile" not in st.session_state:
 
 # ===== SIDEBAR =====
 with st.sidebar:
-    st.markdown("### 🛡️ AlphaStream")
-    st.caption("Wealth Management Suite v4.0")
+    st.markdown("### 📊 Portfolio Optimizer")
+    st.caption("Long Term Strategy Suite v5.0")
     
     st.divider()
     
@@ -1040,7 +1040,7 @@ if view_mode == "🏠 Global Dashboard":
     profiles = st.session_state.db.get("profiles", {})
     
     if not profiles:
-        st.info("👋 Welcome to AlphaStream! Create your first investment profile using the sidebar.")
+        st.info("👋 Welcome to Long Term Strategy Optimizer! Create your first investment profile using the sidebar.")
         
         st.markdown("### 🎯 Key Features")
         
@@ -1660,12 +1660,13 @@ else:  # Portfolio Manager
                         fig.add_trace(go.Scatter(
                             x=benchmark_data.index,
                             y=benchmark_normalized,
-                            name=f'100% in {benchmark_ticker} ({bench_return:+.1f}%)',
-                            line=dict(color='#f59e0b', width=2, dash='dot'),
+                            name=f'100% {benchmark_ticker} Benchmark ({bench_return:+.1f}%)',
+                            line=dict(color='#f59e0b', width=2.5, dash='dashdot'),
                             hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
                                          '<b>Value if 100% in Benchmark:</b> $%{y:,.2f}<br>' +
                                          f'<b>Benchmark:</b> {benchmark_ticker}<br>' +
                                          f'<b>Total Return:</b> {bench_return:+.1f}%<br>' +
+                                         f'<b>Assumption:</b> 100% principal invested at profile start<br>' +
                                          '<extra></extra>'
                         ))
                         
@@ -1681,9 +1682,15 @@ else:  # Portfolio Manager
                     st.caption(f"⚠️ Could not load benchmark {benchmark_ticker}")
             
             fig.update_layout(
+                title=dict(
+                    text='Portfolio Performance Comparison',
+                    font=dict(size=18, color='#1e293b'),
+                    x=0.5,
+                    xanchor='center'
+                ),
                 hovermode='x unified',
                 plot_bgcolor='white',
-                height=550,
+                height=600,
                 hoverlabel=dict(
                     bgcolor="white",
                     font_size=14,
@@ -1694,23 +1701,29 @@ else:  # Portfolio Manager
                     showgrid=True,
                     gridcolor='#f1f5f9',
                     title='Date',
-                    title_font=dict(size=14, color='#64748b')
+                    title_font=dict(size=14, color='#64748b'),
+                    tickfont=dict(size=11)
                 ),
                 yaxis=dict(
                     showgrid=True,
                     gridcolor='#f1f5f9',
                     title='Portfolio Value ($)',
-                    title_font=dict(size=14, color='#64748b')
+                    title_font=dict(size=14, color='#64748b'),
+                    tickfont=dict(size=11),
+                    tickformat='$,.0f'
                 ),
                 legend=dict(
                     orientation="h",
                     yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1,
-                    font=dict(size=12)
+                    y=1.05,
+                    xanchor="center",
+                    x=0.5,
+                    font=dict(size=13),
+                    bgcolor='rgba(255, 255, 255, 0.9)',
+                    bordercolor='#e2e8f0',
+                    borderwidth=1
                 ),
-                margin=dict(l=60, r=40, t=40, b=60)
+                margin=dict(l=70, r=40, t=80, b=60)
             )
             
             st.plotly_chart(fig, use_container_width=True)
@@ -1726,8 +1739,8 @@ else:  # Portfolio Manager
                 🟢 **Goal Path (Green dashed line)**  
                 Your target growth trajectory based on your yearly goal percentage. This shows where you *want* to be.
                 
-                🟠 **Benchmark (Orange dotted line)** *(if selected)*  
-                Shows what would happen if you invested 100% in the selected market index (SPY, QQQ, etc.) instead of your custom allocation.
+                🟠 **Benchmark (Orange dash-dot line)** *(if selected)*  
+                Shows what would happen if you invested 100% of your principal in the selected market index at profile creation date. This provides a "buy and hold" comparison baseline.
                 
                 **How to use this:**
                 - **Above goal path?** 🎉 You're outperforming your target!
@@ -1739,6 +1752,7 @@ else:  # Portfolio Manager
                 - Short-term fluctuations are normal - focus on long-term trends
                 - If consistently below benchmark, passive investing (100% in benchmark) might be simpler
                 - If above benchmark, your diversification strategy is working!
+                - Benchmark assumes 100% invested from day 1 (unrealistic but useful comparison)
                 """)
             
             # Show benchmark comparison if available
@@ -2078,7 +2092,7 @@ else:  # Portfolio Manager
 st.divider()
 st.markdown("""
     <div style="text-align: center; color: #64748b; padding: 20px;">
-        <p><strong>AlphaStream Wealth Master</strong> • v4.0</p>
+        <p><strong>Long Term Strategy Optimizer</strong> • v5.0</p>
         <p style="font-size: 0.85rem;">Market data by Yahoo Finance • For informational purposes only</p>
     </div>
 """, unsafe_allow_html=True)
