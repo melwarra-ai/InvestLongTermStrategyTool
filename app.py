@@ -1408,10 +1408,27 @@ else:  # Portfolio Manager
             curr_v = float(daily_val.iloc[-1])
             start_val = float(prof['principal'])
             
+            # Check for zero portfolio value
+            if curr_v <= 0:
+                st.warning("⚠️ **Portfolio value is zero**")
+                st.info("""
+                    Your portfolio shows zero value. This can happen if:
+                    - You haven't entered any units for your assets yet
+                    - Asset deployment is not complete
+                    
+                    **Next steps:**
+                    1. Go to **💰 Asset Deployment** section
+                    2. Record your capital deployments for each asset
+                    3. The system will automatically calculate units based on purchase prices
+                """)
+                st.stop()
+            
             years = max((data.index[-1] - data.index[0]).days / 365.25, 0.01)
             target_val = start_val * (1 + (float(prof['yearly_goal_pct'])/100))**years
-            perc_diff = ((curr_v / target_val) - 1) * 100
-            roi_pct = ((curr_v / start_val) - 1) * 100
+            
+            # Safe division with zero checks
+            perc_diff = ((curr_v / target_val) - 1) * 100 if target_val > 0 else 0
+            roi_pct = ((curr_v / start_val) - 1) * 100 if start_val > 0 else 0
             
             # Calculate CAGR
             prof_start_date = datetime.strptime(prof.get('start_date', str(date.today())), '%Y-%m-%d')
@@ -1423,8 +1440,9 @@ else:  # Portfolio Manager
             needs_rebalance = False
             drift_assets = []
             
-            if not recently_rebalanced:
+            if not recently_rebalanced and curr_v > 0:
                 for t in v_t:
+                    # Safe division - check curr_v is not zero
                     actual_pct = float((asset_dict[t]["units"] * data[t].iloc[-1] / curr_v * 100))
                     target_pct = float(asset_dict[t]["target"])
                     drift = float(abs(actual_pct - target_pct))
@@ -1607,9 +1625,9 @@ else:  # Portfolio Manager
                         # Prepare comparison message
                         portfolio_vs_bench = curr_v - bench_final_value
                         if portfolio_vs_bench > 0:
-                            benchmark_comparison_msg = ("success", f"📊 Your portfolio outperformed {benchmark_ticker} by ${portfolio_vs_bench:,.0f} ({((curr_v/bench_final_value - 1)*100):+.1f}%)")
+                            benchmark_comparison_msg = ("success", f"📊 Your portfolio outperformed {benchmark_ticker} by ${portfolio_vs_bench:,.0f} ({((curr_v/bench_final_value - 1)*100):+.1f}%)" if bench_final_value > 0 else f"📊 Your portfolio: ${curr_v:,.0f}")
                         else:
-                            benchmark_comparison_msg = ("info", f"📊 {benchmark_ticker} outperformed your portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)")
+                            benchmark_comparison_msg = ("info", f"📊 {benchmark_ticker} outperformed your portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)" if curr_v > 0 else f"📊 Benchmark: ${bench_final_value:,.0f}")
                     else:
                         st.caption(f"⚠️ No benchmark data available for {benchmark_ticker}")
                 except Exception as e:
@@ -1710,11 +1728,11 @@ else:  # Portfolio Manager
                 avg_cost_display = f"${avg_cost:.2f}" if avg_cost is not None else "Pending"
                 
                 act_val = cur_u * current_price
-                act_w = (act_val / curr_v * 100)
+                act_w = (act_val / curr_v * 100) if curr_v > 0 else 0
                 drift = act_w - tar_w
                 
                 tar_val = (tar_w / 100) * curr_v
-                tar_u = tar_val / current_price
+                tar_u = tar_val / current_price if current_price > 0 else 0
                 
                 val_diff = tar_val - act_val
                 unit_diff = tar_u - cur_u
