@@ -1646,6 +1646,7 @@ else:  # Portfolio Manager
             
             if benchmark_ticker:
                 try:
+                    st.caption(f"🔍 Fetching benchmark data for {benchmark_ticker}...")
                     benchmark_raw = yf.download(benchmark_ticker, start=prof["start_date"], auto_adjust=True, progress=False)
                     if not benchmark_raw.empty:
                         benchmark_data = benchmark_raw['Close']
@@ -1655,23 +1656,28 @@ else:  # Portfolio Manager
                         bench_return = ((float(benchmark_normalized.iloc[-1]) / start_val) - 1) * 100
                         bench_final_value = float(benchmark_normalized.iloc[-1])
                         
-                        # ADD TRACE IMMEDIATELY - don't store it
+                        # Debug info
+                        st.caption(f"✅ Benchmark data loaded: {len(benchmark_normalized)} points, range ${benchmark_normalized.min():.0f} to ${benchmark_normalized.max():.0f}")
+                        
+                        # ADD TRACE IMMEDIATELY - Try MAGENTA color for maximum visibility
                         fig.add_trace(go.Scatter(
                             x=benchmark_data.index,
                             y=benchmark_normalized,
                             name=f'100% {benchmark_ticker} Benchmark ({bench_return:+.1f}%)',
                             line=dict(
-                                color='#FF6600',
-                                width=5,
+                                color='#FF00FF',  # MAGENTA - impossible to miss!
+                                width=6,           # Even thicker!
                                 dash='solid'
                             ),
                             mode='lines',
                             hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
                                          '<b>Benchmark Value:</b> $%{y:,.2f}<br>' +
                                          f'<b>Ticker:</b> {benchmark_ticker}<br>' +
-                                         f'<b>Total Return:</b> {bench_return:+.1f}%<br>' +
+                                         f'<b>Return:</b> {bench_return:+.1f}%<br>' +
                                          '<extra></extra>'
                         ))
+                        
+                        st.caption(f"✅ Benchmark trace added to chart")
                         
                         # Comparison message
                         portfolio_vs_bench = curr_v - bench_final_value
@@ -1680,9 +1686,9 @@ else:  # Portfolio Manager
                         else:
                             benchmark_comparison_msg = ("info", f"📊 {benchmark_ticker} outperformed your portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)" if curr_v > 0 else f"📊 Benchmark: ${bench_final_value:,.0f}")
                     else:
-                        st.caption(f"⚠️ No benchmark data for {benchmark_ticker}")
+                        st.error(f"⚠️ No benchmark data for {benchmark_ticker}")
                 except Exception as e:
-                    st.caption(f"⚠️ Benchmark error: {str(e)}")
+                    st.error(f"⚠️ Benchmark error: {str(e)}")
             
             fig.update_layout(
                 hovermode='x unified',
@@ -1735,23 +1741,18 @@ else:  # Portfolio Manager
                 Your portfolio's real performance based on actual asset prices and your holdings.
                 
                 🟢 **Goal Path (Green dashed line)**  
-                Your target growth trajectory based on your yearly goal percentage. This shows where you *want* to be.
+                Your target growth trajectory based on your yearly goal percentage.
                 
-                🟠 **Benchmark (Orange SOLID line)** *(if selected)*  
-                Shows what would happen if you invested 100% of your principal in the selected market index at profile creation date.  
-                **Key:** This is a THICK ORANGE SOLID LINE - should be very easy to see!  
-                **Assumption:** 100% invested on day 1 (perfect timing, lump sum).
+                🟣 **Benchmark (MAGENTA/PINK solid line)** *(if selected)*  
+                Shows what would happen if you invested 100% in the market index at profile start.  
+                **This should be a VERY THICK BRIGHT PINK/MAGENTA LINE - 6px width!**  
+                If you don't see it, there may be a Plotly rendering bug.
                 
-                **How to use this:**
-                - **Above goal path?** 🎉 You're outperforming your target!
-                - **Below goal path?** 📉 May need to adjust strategy or goals
-                - **Above benchmark?** ✨ Your allocation is beating the market
-                - **Below benchmark?** 🤔 Consider if active management adds value
-                
-                **Tips:**
-                - Short-term fluctuations are normal - focus on long-term trends
-                - Benchmark shows "perfect timing" (100% invested from day 1)
-                - **The orange line should be clearly visible** - if not, report a bug!
+                **Troubleshooting:**
+                - Check debug messages above the chart for data loading info
+                - Try clicking legend items to hide/show lines
+                - Look for ANY pink/magenta color on the chart
+                - Check if line is outside the visible Y-axis range
                 """)
             
             # Show benchmark comparison if available
