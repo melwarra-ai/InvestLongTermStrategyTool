@@ -1651,33 +1651,35 @@ else:  # Portfolio Manager
                     if not benchmark_raw.empty:
                         benchmark_data = benchmark_raw['Close']
                         
-                        # Normalize benchmark to start value
-                        benchmark_normalized = (benchmark_data / float(benchmark_data.iloc[0])) * start_val
-                        bench_return = ((float(benchmark_normalized.iloc[-1]) / start_val) - 1) * 100
+                        # Normalize benchmark to start value - ENSURE SCALAR VALUES
+                        first_price = float(benchmark_data.iloc[0])
+                        last_price = float(benchmark_data.iloc[-1])
+                        benchmark_normalized = (benchmark_data / first_price) * start_val
+                        bench_return = ((last_price / first_price) - 1) * 100
                         bench_final_value = float(benchmark_normalized.iloc[-1])
                         
                         # Debug info
-                        st.caption(f"✅ Benchmark data loaded: {len(benchmark_normalized)} points, range ${benchmark_normalized.min():.0f} to ${benchmark_normalized.max():.0f}")
+                        st.caption(f"✅ Benchmark loaded: {len(benchmark_normalized)} points, ${float(benchmark_normalized.min()):,.0f} to ${float(benchmark_normalized.max()):,.0f}, return: {bench_return:.1f}%")
                         
-                        # ADD TRACE IMMEDIATELY - Try MAGENTA color for maximum visibility
+                        # ADD TRACE - with fixed formatting
                         fig.add_trace(go.Scatter(
                             x=benchmark_data.index,
                             y=benchmark_normalized,
                             name=f'100% {benchmark_ticker} Benchmark ({bench_return:+.1f}%)',
                             line=dict(
-                                color='#FF00FF',  # MAGENTA - impossible to miss!
-                                width=6,           # Even thicker!
+                                color='#FF00FF',  # MAGENTA
+                                width=6,
                                 dash='solid'
                             ),
                             mode='lines',
                             hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
-                                         '<b>Benchmark Value:</b> $%{y:,.2f}<br>' +
+                                         '<b>Benchmark Value:</b> $%{y:,.0f}<br>' +
                                          f'<b>Ticker:</b> {benchmark_ticker}<br>' +
                                          f'<b>Return:</b> {bench_return:+.1f}%<br>' +
                                          '<extra></extra>'
                         ))
                         
-                        st.caption(f"✅ Benchmark trace added to chart")
+                        st.success(f"✅ Benchmark trace added successfully!")
                         
                         # Comparison message
                         portfolio_vs_bench = curr_v - bench_final_value
@@ -1689,6 +1691,8 @@ else:  # Portfolio Manager
                         st.error(f"⚠️ No benchmark data for {benchmark_ticker}")
                 except Exception as e:
                     st.error(f"⚠️ Benchmark error: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
             
             fig.update_layout(
                 hovermode='x unified',
