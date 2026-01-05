@@ -1454,7 +1454,17 @@ else:  # Portfolio Manager
             needs_rebalance = False
             drift_assets = []
             
-            if not recently_rebalanced and curr_v > 0:
+            # Check if all assets are 100% deployed
+            all_assets_deployed = all(
+                asset_dict[t].get("allocated_pct", 0) >= 100.0 
+                for t in asset_dict
+            )
+            
+            # Only check drift if: (1) all assets deployed, (2) not recently rebalanced, (3) portfolio has value
+            # If never rebalanced but 100% deployed = perfectly balanced, no drift check needed
+            has_rebalanced = prof.get("last_rebalanced") is not None
+            
+            if all_assets_deployed and has_rebalanced and not recently_rebalanced and curr_v > 0:
                 for t in v_t:
                     # Safe division - check curr_v is not zero
                     actual_pct = float((asset_dict[t]["units"] * data[t].iloc[-1] / curr_v * 100))
