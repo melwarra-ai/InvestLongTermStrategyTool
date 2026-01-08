@@ -1618,7 +1618,6 @@ else:  # Portfolio Manager
             
             if benchmark_ticker:
                 try:
-                    st.caption(f"🔍 Fetching benchmark data for {benchmark_ticker}...")
                     benchmark_raw = yf.download(benchmark_ticker, start=prof["start_date"], auto_adjust=True, progress=False)
                     if not benchmark_raw.empty:
                         benchmark_data = benchmark_raw['Close']
@@ -1634,46 +1633,36 @@ else:  # Portfolio Manager
                         if len(benchmark_data) == 0:
                             st.error(f"⚠️ No valid benchmark data for {benchmark_ticker}")
                         else:
-                            # Normalize benchmark to start value - ENSURE SCALAR VALUES
+                            # Normalize benchmark to start value
                             first_price = float(benchmark_data.iloc[0])
                             last_price = float(benchmark_data.iloc[-1])
                             benchmark_normalized = (benchmark_data / first_price) * start_val
                             bench_return = ((last_price / first_price) - 1) * 100
                             bench_final_value = float(benchmark_normalized.iloc[-1])
                             
-                            # Debug info
-                            st.caption(f"✅ Benchmark loaded: {len(benchmark_normalized)} points, ${float(benchmark_normalized.min()):,.0f} to ${float(benchmark_normalized.max()):,.0f}, return: {bench_return:.1f}%")
-                            
-                            # FIX: Convert to flat lists for Plotly compatibility
-                            # Use .tolist() on Series (not DataFrame) to ensure flat array
+                            # Convert to flat lists for Plotly compatibility
                             bench_dates = benchmark_normalized.index.tolist()
-                            bench_values = benchmark_normalized.tolist()  # Series.tolist() gives flat list
-                            
-                            # Debug: Verify data shape
-                            st.caption(f"📊 Data converted: {len(bench_dates)} dates, {len(bench_values)} values")
-                            st.caption(f"📊 Sample values: first={bench_values[0]:.2f}, last={bench_values[-1]:.2f}")
+                            bench_values = benchmark_normalized.tolist()
                         
-                            # ADD TRACE - with proper data format (INSIDE else block)
+                            # Add benchmark trace
                             fig.add_trace(go.Scatter(
-                                x=bench_dates,              # Convert to list
-                                y=bench_values,             # Convert to list
+                                x=bench_dates,
+                                y=bench_values,
                                 name=f'100% {benchmark_ticker} Benchmark ({bench_return:+.1f}%)',
                                 line=dict(
-                                    color='#FF0000',      # BRIGHT RED
-                                    width=8,              # VERY THICK
-                                    dash='solid'          # SOLID LINE
+                                    color='#ef4444',
+                                    width=2,
+                                    dash='dot'
                                 ),
                                 mode='lines',
-                                visible=True,             # Explicitly visible
-                                showlegend=True,          # Show in legend
+                                visible=True,
+                                showlegend=True,
                                 hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
                                              '<b>Benchmark Value:</b> $%{y:,.0f}<br>' +
                                              f'<b>Ticker:</b> {benchmark_ticker}<br>' +
                                              f'<b>Return:</b> {bench_return:+.1f}%<br>' +
                                              '<extra></extra>'
                             ))
-                            
-                            st.success(f"✅ Benchmark trace added successfully! (RED line, 8px thick)")
                             
                             # Comparison message
                             portfolio_vs_bench = curr_v - bench_final_value
@@ -1763,26 +1752,19 @@ else:  # Portfolio Manager
                 st.markdown("""
                 **What the lines represent:**
                 
-                🔴 **Benchmark (BRIGHT RED SOLID line - 8px THICK)** *(if selected)* - **LOOK FOR THIS FIRST!**  
-                Shows what would happen if you invested 100% in the market index at profile start.  
-                **This is the THICKEST line on the chart - bright red, solid, 8px width!**  
-                Should be impossible to miss if rendering correctly.
+                🔴 **Benchmark (Red dotted line)** *(if selected)*  
+                Shows what would happen if you invested 100% in the market index at profile start.
                 
-                🔵 **Actual Portfolio (Blue solid line - 3px)**  
+                🔵 **Actual Portfolio (Blue solid line)**  
                 Your portfolio's real performance based on actual asset prices and your holdings.
                 
-                🟢 **Goal Path (Green dashed line - 2px)**  
+                🟢 **Goal Path (Green dashed line)**  
                 Your target growth trajectory based on your yearly goal percentage.
                 
-                **Troubleshooting if you still don't see the red line:**
-                - Check debug messages above chart (should say "trace added successfully")
-                - Click "Actual Portfolio" in legend to hide blue line
-                - Click "Goal Path" in legend to hide green line
-                - With both hidden, you should ONLY see the thick red line
-                - The red line should be around $9k-$12k range based on your data
-                - Try zooming out on the chart (reset zoom button in top right)
-                
-                **Pro tip:** The red line being 8px thick means it's almost 3x thicker than your portfolio line - you really can't miss it if it's rendering!
+                **Tips:**
+                - Click any legend item to show/hide that line
+                - Hover over the chart to see exact values at any date
+                - Use the toolbar to zoom, pan, or save the chart
                 """)
             
             # Show benchmark comparison if available
