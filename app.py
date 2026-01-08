@@ -1623,64 +1623,50 @@ else:  # Portfolio Manager
                     if not benchmark_raw.empty:
                         benchmark_data = benchmark_raw['Close']
                         
-                        # FIX: Handle both DataFrame and Series from yfinance
-                        # Newer yfinance versions return DataFrame even for single ticker
-                        if isinstance(benchmark_data, pd.DataFrame):
-                            benchmark_data = benchmark_data.squeeze()  # Convert to Series
+                        # Normalize benchmark to start value - ENSURE SCALAR VALUES
+                        first_price = float(benchmark_data.iloc[0])
+                        last_price = float(benchmark_data.iloc[-1])
+                        benchmark_normalized = (benchmark_data / first_price) * start_val
+                        bench_return = ((last_price / first_price) - 1) * 100
+                        bench_final_value = float(benchmark_normalized.iloc[-1])
                         
-                        # Ensure we have a proper Series with numeric values
-                        benchmark_data = benchmark_data.dropna()
+                        # Debug info
+                        st.caption(f"✅ Benchmark loaded: {len(benchmark_normalized)} points, ${float(benchmark_normalized.min()):,.0f} to ${float(benchmark_normalized.max()):,.0f}, return: {bench_return:.1f}%")
                         
-                        if len(benchmark_data) == 0:
-                            st.error(f"⚠️ No valid benchmark data for {benchmark_ticker}")
+                        # Convert to lists for Plotly compatibility
+                        bench_dates = benchmark_data.index.tolist()
+                        bench_values = benchmark_normalized.values.tolist()
+                        
+                        st.caption(f"📊 Data converted: {len(bench_dates)} dates, {len(bench_values)} values")
+                        
+                        # ADD TRACE - with proper data format
+                        fig.add_trace(go.Scatter(
+                            x=bench_dates,              # Convert to list
+                            y=bench_values,             # Convert to list
+                            name=f'100% {benchmark_ticker} Benchmark ({bench_return:+.1f}%)',
+                            line=dict(
+                                color='#FF0000',      # BRIGHT RED
+                                width=8,              # VERY THICK
+                                dash='solid'          # SOLID LINE
+                            ),
+                            mode='lines',
+                            visible=True,             # Explicitly visible
+                            showlegend=True,          # Show in legend
+                            hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
+                                         '<b>Benchmark Value:</b> $%{y:,.0f}<br>' +
+                                         f'<b>Ticker:</b> {benchmark_ticker}<br>' +
+                                         f'<b>Return:</b> {bench_return:+.1f}%<br>' +
+                                         '<extra></extra>'
+                        ))
+                        
+                        st.success(f"✅ Benchmark trace added successfully! (RED line, 8px thick)")
+                        
+                        # Comparison message
+                        portfolio_vs_bench = curr_v - bench_final_value
+                        if portfolio_vs_bench > 0:
+                            benchmark_comparison_msg = ("success", f"📊 Your portfolio outperformed {benchmark_ticker} by ${portfolio_vs_bench:,.0f} ({((curr_v/bench_final_value - 1)*100):+.1f}%)" if bench_final_value > 0 else f"📊 Your portfolio: ${curr_v:,.0f}")
                         else:
-                            # Normalize benchmark to start value - ENSURE SCALAR VALUES
-                            first_price = float(benchmark_data.iloc[0])
-                            last_price = float(benchmark_data.iloc[-1])
-                            benchmark_normalized = (benchmark_data / first_price) * start_val
-                            bench_return = ((last_price / first_price) - 1) * 100
-                            bench_final_value = float(benchmark_normalized.iloc[-1])
-                            
-                            # Debug info
-                            st.caption(f"✅ Benchmark loaded: {len(benchmark_normalized)} points, ${float(benchmark_normalized.min()):,.0f} to ${float(benchmark_normalized.max()):,.0f}, return: {bench_return:.1f}%")
-                            
-                            # FIX: Convert to flat lists for Plotly compatibility
-                            # Use .tolist() on Series (not DataFrame) to ensure flat array
-                            bench_dates = benchmark_normalized.index.tolist()
-                            bench_values = benchmark_normalized.tolist()  # Series.tolist() gives flat list
-                            
-                            # Debug: Verify data shape
-                            st.caption(f"📊 Data converted: {len(bench_dates)} dates, {len(bench_values)} values")
-                            st.caption(f"📊 Sample values: first={bench_values[0]:.2f}, last={bench_values[-1]:.2f}")
-                        
-                            # ADD TRACE - with proper data format (INSIDE else block)
-                            fig.add_trace(go.Scatter(
-                                x=bench_dates,              # Convert to list
-                                y=bench_values,             # Convert to list
-                                name=f'100% {benchmark_ticker} Benchmark ({bench_return:+.1f}%)',
-                                line=dict(
-                                    color='#FF0000',      # BRIGHT RED
-                                    width=8,              # VERY THICK
-                                    dash='solid'          # SOLID LINE
-                                ),
-                                mode='lines',
-                                visible=True,             # Explicitly visible
-                                showlegend=True,          # Show in legend
-                                hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
-                                             '<b>Benchmark Value:</b> $%{y:,.0f}<br>' +
-                                             f'<b>Ticker:</b> {benchmark_ticker}<br>' +
-                                             f'<b>Return:</b> {bench_return:+.1f}%<br>' +
-                                             '<extra></extra>'
-                            ))
-                            
-                            st.success(f"✅ Benchmark trace added successfully! (RED line, 8px thick)")
-                            
-                            # Comparison message
-                            portfolio_vs_bench = curr_v - bench_final_value
-                            if portfolio_vs_bench > 0:
-                                benchmark_comparison_msg = ("success", f"📊 Your portfolio outperformed {benchmark_ticker} by ${portfolio_vs_bench:,.0f} ({((curr_v/bench_final_value - 1)*100):+.1f}%)" if bench_final_value > 0 else f"📊 Your portfolio: ${curr_v:,.0f}")
-                            else:
-                                benchmark_comparison_msg = ("info", f"📊 {benchmark_ticker} outperformed your portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)" if curr_v > 0 else f"📊 Benchmark: ${bench_final_value:,.0f}")
+                            benchmark_comparison_msg = ("info", f"📊 {benchmark_ticker} outperformed your portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)" if curr_v > 0 else f"📊 Benchmark: ${bench_final_value:,.0f}")
                     else:
                         st.error(f"⚠️ No benchmark data for {benchmark_ticker}")
                 except Exception as e:
