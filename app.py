@@ -1612,7 +1612,69 @@ else:  # Portfolio Manager
             
             fig = go.Figure()
             
-            # Actual portfolio
+            # Benchmark comparison - ADD FIRST so it renders in background
+            benchmark_ticker = prof.get('benchmark')
+            benchmark_comparison_msg = None
+            
+            if benchmark_ticker:
+                try:
+                    st.caption(f"🔍 Fetching benchmark data for {benchmark_ticker}...")
+                    benchmark_raw = yf.download(benchmark_ticker, start=prof["start_date"], auto_adjust=True, progress=False)
+                    if not benchmark_raw.empty:
+                        benchmark_data = benchmark_raw['Close']
+                        
+                        # Normalize benchmark to start value - ENSURE SCALAR VALUES
+                        first_price = float(benchmark_data.iloc[0])
+                        last_price = float(benchmark_data.iloc[-1])
+                        benchmark_normalized = (benchmark_data / first_price) * start_val
+                        bench_return = ((last_price / first_price) - 1) * 100
+                        bench_final_value = float(benchmark_normalized.iloc[-1])
+                        
+                        # Debug info
+                        st.caption(f"✅ Benchmark loaded: {len(benchmark_normalized)} points, ${float(benchmark_normalized.min()):,.0f} to ${float(benchmark_normalized.max()):,.0f}, return: {bench_return:.1f}%")
+                        
+                        # Convert to lists for Plotly compatibility
+                        bench_dates = benchmark_data.index.tolist()
+                        bench_values = benchmark_normalized.values.tolist()
+                        
+                        st.caption(f"📊 Data converted: {len(bench_dates)} dates, {len(bench_values)} values")
+                        
+                        # ADD TRACE - with proper data format
+                        fig.add_trace(go.Scatter(
+                            x=bench_dates,              # Convert to list
+                            y=bench_values,             # Convert to list
+                            name=f'100% {benchmark_ticker} Benchmark ({bench_return:+.1f}%)',
+                            line=dict(
+                                color='#FF0000',      # BRIGHT RED
+                                width=8,              # VERY THICK
+                                dash='solid'          # SOLID LINE
+                            ),
+                            mode='lines',
+                            visible=True,             # Explicitly visible
+                            showlegend=True,          # Show in legend
+                            hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
+                                         '<b>Benchmark Value:</b> $%{y:,.0f}<br>' +
+                                         f'<b>Ticker:</b> {benchmark_ticker}<br>' +
+                                         f'<b>Return:</b> {bench_return:+.1f}%<br>' +
+                                         '<extra></extra>'
+                        ))
+                        
+                        st.success(f"✅ Benchmark trace added successfully! (RED line, 8px thick)")
+                        
+                        # Comparison message
+                        portfolio_vs_bench = curr_v - bench_final_value
+                        if portfolio_vs_bench > 0:
+                            benchmark_comparison_msg = ("success", f"📊 Your portfolio outperformed {benchmark_ticker} by ${portfolio_vs_bench:,.0f} ({((curr_v/bench_final_value - 1)*100):+.1f}%)" if bench_final_value > 0 else f"📊 Your portfolio: ${curr_v:,.0f}")
+                        else:
+                            benchmark_comparison_msg = ("info", f"📊 {benchmark_ticker} outperformed your portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)" if curr_v > 0 else f"📊 Benchmark: ${bench_final_value:,.0f}")
+                    else:
+                        st.error(f"⚠️ No benchmark data for {benchmark_ticker}")
+                except Exception as e:
+                    st.error(f"⚠️ Benchmark error: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
+            
+            # Actual portfolio (renders ON TOP of benchmark)
             fig.add_trace(go.Scatter(
                 x=data.index,
                 y=daily_val,
@@ -1639,60 +1701,6 @@ else:  # Portfolio Manager
                              f'<b>Goal Rate:</b> {prof["yearly_goal_pct"]}% annually<br>' +
                              '<extra></extra>'
             ))
-            
-            # Benchmark comparison - ADD IMMEDIATELY after fetching
-            benchmark_ticker = prof.get('benchmark')
-            benchmark_comparison_msg = None
-            
-            if benchmark_ticker:
-                try:
-                    st.caption(f"🔍 Fetching benchmark data for {benchmark_ticker}...")
-                    benchmark_raw = yf.download(benchmark_ticker, start=prof["start_date"], auto_adjust=True, progress=False)
-                    if not benchmark_raw.empty:
-                        benchmark_data = benchmark_raw['Close']
-                        
-                        # Normalize benchmark to start value - ENSURE SCALAR VALUES
-                        first_price = float(benchmark_data.iloc[0])
-                        last_price = float(benchmark_data.iloc[-1])
-                        benchmark_normalized = (benchmark_data / first_price) * start_val
-                        bench_return = ((last_price / first_price) - 1) * 100
-                        bench_final_value = float(benchmark_normalized.iloc[-1])
-                        
-                        # Debug info
-                        st.caption(f"✅ Benchmark loaded: {len(benchmark_normalized)} points, ${float(benchmark_normalized.min()):,.0f} to ${float(benchmark_normalized.max()):,.0f}, return: {bench_return:.1f}%")
-                        
-                        # ADD TRACE - with fixed formatting
-                        fig.add_trace(go.Scatter(
-                            x=benchmark_data.index,
-                            y=benchmark_normalized,
-                            name=f'100% {benchmark_ticker} Benchmark ({bench_return:+.1f}%)',
-                            line=dict(
-                                color='#FF00FF',  # MAGENTA
-                                width=6,
-                                dash='solid'
-                            ),
-                            mode='lines',
-                            hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
-                                         '<b>Benchmark Value:</b> $%{y:,.0f}<br>' +
-                                         f'<b>Ticker:</b> {benchmark_ticker}<br>' +
-                                         f'<b>Return:</b> {bench_return:+.1f}%<br>' +
-                                         '<extra></extra>'
-                        ))
-                        
-                        st.success(f"✅ Benchmark trace added successfully!")
-                        
-                        # Comparison message
-                        portfolio_vs_bench = curr_v - bench_final_value
-                        if portfolio_vs_bench > 0:
-                            benchmark_comparison_msg = ("success", f"📊 Your portfolio outperformed {benchmark_ticker} by ${portfolio_vs_bench:,.0f} ({((curr_v/bench_final_value - 1)*100):+.1f}%)" if bench_final_value > 0 else f"📊 Your portfolio: ${curr_v:,.0f}")
-                        else:
-                            benchmark_comparison_msg = ("info", f"📊 {benchmark_ticker} outperformed your portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)" if curr_v > 0 else f"📊 Benchmark: ${bench_final_value:,.0f}")
-                    else:
-                        st.error(f"⚠️ No benchmark data for {benchmark_ticker}")
-                except Exception as e:
-                    st.error(f"⚠️ Benchmark error: {str(e)}")
-                    import traceback
-                    st.code(traceback.format_exc())
             
             fig.update_layout(
                 hovermode='x unified',
@@ -1741,22 +1749,26 @@ else:  # Portfolio Manager
                 st.markdown("""
                 **What the lines represent:**
                 
-                🔵 **Actual Portfolio (Blue solid line)**  
+                🔴 **Benchmark (BRIGHT RED SOLID line - 8px THICK)** *(if selected)* - **LOOK FOR THIS FIRST!**  
+                Shows what would happen if you invested 100% in the market index at profile start.  
+                **This is the THICKEST line on the chart - bright red, solid, 8px width!**  
+                Should be impossible to miss if rendering correctly.
+                
+                🔵 **Actual Portfolio (Blue solid line - 3px)**  
                 Your portfolio's real performance based on actual asset prices and your holdings.
                 
-                🟢 **Goal Path (Green dashed line)**  
+                🟢 **Goal Path (Green dashed line - 2px)**  
                 Your target growth trajectory based on your yearly goal percentage.
                 
-                🟣 **Benchmark (MAGENTA/PINK solid line)** *(if selected)*  
-                Shows what would happen if you invested 100% in the market index at profile start.  
-                **This should be a VERY THICK BRIGHT PINK/MAGENTA LINE - 6px width!**  
-                If you don't see it, there may be a Plotly rendering bug.
+                **Troubleshooting if you still don't see the red line:**
+                - Check debug messages above chart (should say "trace added successfully")
+                - Click "Actual Portfolio" in legend to hide blue line
+                - Click "Goal Path" in legend to hide green line
+                - With both hidden, you should ONLY see the thick red line
+                - The red line should be around $9k-$12k range based on your data
+                - Try zooming out on the chart (reset zoom button in top right)
                 
-                **Troubleshooting:**
-                - Check debug messages above the chart for data loading info
-                - Try clicking legend items to hide/show lines
-                - Look for ANY pink/magenta color on the chart
-                - Check if line is outside the visible Y-axis range
+                **Pro tip:** The red line being 8px thick means it's almost 3x thicker than your portfolio line - you really can't miss it if it's rendering!
                 """)
             
             # Show benchmark comparison if available
