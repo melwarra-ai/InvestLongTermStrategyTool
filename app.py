@@ -7,6 +7,11 @@ from datetime import datetime, date, timedelta
 import json
 import os
 
+# ===== VERSION INFORMATION =====
+VERSION = "5.5"
+VERSION_DATE = "2026-01-08"
+VERSION_NAME = "Stable Benchmark Release"
+
 # ===== CONFIGURATION =====
 st.set_page_config(
     page_title="Long Term Strategy Optimizer",
@@ -378,7 +383,7 @@ if "active_profile" not in st.session_state:
 # ===== SIDEBAR =====
 with st.sidebar:
     st.markdown("### 📊 Portfolio Optimizer")
-    st.caption("Long Term Strategy Suite v5.0")
+    st.caption(f"Long Term Strategy Suite v{VERSION}")
     
     st.divider()
     
@@ -714,7 +719,7 @@ with st.sidebar:
                         st.divider()
                         
                         # Deploy button
-                        if st.button("📥 Record Deployment", type="primary", use_container_width=True, key="record_deploy_btn"):
+                        if st.button("🔥 Record Deployment", type="primary", use_container_width=True, key="record_deploy_btn"):
                             try:
                                 with st.spinner(f"Fetching price for {selected_ticker} on {deploy_date}..."):
                                     # Fetch historical price using yfinance
@@ -829,7 +834,7 @@ with st.sidebar:
         current_alloc = sum(a.get('target', 0) for a in prof.get("assets", {}).values())
         
         # Allocation progress bar with color coding
-        progress_color = "🟢" if current_alloc >= 100 else "🟠"
+        progress_color = "🟢" if current_alloc >= 100 else "🟡"
         bar_color = "#10b981" if current_alloc >= 100 else "#f97316"
         
         st.markdown(f"""
@@ -1145,7 +1150,7 @@ if view_mode == "🏠 Global Dashboard":
         st.divider()
         
         # Portfolio Grid
-        st.markdown("### 📁 Portfolio Strategies")
+        st.markdown("### 🔍 Portfolio Strategies")
         st.caption("Click any profile name to view detailed analytics and manage assets")
         
         cols = st.columns(2)
@@ -1190,7 +1195,7 @@ if view_mode == "🏠 Global Dashboard":
                 # Assets exist but not fully deployed
                 tile_class = "profile-tile"
                 deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
-                status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">📥 Deploying ({deployed_count}/{len(p_assets)})</span>'
+                status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">🔥 Deploying ({deployed_count}/{len(p_assets)})</span>'
             elif all_deployed:
                 # All deployed but never rebalanced
                 tile_class = "profile-tile-optimized"
@@ -1365,7 +1370,7 @@ else:  # Portfolio Manager
                 • Select an asset to deploy capital into<br>
                 • Enter the % of that asset's target you want to deploy<br>
                 • Choose the deployment date (historical prices will be fetched)<br>
-                • Click <strong>"📥 Record Deployment"</strong><br>
+                • Click <strong>"🔥 Record Deployment"</strong><br>
                 • Repeat for each asset until all reach 100%
             </p>
         </div>
@@ -2102,9 +2107,9 @@ else:  # Portfolio Manager
 
 # Footer
 st.divider()
-st.markdown("""
+st.markdown(f"""
     <div style="text-align: center; color: #64748b; padding: 20px;">
-        <p><strong>Long Term Strategy Optimizer</strong> • v5.0</p>
+        <p><strong>Long Term Strategy Optimizer</strong> • v{VERSION} - {VERSION_NAME}</p>
         <p style="font-size: 0.85rem;">Market data by Yahoo Finance • For informational purposes only</p>
     </div>
 """, unsafe_allow_html=True)
