@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.5"
-VERSION_DATE = "2026-01-08"
-VERSION_NAME = "Stable Benchmark Release"
+VERSION = "5.6"
+VERSION_DATE = "2026-01-09"
+VERSION_NAME = "UX Enhancement Release"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -219,6 +219,19 @@ st.markdown("""
         margin: 0 2px;
     }
     
+    .neutral-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        color: white;
+    }
+    
+    .neutral-state h2 {
+        color: white;
+        margin-bottom: 20px;
+    }
+    
     h1, h2, h3 {
         font-weight: 600;
         color: #1e293b;
@@ -254,6 +267,10 @@ def load_db():
                     p.setdefault("rebalance_stats", [])
                     p.setdefault("last_rebalanced", None)
                     p.setdefault("benchmark", None)
+                    
+                    # v5.6 NEW: Bank/Broker fields
+                    p.setdefault("bank_name", "")
+                    p.setdefault("account_type", "")
                     
                     # Workflow field migration
                     p.setdefault("account_name", "")
@@ -372,6 +389,30 @@ def calculate_drift_status(p_data, prices):
     
     return len(drift_details) > 0, drift_details
 
+def validate_deployment_date(deploy_date, inception_date_str):
+    """
+    v5.6 NEW: Validate that deployment date is not before inception date.
+    
+    Args:
+        deploy_date: date object for deployment
+        inception_date_str: string date in YYYY-MM-DD format
+    
+    Returns:
+        tuple: (is_valid: bool, error_message: str)
+    """
+    try:
+        inception_date = datetime.strptime(inception_date_str, '%Y-%m-%d').date()
+        
+        if deploy_date < inception_date:
+            return False, f"Deployment date cannot be before inception date ({inception_date})"
+        
+        if deploy_date > date.today():
+            return False, "Deployment date cannot be in the future"
+        
+        return True, ""
+    except:
+        return False, "Invalid date format"
+
 # ===== SESSION STATE =====
 if "db" not in st.session_state:
     st.session_state.db = load_db()
@@ -396,31 +437,60 @@ with st.sidebar:
     
     st.divider()
     
-    # Profile Creation
-    st.markdown("### ⚙️ Strategy Setup")
+    # ① Profile Creation - v5.6 ENHANCED with numbered steps
+    st.markdown("### ① Strategy Setup")
     with st.expander("🆕 Create New Profile", expanded=False):
         with st.form("new_profile_form"):
-            n_name = st.text_input("Profile Name", placeholder="e.g., Retirement USD")
-            n_account = st.text_input(
-                "Investment Account", 
-                placeholder="e.g., Fidelity 401k, IBKR Taxable",
-                help="Which brokerage account is this strategy for?"
+            n_name = st.text_input("Profile Name*", placeholder="e.g., Retirement USD")
+            
+            # v5.6 NEW: Bank/Broker and Account Type
+            col1, col2 = st.columns(2)
+            with col1:
+                n_bank = st.text_input(
+                    "Bank/Broker*",
+                    placeholder="e.g., Fidelity, IBKR",
+                    help="Name of your financial institution"
+                )
+            with col2:
+                n_account_type = st.selectbox(
+                    "Account Type*",
+                    ["", "Taxable", "401k", "IRA", "Roth IRA", "529", "HSA", "Other"],
+                    help="Type of investment account"
+                )
+            
+            n_curr = st.selectbox("Currency*", ["USD", "CAD"])
+            n_p = st.number_input("Principal ($)*", value=10000.0, step=1000.0, min_value=0.0)
+            n_goal = st.number_input("Annual Growth Goal (%)*", value=10.0, step=0.5, min_value=0.0)
+            
+            # v5.6 NEW: Date validation enforcement
+            n_start = st.date_input(
+                "Inception Date*", 
+                value=date.today() - timedelta(days=365),
+                max_value=date.today(),
+                help="Portfolio start date (cannot be in the future)"
             )
-            n_curr = st.selectbox("Currency", ["USD", "CAD"])
-            n_p = st.number_input("Principal ($)", value=10000.0, step=1000.0, min_value=0.0)
-            n_goal = st.number_input("Annual Growth Goal (%)", value=10.0, step=0.5, min_value=0.0)
-            n_start = st.date_input("Inception Date", value=date.today() - timedelta(days=365))
             
             submitted = st.form_submit_button("🚀 Initialize Profile", use_container_width=True)
             
             if submitted:
-                if n_name and n_name not in st.session_state.db["profiles"]:
+                # v5.6 NEW: Enhanced validation
+                if not n_name:
+                    st.error("❌ Profile name is required")
+                elif not n_bank:
+                    st.error("❌ Bank/Broker is required")
+                elif not n_account_type:
+                    st.error("❌ Account Type is required")
+                elif n_name in st.session_state.db["profiles"]:
+                    st.warning(f"⚠️ Profile '{n_name}' already exists")
+                else:
                     st.session_state.db["profiles"][n_name] = {
                         "currency": n_curr,
                         "principal": n_p,
                         "yearly_goal_pct": n_goal,
                         "start_date": str(n_start),
-                        "account_name": n_account,
+                        "bank_name": n_bank,
+                        "account_type": n_account_type,
+                        "account_name": f"{n_bank} {n_account_type}",
                         "initialization_date": str(n_start),
                         "asset_mix_locked": False,
                         "assets": {},
@@ -434,10 +504,6 @@ with st.sidebar:
                     log_profile(st.session_state.db["profiles"][n_name], "Profile created")
                     st.success(f"✅ Profile '{n_name}' created!")
                     st.rerun()
-                elif not n_name:
-                    st.error("Please enter a profile name")
-                else:
-                    st.warning(f"Profile '{n_name}' already exists")
     
     # Profile-specific sidebar content
     if view_mode == "📊 Portfolio Manager" and st.session_state.db["profiles"]:
@@ -465,10 +531,111 @@ with st.sidebar:
         prof = st.session_state.db["profiles"][st.session_state.active_profile]
         p_flag = "🇺🇸" if prof.get("currency") == "USD" else "🇨🇦"
         
+        # v5.6 NEW: Show Bank/Broker info
+        st.caption(f"🏦 {prof.get('bank_name', 'N/A')} • {prof.get('account_type', 'N/A')}")
+        
+        # v5.6 NEW: CRUD Actions
+        st.divider()
+        st.markdown("### ⚙️ Profile Actions")
+        
+        col_crud1, col_crud2, col_crud3 = st.columns(3)
+        
+        with col_crud1:
+            if st.button("✏️ Edit", use_container_width=True, key="edit_profile"):
+                st.session_state.editing_profile = True
+        
+        with col_crud2:
+            if st.button("🔄 Reset", use_container_width=True, key="reset_profile"):
+                st.session_state.reset_confirm = True
+        
+        with col_crud3:
+            if st.button("🗑️ Delete", use_container_width=True, key="delete_profile", type="secondary"):
+                st.session_state.delete_confirm = True
+        
+        # v5.6 NEW: Edit Profile Dialog
+        if st.session_state.get("editing_profile", False):
+            st.markdown("#### ✏️ Edit Profile")
+            with st.form("edit_profile_form"):
+                edit_principal = st.number_input("Principal ($)", value=prof['principal'], step=1000.0, min_value=0.0)
+                edit_goal = st.number_input("Annual Goal (%)", value=prof['yearly_goal_pct'], step=0.5, min_value=0.0)
+                
+                col_e1, col_e2 = st.columns(2)
+                with col_e1:
+                    edit_bank = st.text_input("Bank/Broker", value=prof.get('bank_name', ''))
+                with col_e2:
+                    current_acct = prof.get('account_type', '')
+                    acct_types = ["Taxable", "401k", "IRA", "Roth IRA", "529", "HSA", "Other"]
+                    default_idx = acct_types.index(current_acct) if current_acct in acct_types else 0
+                    edit_acct = st.selectbox("Account Type", acct_types, index=default_idx)
+                
+                col_save, col_cancel = st.columns(2)
+                with col_save:
+                    if st.form_submit_button("💾 Save Changes", use_container_width=True):
+                        prof['principal'] = edit_principal
+                        prof['yearly_goal_pct'] = edit_goal
+                        prof['bank_name'] = edit_bank
+                        prof['account_type'] = edit_acct
+                        prof['account_name'] = f"{edit_bank} {edit_acct}"
+                        save_db(st.session_state.db)
+                        log_profile(prof, "Profile edited")
+                        st.session_state.editing_profile = False
+                        st.success("✅ Profile updated!")
+                        st.rerun()
+                
+                with col_cancel:
+                    if st.form_submit_button("❌ Cancel", use_container_width=True):
+                        st.session_state.editing_profile = False
+                        st.rerun()
+        
+        # v5.6 NEW: Reset Confirmation Dialog
+        if st.session_state.get("reset_confirm", False):
+            st.warning("⚠️ **Reset Profile?**")
+            st.caption("This will delete all assets, deployments, and rebalance history. Profile metadata will be preserved.")
+            
+            col_r1, col_r2 = st.columns(2)
+            with col_r1:
+                if st.button("🔄 Yes, Reset", use_container_width=True, type="primary", key="confirm_reset"):
+                    prof['assets'] = {}
+                    prof['rebalance_logs'] = []
+                    prof['rebalance_stats'] = []
+                    prof['last_rebalanced'] = None
+                    prof['asset_mix_locked'] = False
+                    save_db(st.session_state.db)
+                    log_profile(prof, "Profile reset - all asset data cleared")
+                    st.session_state.reset_confirm = False
+                    st.success("✅ Profile reset successfully!")
+                    st.rerun()
+            
+            with col_r2:
+                if st.button("❌ Cancel", use_container_width=True, key="cancel_reset"):
+                    st.session_state.reset_confirm = False
+                    st.rerun()
+        
+        # v5.6 NEW: Delete Confirmation Dialog
+        if st.session_state.get("delete_confirm", False):
+            st.error("🗑️ **Delete Profile?**")
+            st.caption(f"This will permanently delete '{st.session_state.active_profile}'. This action cannot be undone.")
+            
+            col_d1, col_d2 = st.columns(2)
+            with col_d1:
+                if st.button("🗑️ Yes, Delete", use_container_width=True, type="primary", key="confirm_delete"):
+                    profile_to_delete = st.session_state.active_profile
+                    del st.session_state.db["profiles"][profile_to_delete]
+                    save_db(st.session_state.db)
+                    st.session_state.active_profile = None
+                    st.session_state.delete_confirm = False
+                    st.success(f"✅ Profile '{profile_to_delete}' deleted!")
+                    st.rerun()
+            
+            with col_d2:
+                if st.button("❌ Cancel", use_container_width=True, key="cancel_delete"):
+                    st.session_state.delete_confirm = False
+                    st.rerun()
+        
         st.divider()
         
-        # Drift Strategy
-        st.markdown("### ⚙️ Drift Strategy")
+        # ② Drift Strategy
+        st.markdown("### ② Drift Strategy")
         st.caption("Set tolerance threshold for rebalance alerts")
         with st.expander("ℹ️ What is drift tolerance?", expanded=False):
             st.markdown("""
@@ -498,8 +665,8 @@ with st.sidebar:
         
         st.divider()
         
-        # Benchmark Selection
-        st.markdown("### 📊 Benchmark Comparison")
+        # ③ Benchmark Selection
+        st.markdown("### ③ Benchmark Comparison")
         st.caption("Compare your portfolio against market benchmarks")
         with st.expander("ℹ️ Why use a benchmark?", expanded=False):
             st.markdown("""
@@ -532,7 +699,7 @@ with st.sidebar:
             options=list(benchmark_options.keys()),
             index=benchmark_index,
             key="benchmark_select",
-            help="Choose a market index to compare your portfolio's performance. The chart will show what would happen if you invested 100% in this benchmark."
+            help="Choose a market index to compare your portfolio's performance."
         )
         
         if st.button("💾 Save Benchmark", use_container_width=True, key="save_benchmark"):
@@ -548,267 +715,8 @@ with st.sidebar:
         
         st.divider()
         
-        # Asset Deployment Section
-        st.markdown("### 💰 Asset Deployment")
-        st.caption("Deploy capital into individual assets over time")
-        
-        # Only show deployment UI if asset mix is locked
-        if not prof.get("asset_mix_locked", False):
-            st.info("🔒 **Lock your asset mix first** to enable deployment")
-            st.caption("Complete asset definitions (totaling 100%) and lock the mix before deploying capital.")
-        else:
-            # Get assets that still need deployment
-            assets = prof.get("assets", {})
-            deployable_assets = {
-                ticker: data 
-                for ticker, data in assets.items()
-                if data.get("allocated_pct", 0) < 100.0
-            }
-            
-            # Show overall deployment progress
-            fully_deployed_count = sum(
-                1 for a in assets.values() 
-                if a.get("allocated_pct", 0) >= 100.0
-            )
-            total_assets = len(assets)
-            
-            st.markdown(f"**Progress:** {fully_deployed_count}/{total_assets} assets fully deployed")
-            
-            # Progress bar
-            if total_assets > 0:
-                deployment_progress = fully_deployed_count / total_assets
-                
-                # Green progress bar when 100% complete
-                if deployment_progress >= 1.0:
-                    st.markdown("""
-                        <style>
-                        div[data-testid="stProgress"] > div > div > div {
-                            background-color: #10b981 !important;
-                        }
-                        </style>
-                    """, unsafe_allow_html=True)
-                
-                st.progress(deployment_progress)
-            
-            if not deployable_assets:
-                # All assets 100% deployed
-                st.success("✅ **All assets 100% deployed!**")
-                st.caption("Portfolio-level drift monitoring is now active.")
-                
-                # Show deployment history
-                with st.expander("✏️ View Deployment History", expanded=False):
-                    st.markdown("""
-                    Review your deployment history for each asset. All assets are fully deployed.
-                    """)
-                    
-                    for ticker, asset_data in assets.items():
-                        fund_name = asset_data.get("fund_name", ticker)
-                        purchases = asset_data.get("purchases", [])
-                        allocated_pct = asset_data.get("allocated_pct", 0)
-                        avg_cost = calculate_average_cost(asset_data)
-                        
-                        st.markdown(f"### {ticker} - {fund_name}")
-                        st.caption(f"✅ {allocated_pct:.1f}% deployed | Avg Cost: ${avg_cost:.2f}" if avg_cost else f"✅ {allocated_pct:.1f}% deployed")
-                        
-                        if purchases:
-                            # Create deployment history table
-                            history_data = []
-                            for p in purchases:
-                                history_data.append({
-                                    "Date": p.get("date", "N/A"),
-                                    "Deploy %": f"{p.get('deploy_pct', 0):.1f}%",
-                                    "Amount": f"${p.get('amount', 0):,.2f}",
-                                    "Price": f"${p.get('price', 0):.2f}",
-                                    "Quantity": f"{p.get('quantity', 0):.4f}"
-                                })
-                            
-                            df_history = pd.DataFrame(history_data)
-                            st.dataframe(df_history, use_container_width=True, hide_index=True)
-                        else:
-                            st.caption("No deployment history recorded")
-                        
-                        st.markdown("---")
-                        
-            else:
-                # Some assets still need deployment
-                # Deployment form
-                with st.expander("➕ Record Asset Deployment", expanded=False):
-                    st.markdown("""
-                    **Deploy capital into a specific asset** at market prices from a selected date.
-                    
-                    - **Deployment %** is relative to that asset's target allocation
-                    - Each asset can be deployed gradually over multiple events
-                    - **Average cost** activates when an asset reaches 100% deployment
-                    - **Portfolio drift** activates when ALL assets reach 100%
-                    """)
-                    
-                    # Asset selector dropdown
-                    selected_ticker = st.selectbox(
-                        "Select Asset to Deploy",
-                        options=list(deployable_assets.keys()),
-                        format_func=lambda t: f"{t} - {deployable_assets[t].get('fund_name', t)}",
-                        key="deploy_asset_selector",
-                        help="Choose which asset to deploy capital into"
-                    )
-                    
-                    if selected_ticker:
-                        asset_data = deployable_assets[selected_ticker]
-                        current_allocated = asset_data.get("allocated_pct", 0)
-                        remaining_pct = 100.0 - current_allocated
-                        target_pct = asset_data.get("target", 0)
-                        fund_name = asset_data.get("fund_name", selected_ticker)
-                        
-                        # Display asset information
-                        st.markdown(f"""
-                            **Asset Information:**  
-                            • **Fund:** {fund_name}  
-                            • **Ticker:** {selected_ticker}  
-                            • **Target Allocation:** {target_pct}% of total portfolio  
-                            • **Currently Deployed:** {current_allocated:.1f}% of this asset's target  
-                            • **Remaining:** {remaining_pct:.1f}% of this asset's target
-                        """)
-                        
-                        # Show existing deployments if any
-                        existing_purchases = asset_data.get("purchases", [])
-                        if existing_purchases:
-                            st.markdown("**Previous Deployments:**")
-                            for idx, p in enumerate(existing_purchases, 1):
-                                st.caption(f"{idx}. {p.get('date')}: {p.get('deploy_pct', 0):.1f}% (${p.get('amount', 0):,.2f} @ ${p.get('price', 0):.2f})")
-                        
-                        st.divider()
-                        
-                        # Deployment percentage input
-                        deploy_pct = st.number_input(
-                            "Deploy % (of this asset's target allocation)",
-                            min_value=0.1,
-                            max_value=remaining_pct,
-                            value=min(25.0, remaining_pct),
-                            step=0.1,
-                            help=f"Enter % of {selected_ticker}'s {target_pct}% target to deploy (max: {remaining_pct:.1f}%)",
-                            key="deploy_pct_input"
-                        )
-                        
-                        # Deployment date input
-                        deploy_date = st.date_input(
-                            "Deployment Date",
-                            value=date.today(),
-                            max_value=date.today(),
-                            help="Market prices will be fetched for this date (or closest prior trading day)",
-                            key="deploy_date_input"
-                        )
-                        
-                        # Calculate dollar amount
-                        # Formula: (deploy_pct / 100) × (target_pct / 100) × principal
-                        portfolio_pct = (deploy_pct / 100) * target_pct
-                        deploy_amount = (portfolio_pct / 100) * prof['principal']
-                        
-                        # Show calculation breakdown
-                        st.info(f"""
-                            **📊 Deployment Calculation:**  
-                            • {deploy_pct:.1f}% of {selected_ticker}'s {target_pct}% target  
-                            • = {portfolio_pct:.2f}% of total ${prof['principal']:,.0f} portfolio  
-                            • = **${deploy_amount:,.2f}** to be invested
-                        """)
-                        
-                        # Price source indicator
-                        if deploy_date == date.today():
-                            st.caption("💹 Will use today's closing price")
-                        else:
-                            st.caption(f"📅 Will use {deploy_date} historical closing price")
-                        
-                        st.divider()
-                        
-                        # Deploy button
-                        if st.button("🔥 Record Deployment", type="primary", use_container_width=True, key="record_deploy_btn"):
-                            try:
-                                with st.spinner(f"Fetching price for {selected_ticker} on {deploy_date}..."):
-                                    # Fetch historical price using yfinance
-                                    t_obj = yf.Ticker(selected_ticker)
-                                    deploy_datetime = pd.to_datetime(deploy_date)
-                                    today_dt = pd.to_datetime(date.today())
-                                    
-                                    # Determine data range to fetch
-                                    if deploy_datetime.date() == today_dt.date():
-                                        # Today's price
-                                        hist = t_obj.history(period="1d")
-                                    else:
-                                        # Historical price - fetch range around deployment date
-                                        start_date = deploy_datetime - timedelta(days=7)
-                                        end_date = deploy_datetime + timedelta(days=1)
-                                        hist = t_obj.history(start=start_date, end=end_date)
-                                    
-                                    if hist.empty:
-                                        st.error(f"❌ Could not fetch price data for {selected_ticker}")
-                                    else:
-                                        # Find price for deployment date
-                                        hist.index = pd.to_datetime(hist.index).date
-                                        
-                                        if deploy_datetime.date() in hist.index:
-                                            # Exact date found
-                                            price = float(hist.loc[deploy_datetime.date()]['Close'])
-                                            price_date = deploy_datetime.date()
-                                        else:
-                                            # Weekend or holiday - use closest prior trading day
-                                            available_dates = [d for d in hist.index if d <= deploy_datetime.date()]
-                                            if available_dates:
-                                                price_date = max(available_dates)
-                                                price = float(hist.loc[price_date]['Close'])
-                                                
-                                                # Notify user if different date used
-                                                if price_date != deploy_datetime.date():
-                                                    st.caption(f"ℹ️ Using {price_date} closing price (closest trading day before {deploy_date})")
-                                            else:
-                                                st.error(f"❌ No price data available on or before {deploy_date}")
-                                                price = None
-                                                price_date = None
-                                        
-                                        if price is not None:
-                                            # Calculate quantity
-                                            quantity = deploy_amount / price
-                                            
-                                            # Create purchase record
-                                            purchase = {
-                                                "date": str(deploy_date),
-                                                "deploy_pct": deploy_pct,
-                                                "amount": deploy_amount,
-                                                "price": price,
-                                                "quantity": quantity
-                                            }
-                                            
-                                            # Update asset data
-                                            asset_data.setdefault("purchases", []).append(purchase)
-                                            asset_data["units"] = asset_data.get("units", 0) + quantity
-                                            asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)
-                                            
-                                            # Log the deployment
-                                            log_msg = (
-                                                f"Deployed {deploy_pct:.1f}% of {selected_ticker} "
-                                                f"(${deploy_amount:,.2f} @ ${price:.2f}/unit = {quantity:.4f} units)"
-                                            )
-                                            log_profile(prof, log_msg)
-                                            
-                                            # Save to database
-                                            save_db(st.session_state.db)
-                                            
-                                            # Success messages
-                                            st.success(f"✅ Deployed {deploy_pct:.1f}% of {selected_ticker}")
-                                            st.info(f"📊 {selected_ticker} is now {asset_data['allocated_pct']:.1f}% deployed")
-                                            
-                                            # Check if asset is now fully deployed
-                                            if asset_data['allocated_pct'] >= 100.0:
-                                                st.balloons()
-                                                st.success(f"🎉 {selected_ticker} is now 100% deployed! Average cost will be calculated.")
-                                            
-                                            # Reload page to update UI immediately
-                                            st.rerun()
-                            
-                            except Exception as e:
-                                st.error(f"❌ Error recording deployment: {str(e)}")
-                                st.caption("Please check your internet connection and ticker symbol.")
-        st.divider()
-        
-        # Asset Allocation
-        st.markdown("### 🎯 Asset Allocation")
+        # ④ Asset Allocation
+        st.markdown("### ④ Asset Allocation")
         st.caption("Add assets to your portfolio and set target percentages")
         with st.expander("ℹ️ How asset allocation works", expanded=False):
             st.markdown("""
@@ -878,8 +786,7 @@ with st.sidebar:
         last_price = 1.0
         ticker_name = ""
         
-        # Validate ticker
-        # Block asset modification if locked
+        # Validate ticker - Block asset modification if locked
         if prof.get("asset_mix_locked", False) and not is_existing and a_sym:
             st.error("🔒 **Asset mix is locked**")
             st.caption("Cannot add new assets during deployment phase.")
@@ -981,9 +888,9 @@ with st.sidebar:
             for ticker, data in prof["assets"].items():
                 st.caption(f"**{ticker}**: {data['target']}% ({data['units']:.4f} units)")
         
-        # Asset Mix Locking Controls
+        # ⑤ Asset Mix Locking Controls
         st.divider()
-        st.markdown("### 🔒 Asset Mix Status")
+        st.markdown("### ⑤ Lock Asset Mix")
         
         assets = prof.get("assets", {})
         total_allocation = sum(a.get('target', 0) for a in assets.values())
@@ -1017,6 +924,280 @@ with st.sidebar:
             else:
                 st.info("ℹ️ **Asset Mix Not Complete**")
                 st.caption(f"Current: {total_allocation:.1f}% / 100%")
+        
+        st.divider()
+        
+        # ⑥ Asset Deployment Section
+        st.markdown("### ⑥ Asset Deployment")
+        st.caption("Deploy capital into individual assets over time")
+        
+        # Only show deployment UI if asset mix is locked
+        if not prof.get("asset_mix_locked", False):
+            st.info("🔒 **Lock your asset mix first** to enable deployment")
+            st.caption("Complete asset definitions (totaling 100%) and lock the mix before deploying capital.")
+        else:
+            # Get assets that still need deployment
+            assets = prof.get("assets", {})
+            deployable_assets = {
+                ticker: data 
+                for ticker, data in assets.items()
+                if data.get("allocated_pct", 0) < 100.0
+            }
+            
+            # Show overall deployment progress
+            fully_deployed_count = sum(
+                1 for a in assets.values() 
+                if a.get("allocated_pct", 0) >= 100.0
+            )
+            total_assets = len(assets)
+            
+            st.markdown(f"**Progress:** {fully_deployed_count}/{total_assets} assets fully deployed")
+            
+            # v5.6 ENHANCED: Progress bar with dynamic colors
+            if total_assets > 0:
+                deployment_progress = fully_deployed_count / total_assets
+                
+                # Dynamic color - Orange during progress, Green at 100%
+                if deployment_progress >= 1.0:
+                    bar_color = "#10b981"  # Green
+                    st.markdown("""
+                        <style>
+                        div[data-testid="stProgress"] > div > div > div {
+                            background-color: #10b981 !important;
+                        }
+                        </style>
+                    """, unsafe_allow_html=True)
+                else:
+                    bar_color = "#f97316"  # Orange
+                    st.markdown("""
+                        <style>
+                        div[data-testid="stProgress"] > div > div > div {
+                            background-color: #f97316 !important;
+                        }
+                        </style>
+                    """, unsafe_allow_html=True)
+                
+                st.progress(deployment_progress)
+                
+                # Status text with matching color
+                status_text = "✅ All Deployed" if deployment_progress >= 1.0 else f"⏳ In Progress ({fully_deployed_count}/{total_assets})"
+                st.markdown(f"**{status_text}**")
+            
+            if not deployable_assets:
+                # All assets 100% deployed
+                st.success("✅ **All assets 100% deployed!**")
+                st.caption("Portfolio-level drift monitoring is now active.")
+                
+                # Show deployment history
+                with st.expander("✏️ View Deployment History", expanded=False):
+                    st.markdown("""
+                    Review your deployment history for each asset. All assets are fully deployed.
+                    """)
+                    
+                    for ticker, asset_data in assets.items():
+                        fund_name = asset_data.get("fund_name", ticker)
+                        purchases = asset_data.get("purchases", [])
+                        allocated_pct = asset_data.get("allocated_pct", 0)
+                        avg_cost = calculate_average_cost(asset_data)
+                        
+                        st.markdown(f"### {ticker} - {fund_name}")
+                        st.caption(f"✅ {allocated_pct:.1f}% deployed | Avg Cost: ${avg_cost:.2f}" if avg_cost else f"✅ {allocated_pct:.1f}% deployed")
+                        
+                        if purchases:
+                            history_data = []
+                            for p in purchases:
+                                history_data.append({
+                                    "Date": p.get("date", "N/A"),
+                                    "Deploy %": f"{p.get('deploy_pct', 0):.1f}%",
+                                    "Amount": f"${p.get('amount', 0):,.2f}",
+                                    "Price": f"${p.get('price', 0):.2f}",
+                                    "Quantity": f"{p.get('quantity', 0):.4f}"
+                                })
+                            
+                            df_history = pd.DataFrame(history_data)
+                            st.dataframe(df_history, use_container_width=True, hide_index=True)
+                        else:
+                            st.caption("No deployment history recorded")
+                        
+                        st.markdown("---")
+                        
+            else:
+                # Some assets still need deployment - Deployment form
+                with st.expander("➕ Record Asset Deployment", expanded=False):
+                    st.markdown("""
+                    **Deploy capital into a specific asset** at market prices from a selected date.
+                    
+                    - **Deployment %** is relative to that asset's target allocation
+                    - Each asset can be deployed gradually over multiple events
+                    - **Average cost** activates when an asset reaches 100% deployment
+                    - **Portfolio drift** activates when ALL assets reach 100%
+                    """)
+                    
+                    # Asset selector dropdown
+                    selected_ticker = st.selectbox(
+                        "Select Asset to Deploy",
+                        options=list(deployable_assets.keys()),
+                        format_func=lambda t: f"{t} - {deployable_assets[t].get('fund_name', t)}",
+                        key="deploy_asset_selector",
+                        help="Choose which asset to deploy capital into"
+                    )
+                    
+                    if selected_ticker:
+                        asset_data = deployable_assets[selected_ticker]
+                        current_allocated = asset_data.get("allocated_pct", 0)
+                        remaining_pct = 100.0 - current_allocated
+                        target_pct = asset_data.get("target", 0)
+                        fund_name = asset_data.get("fund_name", selected_ticker)
+                        
+                        # Display asset information
+                        st.markdown(f"""
+                            **Asset Information:**  
+                            • **Fund:** {fund_name}  
+                            • **Ticker:** {selected_ticker}  
+                            • **Target Allocation:** {target_pct}% of total portfolio  
+                            • **Currently Deployed:** {current_allocated:.1f}% of this asset's target  
+                            • **Remaining:** {remaining_pct:.1f}% of this asset's target
+                        """)
+                        
+                        # Show existing deployments if any
+                        existing_purchases = asset_data.get("purchases", [])
+                        if existing_purchases:
+                            st.markdown("**Previous Deployments:**")
+                            for idx, p in enumerate(existing_purchases, 1):
+                                st.caption(f"{idx}. {p.get('date')}: {p.get('deploy_pct', 0):.1f}% (${p.get('amount', 0):,.2f} @ ${p.get('price', 0):.2f})")
+                        
+                        st.divider()
+                        
+                        # Deployment percentage input
+                        deploy_pct = st.number_input(
+                            "Deploy % (of this asset's target allocation)",
+                            min_value=0.1,
+                            max_value=remaining_pct,
+                            value=min(25.0, remaining_pct),
+                            step=0.1,
+                            help=f"Enter % of {selected_ticker}'s {target_pct}% target to deploy (max: {remaining_pct:.1f}%)",
+                            key="deploy_pct_input"
+                        )
+                        
+                        # v5.6 NEW: Validation - Cannot exceed remaining %
+                        if deploy_pct > remaining_pct:
+                            st.error(f"❌ Cannot deploy {deploy_pct:.1f}% - only {remaining_pct:.1f}% remaining for this asset")
+                            deploy_pct = remaining_pct
+                        
+                        # v5.6 NEW: Enforce deployment date >= inception date
+                        inception_date = datetime.strptime(prof.get('start_date'), '%Y-%m-%d').date()
+                        
+                        deploy_date = st.date_input(
+                            "Deployment Date*",
+                            value=date.today(),
+                            min_value=inception_date,
+                            max_value=date.today(),
+                            help=f"Deployment date (must be on or after inception: {inception_date})",
+                            key="deploy_date_input"
+                        )
+                        
+                        # Calculate dollar amount
+                        portfolio_pct = (deploy_pct / 100) * target_pct
+                        deploy_amount = (portfolio_pct / 100) * prof['principal']
+                        
+                        # Show calculation breakdown
+                        st.info(f"""
+                            **📊 Deployment Calculation:**  
+                            • {deploy_pct:.1f}% of {selected_ticker}'s {target_pct}% target  
+                            • = {portfolio_pct:.2f}% of total ${prof['principal']:,.0f} portfolio  
+                            • = **${deploy_amount:,.2f}** to be invested
+                        """)
+                        
+                        # Price source indicator
+                        if deploy_date == date.today():
+                            st.caption("💹 Will use today's closing price")
+                        else:
+                            st.caption(f"📅 Will use {deploy_date} historical closing price")
+                        
+                        st.divider()
+                        
+                        # Deploy button
+                        if st.button("🔥 Record Deployment", type="primary", use_container_width=True, key="record_deploy_btn"):
+                            try:
+                                with st.spinner(f"Fetching price for {selected_ticker} on {deploy_date}..."):
+                                    # Fetch historical price using yfinance
+                                    t_obj = yf.Ticker(selected_ticker)
+                                    deploy_datetime = pd.to_datetime(deploy_date)
+                                    today_dt = pd.to_datetime(date.today())
+                                    
+                                    # Determine data range to fetch
+                                    if deploy_datetime.date() == today_dt.date():
+                                        hist = t_obj.history(period="1d")
+                                    else:
+                                        start_date = deploy_datetime - timedelta(days=7)
+                                        end_date = deploy_datetime + timedelta(days=1)
+                                        hist = t_obj.history(start=start_date, end=end_date)
+                                    
+                                    if hist.empty:
+                                        st.error(f"❌ Could not fetch price data for {selected_ticker}")
+                                    else:
+                                        # Find price for deployment date
+                                        hist.index = pd.to_datetime(hist.index).date
+                                        
+                                        if deploy_datetime.date() in hist.index:
+                                            price = float(hist.loc[deploy_datetime.date()]['Close'])
+                                            price_date = deploy_datetime.date()
+                                        else:
+                                            # Weekend or holiday - use closest prior trading day
+                                            available_dates = [d for d in hist.index if d <= deploy_datetime.date()]
+                                            if available_dates:
+                                                price_date = max(available_dates)
+                                                price = float(hist.loc[price_date]['Close'])
+                                                
+                                                if price_date != deploy_datetime.date():
+                                                    st.caption(f"ℹ️ Using {price_date} closing price (closest trading day before {deploy_date})")
+                                            else:
+                                                st.error(f"❌ No price data available on or before {deploy_date}")
+                                                price = None
+                                                price_date = None
+                                        
+                                        if price is not None:
+                                            # Calculate quantity
+                                            quantity = deploy_amount / price
+                                            
+                                            # Create purchase record
+                                            purchase = {
+                                                "date": str(deploy_date),
+                                                "deploy_pct": deploy_pct,
+                                                "amount": deploy_amount,
+                                                "price": price,
+                                                "quantity": quantity
+                                            }
+                                            
+                                            # Update asset data
+                                            asset_data.setdefault("purchases", []).append(purchase)
+                                            asset_data["units"] = asset_data.get("units", 0) + quantity
+                                            asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)
+                                            
+                                            # Log the deployment
+                                            log_msg = (
+                                                f"Deployed {deploy_pct:.1f}% of {selected_ticker} "
+                                                f"(${deploy_amount:,.2f} @ ${price:.2f}/unit = {quantity:.4f} units)"
+                                            )
+                                            log_profile(prof, log_msg)
+                                            
+                                            # Save to database
+                                            save_db(st.session_state.db)
+                                            
+                                            # Success messages
+                                            st.success(f"✅ Deployed {deploy_pct:.1f}% of {selected_ticker}")
+                                            st.info(f"📊 {selected_ticker} is now {asset_data['allocated_pct']:.1f}% deployed")
+                                            
+                                            # Check if asset is now fully deployed
+                                            if asset_data['allocated_pct'] >= 100.0:
+                                                st.balloons()
+                                                st.success(f"🎉 {selected_ticker} is now 100% deployed! Average cost will be calculated.")
+                                            
+                                            st.rerun()
+                            
+                            except Exception as e:
+                                st.error(f"❌ Error recording deployment: {str(e)}")
+                                st.caption("Please check your internet connection and ticker symbol.")
         
         # Activity Log
         st.divider()
@@ -1149,6 +1330,55 @@ if view_mode == "🏠 Global Dashboard":
         
         st.divider()
         
+        # v5.6 NEW: Profile Comparison Tool
+        st.markdown("### 📊 Portfolio Comparison")
+        with st.expander("Compare Multiple Profiles", expanded=False):
+            if len(profiles) < 2:
+                st.info("ℹ️ Need at least 2 profiles to compare")
+            else:
+                compare_profiles = st.multiselect(
+                    "Select Profiles to Compare",
+                    list(profiles.keys()),
+                    default=list(profiles.keys())[:3] if len(profiles) >= 3 else list(profiles.keys()),
+                    help="Select 2-5 profiles to compare side-by-side"
+                )
+                
+                if len(compare_profiles) >= 2:
+                    comparison_data = []
+                    
+                    for p_name in compare_profiles:
+                        p_data = profiles[p_name]
+                        p_assets = p_data.get("assets", {})
+                        
+                        # Calculate current value
+                        curr_val = 0
+                        for ticker, asset_info in p_assets.items():
+                            if ticker in prices:
+                                curr_val += asset_info["units"] * prices[ticker]
+                        
+                        # Calculate metrics
+                        start_val = float(p_data.get('principal', 0))
+                        roi = ((curr_val / start_val) - 1) * 100 if start_val > 0 else 0
+                        
+                        start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d')
+                        years = max((date.today() - start_date.date()).days / 365.25, 0.01)
+                        cagr = ((curr_val / start_val) ** (1 / years) - 1) * 100 if start_val > 0 else 0
+                        
+                        comparison_data.append({
+                            "Profile": p_name,
+                            "Bank/Account": f"{p_data.get('bank_name', 'N/A')} {p_data.get('account_type', '')}",
+                            "Current Value": f"${curr_val:,.0f}",
+                            "CAGR": f"{cagr:+.2f}%",
+                            "Total ROI": f"{roi:+.2f}%",
+                            "Goal": f"{p_data['yearly_goal_pct']}%/yr",
+                            "Assets": len(p_assets)
+                        })
+                    
+                    df_compare = pd.DataFrame(comparison_data)
+                    st.dataframe(df_compare, use_container_width=True, hide_index=True)
+        
+        st.divider()
+        
         # Portfolio Grid
         st.markdown("### 🔍 Portfolio Strategies")
         st.caption("Click any profile name to view detailed analytics and manage assets")
@@ -1180,34 +1410,34 @@ if view_mode == "🏠 Global Dashboard":
             
             # Determine status - Check drift/rebalance need FIRST
             if recently_rebalanced:
-                # Just rebalanced - show balanced
                 tile_class = "profile-tile-optimized"
                 status_badge = '<span class="success-badge">✅ Balanced</span>'
             elif needs_rebal:
-                # Drift detected - SHOW REBALANCE REQUIRED
                 tile_class = "profile-tile-warning"
                 status_badge = '<span class="drift-badge">🚨 REBALANCE REQUIRED</span>'
             elif has_rebalanced:
-                # Previously rebalanced, no drift - balanced
                 tile_class = "profile-tile-optimized"
                 status_badge = '<span class="success-badge">✅ Balanced</span>'
             elif not all_deployed and len(p_assets) > 0:
-                # Assets exist but not fully deployed
                 tile_class = "profile-tile"
                 deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
                 status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">🔥 Deploying ({deployed_count}/{len(p_assets)})</span>'
             elif all_deployed:
-                # All deployed but never rebalanced
                 tile_class = "profile-tile-optimized"
                 status_badge = '<span class="success-badge">✅ Deployed</span>'
             else:
-                # No assets or new profile
                 tile_class = "profile-tile"
                 status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
             
             with cols[i % 2]:
-                # Clickable title button
-                if st.button(f"{p_flag} {name}", key=f"title_{name}", use_container_width=True, type="secondary"):
+                # v5.6 NEW: Clickable profile name button
+                if st.button(
+                    f"{p_flag} **{name}**", 
+                    key=f"nav_{name}", 
+                    use_container_width=True,
+                    type="primary",
+                    help=f"Click to view {name} details"
+                ):
                     st.session_state.active_profile = name
                     st.rerun()
                 
@@ -1250,9 +1480,40 @@ if view_mode == "🏠 Global Dashboard":
                 st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
 
 else:  # Portfolio Manager
-    if not st.session_state.active_profile or st.session_state.active_profile not in st.session_state.db["profiles"]:
-        st.warning("⚠️ No profile selected. Please select a profile from the sidebar.")
+    # v5.6 NEW: Neutral state when no profile selected
+    if not st.session_state.active_profile:
+        st.title("📊 Portfolio Manager")
+        
+        st.markdown("""
+            <div class="neutral-state">
+                <h2>👋 Welcome to Portfolio Manager</h2>
+                <p style="font-size: 1.2rem; margin-bottom: 30px;">Select a profile from the sidebar to view detailed analytics</p>
+                <p style="opacity: 0.9;">or</p>
+                <p style="font-size: 1.1rem; margin-top: 20px;">Create a new profile to get started →</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.divider()
+        
+        # Show available profiles
+        profiles = st.session_state.db.get("profiles", {})
+        if profiles:
+            st.markdown("### 📁 Available Profiles")
+            
+            for name in profiles.keys():
+                if st.button(f"📂 {name}", key=f"select_{name}", use_container_width=True):
+                    st.session_state.active_profile = name
+                    st.rerun()
+        else:
+            st.info("ℹ️ No profiles yet. Create your first profile using the sidebar!")
+        
         st.stop()
+    
+    # Validate active profile exists
+    if st.session_state.active_profile not in st.session_state.db["profiles"]:
+        st.error("⚠️ Selected profile no longer exists. Please select another.")
+        st.session_state.active_profile = None
+        st.rerun()
     
     prof = st.session_state.db["profiles"][st.session_state.active_profile]
     p_flag = "🇺🇸" if prof.get("currency") == "USD" else "🇨🇦"
@@ -1311,7 +1572,6 @@ else:  # Portfolio Manager
                     else:
                         st.metric("Status", "Active", delta="Monitoring", delta_color="off")
                 else:
-                    # All assets deployed but never rebalanced
                     st.metric("Status", "✅ Deployed", delta="Ready to Monitor", delta_color="normal")
             else:
                 st.metric("Status", "⚙️ Setup", delta="Add assets", delta_color="off")
@@ -1331,75 +1591,46 @@ else:  # Portfolio Manager
         Follow these steps to set up your complete investment workflow:
         """)
         
-        # Step 1
+        # Step guides...
         st.markdown("""
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                     color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
-            <h4 style="margin-top: 0; color: white;">📋 Step 1: Define Your Asset Mix</h4>
+            <h4 style="margin-top: 0; color: white;">① Define Your Asset Mix</h4>
             <p style="margin-bottom: 0;">
-                • Go to the <strong>🎯 Asset Allocation</strong> section in the sidebar<br>
-                • Enter ticker symbols (e.g., SPXL, IAU, BIL, DBMF)<br>
-                • Set target allocation % for each asset<br>
-                • <strong>Important:</strong> Total allocations must equal 100%<br>
-                • The system will auto-fetch fund names and current prices
+                Add tickers and set target allocation % for each asset. Total must equal 100%.
             </p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Step 2
         st.markdown("""
         <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
                     color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
-            <h4 style="margin-top: 0; color: white;">🔒 Step 2: Lock Your Asset Mix</h4>
+            <h4 style="margin-top: 0; color: white;">② Lock Your Asset Mix</h4>
             <p style="margin-bottom: 0;">
-                • Once all assets total 100%, go to <strong>🔒 Asset Mix Status</strong><br>
-                • Click the <strong>"🔒 Lock Asset Mix"</strong> button<br>
-                • This finalizes your asset list and enables deployment tracking<br>
-                • <strong>Note:</strong> You cannot add new assets after locking
+                Once assets total 100%, lock the mix to enable deployment tracking.
             </p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Step 3
         st.markdown("""
         <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
                     color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
-            <h4 style="margin-top: 0; color: white;">💰 Step 3: Deploy Capital Into Assets</h4>
+            <h4 style="margin-top: 0; color: white;">③ Deploy Capital Into Assets</h4>
             <p style="margin-bottom: 0;">
-                • Go to <strong>💰 Asset Deployment</strong> section<br>
-                • Select an asset to deploy capital into<br>
-                • Enter the % of that asset's target you want to deploy<br>
-                • Choose the deployment date (historical prices will be fetched)<br>
-                • Click <strong>"🔥 Record Deployment"</strong><br>
-                • Repeat for each asset until all reach 100%
+                Record your purchases for each asset until all reach 100% deployment.
             </p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Step 4
         st.markdown("""
         <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); 
                     color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
-            <h4 style="margin-top: 0; color: white;">📊 Step 4: Monitor & Rebalance</h4>
+            <h4 style="margin-top: 0; color: white;">④ Monitor & Rebalance</h4>
             <p style="margin-bottom: 0;">
-                • Once all assets reach 100% deployment, drift monitoring activates<br>
-                • Average cost is calculated for each asset<br>
-                • Portfolio drift is measured against target allocations<br>
-                • When drift exceeds tolerance, rebalance to restore targets<br>
-                • Track performance against benchmarks (SPY, QQQ, etc.)
+                Track drift and rebalance when allocations deviate from targets.
             </p>
         </div>
         """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.markdown("""
-        ### 💡 Pro Tips
-        - **Diversify:** Spread investments across different asset classes
-        - **Deploy Gradually:** Use multiple deployment events to dollar-cost average
-        - **Track History:** All deployments and rebalances are logged for your records
-        - **Benchmark:** Compare your strategy against market indexes
-        - **Stay Disciplined:** Rebalance when drift exceeds your tolerance threshold
-        """)
         
         st.markdown("---")
         st.success("👈 **Ready to start?** Add your first asset in the sidebar!")
@@ -1465,31 +1696,22 @@ else:  # Portfolio Manager
             prof_years = max((date.today() - prof_start_date.date()).days / 365.25, 0.01)
             profile_cagr = ((curr_v / start_val) ** (1 / prof_years) - 1) * 100 if start_val > 0 else 0
             
-            # Drift detection - Check ANY asset that has units (deployed)
+            # Drift detection
             recently_rebalanced = check_recently_rebalanced(prof.get("last_rebalanced"))
             needs_rebalance = False
             drift_assets = []
             
-            # Check drift for each asset that has units
             if not recently_rebalanced and curr_v > 0:
                 for t in v_t:
-                    # Get allocated_pct with fallback
                     allocated_pct = asset_dict[t].get("allocated_pct", 0)
                     cur_units = float(asset_dict[t].get("units", 0))
                     
-                    # If allocated_pct not tracked BUT has units, assume 100% deployed (legacy assets)
                     if allocated_pct == 0 and cur_units > 0:
                         allocated_pct = 100.0
                     
-                    # Skip if asset not deployed (no units and no allocated_pct)
-                    if allocated_pct < 100.0 and cur_units == 0:
-                        continue
-                    
-                    # If asset has no units at all, skip
                     if cur_units == 0:
                         continue
                     
-                    # Now check drift for this deployed asset (regardless of rebalance history)
                     actual_pct = float((asset_dict[t]["units"] * data[t].iloc[-1] / curr_v * 100))
                     target_pct = float(asset_dict[t]["target"])
                     drift = float(abs(actual_pct - target_pct))
@@ -1526,24 +1748,19 @@ else:  # Portfolio Manager
                 
                 st.divider()
             
-            # Determine status badge - Check drift FIRST
+            # Determine status badge
             has_rebalanced = prof.get("last_rebalanced") is not None
             has_assets = len(asset_dict) > 0
             
             if recently_rebalanced:
-                # Just rebalanced - show balanced
                 alert_html = '<span class="success-badge">✅ Balanced</span>'
             elif needs_rebalance:
-                # Drift detected - SHOW REBALANCE REQUIRED
                 alert_html = '<span class="drift-badge">🚨 REBALANCE REQUIRED</span>'
             elif has_rebalanced:
-                # Previously rebalanced, no drift now - balanced
                 alert_html = '<span class="success-badge">✅ Balanced</span>'
             elif has_assets:
-                # Has assets but never rebalanced - deployed/monitoring
                 alert_html = '<span style="background: #3b82f6; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">📊 Monitoring</span>'
             else:
-                # No assets yet
                 alert_html = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
             
             # Header
@@ -1617,7 +1834,7 @@ else:  # Portfolio Manager
             
             fig = go.Figure()
             
-            # Benchmark comparison - ADD FIRST so it renders in background
+            # v5.6 FIXED: Benchmark comparison with proper data handling
             benchmark_ticker = prof.get('benchmark')
             benchmark_comparison_msg = None
             
@@ -1627,16 +1844,15 @@ else:  # Portfolio Manager
                     if not benchmark_raw.empty:
                         benchmark_data = benchmark_raw['Close']
                         
-                        # FIX: Handle both DataFrame and Series from yfinance
-                        # Newer yfinance versions return DataFrame even for single ticker
+                        # Handle both DataFrame and Series from yfinance
                         if isinstance(benchmark_data, pd.DataFrame):
-                            benchmark_data = benchmark_data.squeeze()  # Convert to Series
+                            benchmark_data = benchmark_data.squeeze()
                         
                         # Ensure we have a proper Series with numeric values
                         benchmark_data = benchmark_data.dropna()
                         
                         if len(benchmark_data) == 0:
-                            st.error(f"⚠️ No valid benchmark data for {benchmark_ticker}")
+                            st.warning(f"⚠️ No valid benchmark data for {benchmark_ticker}")
                         else:
                             # Normalize benchmark to start value
                             first_price = float(benchmark_data.iloc[0])
@@ -1645,18 +1861,18 @@ else:  # Portfolio Manager
                             bench_return = ((last_price / first_price) - 1) * 100
                             bench_final_value = float(benchmark_normalized.iloc[-1])
                             
-                            # Convert to flat lists for Plotly compatibility
+                            # v5.6 FIX: Convert to lists for Plotly compatibility
                             bench_dates = benchmark_normalized.index.tolist()
-                            bench_values = benchmark_normalized.tolist()
-                        
-                            # Add benchmark trace
+                            bench_values = benchmark_normalized.values.tolist()
+                            
+                            # Add benchmark trace FIRST (renders in background)
                             fig.add_trace(go.Scatter(
                                 x=bench_dates,
                                 y=bench_values,
                                 name=f'100% {benchmark_ticker} Benchmark ({bench_return:+.1f}%)',
                                 line=dict(
                                     color='#ef4444',
-                                    width=2,
+                                    width=3,
                                     dash='dot'
                                 ),
                                 mode='lines',
@@ -1676,11 +1892,9 @@ else:  # Portfolio Manager
                             else:
                                 benchmark_comparison_msg = ("info", f"📊 {benchmark_ticker} outperformed your portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)" if curr_v > 0 else f"📊 Benchmark: ${bench_final_value:,.0f}")
                     else:
-                        st.error(f"⚠️ No benchmark data for {benchmark_ticker}")
+                        st.warning(f"⚠️ No benchmark data available for {benchmark_ticker}")
                 except Exception as e:
                     st.error(f"⚠️ Benchmark error: {str(e)}")
-                    import traceback
-                    st.code(traceback.format_exc())
             
             # Actual portfolio (renders ON TOP of benchmark)
             fig.add_trace(go.Scatter(
@@ -1782,20 +1996,98 @@ else:  # Portfolio Manager
             
             st.divider()
             
-            # Rebalance Analysis
+            # v5.6 ENHANCED: Rebalance Analysis with improved column order and tooltips
             st.markdown("### ⚖️ Rebalance Analysis")
             st.caption("Review asset allocation drift and required trades to restore target percentages")
             with st.expander("ℹ️ Understanding the rebalance table", expanded=False):
                 st.markdown("""
                 **This table shows what trades are needed** to restore your target allocation.
                 
-                - **Drift**: 🔴 Red = exceeds tolerance, 🟡 Yellow = warning, 🟢 Green = good
-                - **Buy/Sell**: Action needed to rebalance
-                - **Buy/Sell Amt**: Dollar value of the trade
-                - **Buy/Sell Shares**: Exact number of shares to trade
+                - **Target %**: Your desired allocation for this asset
+                - **Allocated %**: How much of this asset's target has been deployed
+                - **Actual %**: Current portfolio percentage based on market values
+                - **Drift**: Difference between Actual % and Target %
+                    - 🔴 Red = exceeds tolerance (action needed)
+                    - 🟡 Yellow = warning (close to tolerance)
+                    - 🟢 Green = within tolerance (good)
+                - **Status**: Deployment or drift monitoring state
                 
                 💡 Execute rebalancing when you see 🔴 red drift indicators
                 """)
+            
+            # v5.6 NEW: Column configuration with tooltips
+            column_config = {
+                "Fund Name": st.column_config.TextColumn(
+                    "Fund Name",
+                    help="Full name of the investment fund or security",
+                    width="large"
+                ),
+                "Ticker": st.column_config.TextColumn(
+                    "Ticker",
+                    help="Stock ticker symbol",
+                    width="small"
+                ),
+                "Target %": st.column_config.TextColumn(
+                    "Target %",
+                    help="Your desired allocation percentage for this asset",
+                    width="small"
+                ),
+                "Allocated %": st.column_config.TextColumn(
+                    "Allocated %",
+                    help="Percentage of target that has been deployed (100% = fully deployed)",
+                    width="small"
+                ),
+                "Actual %": st.column_config.TextColumn(
+                    "Actual %",
+                    help="Current portfolio percentage based on market values",
+                    width="small"
+                ),
+                "Drift": st.column_config.TextColumn(
+                    "Drift",
+                    help="Difference between Actual % and Target % (🔴 = exceeds tolerance)",
+                    width="small"
+                ),
+                "Status": st.column_config.TextColumn(
+                    "Status",
+                    help="Deployment status or drift monitoring state",
+                    width="medium"
+                ),
+                "Avg Cost": st.column_config.TextColumn(
+                    "Avg Cost",
+                    help="Weighted average cost per unit (available when 100% deployed)",
+                    width="small"
+                ),
+                "Units": st.column_config.TextColumn(
+                    "Units",
+                    help="Total shares/units owned",
+                    width="small"
+                ),
+                "Current Price": st.column_config.TextColumn(
+                    "Current Price",
+                    help="Latest market price per unit",
+                    width="small"
+                ),
+                "%Daily Change": st.column_config.TextColumn(
+                    "%Daily Change",
+                    help="Price change from previous trading day",
+                    width="small"
+                ),
+                "Amount": st.column_config.TextColumn(
+                    "Amount",
+                    help="Current market value (Units × Current Price)",
+                    width="medium"
+                ),
+                "Buy/Sell Amt": st.column_config.TextColumn(
+                    "Buy/Sell Amt",
+                    help="Dollar amount to trade for rebalancing",
+                    width="medium"
+                ),
+                "Buy/Sell Shares": st.column_config.TextColumn(
+                    "Buy/Sell Shares",
+                    help="Number of shares to buy (+) or sell (-)",
+                    width="small"
+                )
+            }
             
             rows = []
             total_turnover = 0
@@ -1809,10 +2101,8 @@ else:  # Portfolio Manager
                 except:
                     daily_change_pct = 0.0
                 
-                # Get fund name
                 fund_name = asset_dict[t].get("fund_name", t)
                 if fund_name == t:
-                    # Try to fetch from yfinance if not stored
                     try:
                         ticker_obj = yf.Ticker(t)
                         info = ticker_obj.info
@@ -1823,11 +2113,8 @@ else:  # Portfolio Manager
                 
                 cur_u = float(asset_dict[t]["units"])
                 tar_w = float(asset_dict[t]['target'])
-                
-                # Get allocated percentage
                 allocated_pct = asset_dict[t].get("allocated_pct", 0)
                 
-                # Calculate average cost
                 avg_cost = calculate_average_cost(asset_dict[t])
                 avg_cost_display = f"${avg_cost:.2f}" if avg_cost is not None else "Pending"
                 
@@ -1844,16 +2131,10 @@ else:  # Portfolio Manager
                 total_turnover += abs(val_diff)
                 total_current_val += act_val
                 
-                if abs(drift) < 0.1:
-                    action = "—"
-                else:
-                    action = "BUY" if drift < 0 else "SELL"
-                
-                # Drift display with two-phase logic
+                # v5.6 ENHANCED: Drift display - DISABLED until 100% deployed
                 if allocated_pct < 100.0:
-                    # Asset not fully deployed - no drift monitoring
-                    drift_display = "-"
-                    status_display = f"Deploying ({allocated_pct:.0f}%)"
+                    drift_display = "—"
+                    status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
                 else:
                     # Asset fully deployed - show drift
                     drift_display = f"{drift:+.2f}%"
@@ -1863,23 +2144,24 @@ else:  # Portfolio Manager
                         drift_display = f"🟡 {drift:+.2f}%"
                     else:
                         drift_display = f"🟢 {drift:+.2f}%"
-                    status_display = "Deployed"
+                    status_display = "✅ Deployed"
                 
                 daily_change_display = f"{daily_change_pct:+.2f}%"
                 
+                # v5.6 NEW: Column order - Target %, Allocated %, Actual %, Drift
                 rows.append({
                     "Fund Name": fund_name,
                     "Ticker": t,
                     "Target %": f"{tar_w:.2f}%",
                     "Allocated %": f"{allocated_pct:.1f}%",
+                    "Actual %": f"{act_w:.2f}%",
+                    "Drift": drift_display,
+                    "Status": status_display,
                     "Avg Cost": avg_cost_display,
                     "Units": f"{cur_u:.0f}",
                     "Current Price": f"${current_price:.2f}",
                     "%Daily Change": daily_change_display,
                     "Amount": f"${act_val:,.0f}",
-                    "Actual %": f"{act_w:.2f}%",
-                    "Drift": drift_display,
-                    "Status": status_display,
                     "Buy/Sell Amt": f"${abs(val_diff):,.0f}",
                     "Buy/Sell Shares": f"{unit_diff:+.0f}"
                 })
@@ -1890,20 +2172,27 @@ else:  # Portfolio Manager
                 "Ticker": "",
                 "Target %": "**100.00%**",
                 "Allocated %": "",
+                "Actual %": "**100.00%**",
+                "Drift": "—",
+                "Status": "",
                 "Avg Cost": "",
                 "Units": "",
                 "Current Price": "",
                 "%Daily Change": "",
                 "Amount": f"**${total_current_val:,.0f}**",
-                "Actual %": "**100.00%**",
-                "Drift": "—",
-                "Status": "",
                 "Buy/Sell Amt": f"**${total_turnover:,.0f}**",
                 "Buy/Sell Shares": "—"
             })
             
             df_rebalance = pd.DataFrame(rows)
-            st.dataframe(df_rebalance, use_container_width=True, hide_index=True)
+            
+            # v5.6 NEW: Display with column config and tooltips
+            st.dataframe(
+                df_rebalance, 
+                use_container_width=True, 
+                hide_index=True,
+                column_config=column_config
+            )
             
             # Info about drift activation
             all_deployed = all(a.get("allocated_pct", 0) >= 100.0 for a in asset_dict.values())
@@ -1990,7 +2279,7 @@ else:  # Portfolio Manager
                 st.caption("• Check drift alerts regularly")
                 st.caption("• Rebalance when assets exceed tolerance")
                 st.caption("• Review Activity Log in sidebar")
-                st.caption("• Compare against benchmark below")
+                st.caption("• Compare against benchmark")
                 
                 st.divider()
                 
@@ -2002,7 +2291,7 @@ else:  # Portfolio Manager
             st.error(f"❌ Error analyzing portfolio: {str(e)}")
             st.info("💡 Please check your internet connection and verify all ticker symbols are valid.")
     
-    # Rebalance History at Bottom (organized by time period)
+    # Rebalance History at Bottom
     if tickers and st.session_state.active_profile:
         prof = st.session_state.db["profiles"][st.session_state.active_profile]
         rebalance_events = prof.get('rebalance_stats', [])
@@ -2023,7 +2312,6 @@ else:  # Portfolio Manager
                 Use filters below to view specific time periods.
                 """)
             
-            # Time period selector
             col_filter1, col_filter2 = st.columns([3, 1])
             with col_filter1:
                 time_filter = st.selectbox(
@@ -2034,19 +2322,14 @@ else:  # Portfolio Manager
             with col_filter2:
                 events_per_page = st.selectbox("Show", [10, 25, 50, 100], index=0, key="events_per_page")
             
-            # Parse and filter events
-            from datetime import datetime, timedelta
-            
             filtered_events = []
             now = datetime.now()
             
             for event in rebalance_events:
                 try:
-                    # Extract date from event string (format: "YYYY-MM-DD HH:MM - ...")
                     event_date_str = event.split(" - ")[0].split(" ")[0]
                     event_date = datetime.strptime(event_date_str, "%Y-%m-%d")
                     
-                    # Apply filters
                     if time_filter == "All Events":
                         filtered_events.append((event_date, event))
                     elif time_filter == "Last 30 Days":
@@ -2058,17 +2341,14 @@ else:  # Portfolio Manager
                     elif time_filter == "This Year":
                         if event_date.year == now.year:
                             filtered_events.append((event_date, event))
-                    else:  # By Quarter or By Month
+                    else:
                         filtered_events.append((event_date, event))
                 except:
-                    # If date parsing fails, include in "All Events"
                     if time_filter == "All Events":
                         filtered_events.append((now, event))
             
-            # Sort by date (newest first)
             filtered_events.sort(key=lambda x: x[0], reverse=True)
             
-            # Group by time period if needed
             if time_filter == "By Quarter":
                 st.markdown("### 📊 Events by Quarter")
                 quarters = {}
@@ -2094,7 +2374,6 @@ else:  # Portfolio Manager
                             st.caption(event)
             
             else:
-                # Show as simple list
                 st.markdown(f"### 📊 Showing {min(len(filtered_events), events_per_page)} of {len(filtered_events)} events")
                 for event_date, event in filtered_events[:events_per_page]:
                     st.caption(event)
