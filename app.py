@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.8.2"
+VERSION = "5.8.3"
 VERSION_DATE = "2026-01-09"
-VERSION_NAME = "Professional Dashboard Navigation"
+VERSION_NAME = "Navigation & Button Fix"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -468,10 +468,17 @@ with st.sidebar:
     
     st.divider()
     
-    # Navigation
+    # Navigation - v5.8.3 FIX: Auto-switch to Portfolio Manager when profile clicked
+    # Determine default index based on whether a profile is selected
+    if st.session_state.get("active_profile"):
+        default_nav_index = 1  # Portfolio Manager
+    else:
+        default_nav_index = 0  # Global Dashboard
+    
     view_mode = st.radio(
         "Navigation",
         ["🏠 Global Dashboard", "📊 Portfolio Manager"],
+        index=default_nav_index,
         key="nav_radio"
     )
     
@@ -1466,12 +1473,12 @@ if view_mode == "🏠 Global Dashboard":
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    # Invisible full-width button for click detection
+                    # v5.8.3 FIX: Changed to 'secondary' to avoid red confusion
                     if st.button(
                         "📂 Click to Open →",
                         key=f"open_{name}",
                         use_container_width=True,
-                        type="primary",
+                        type="secondary",
                         help=f"Open {name} portfolio manager"
                     ):
                         st.session_state.active_profile = name
