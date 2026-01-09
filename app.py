@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.7"
+VERSION = "5.8"
 VERSION_DATE = "2026-01-09"
-VERSION_NAME = "Slippage Management Release"
+VERSION_NAME = "UI Refinement Release"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -261,6 +261,19 @@ st.markdown("""
         transform: translateY(-1px);
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
+    
+    /* v5.8 NEW: Professional profile tile header */
+    .profile-tile-header {
+        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        margin: -24px -24px 16px -24px;
+        font-weight: 600;
+        font-size: 1.1rem;
+        text-align: center;
+    }
+    
     </style>
 """, unsafe_allow_html=True)
 
@@ -464,7 +477,7 @@ with st.sidebar:
             with col2:
                 n_account_type = st.selectbox(
                     "Account Type*",
-                    ["", "Taxable", "401k", "IRA", "Roth IRA", "529", "HSA", "Other"],
+                    ["", "Taxable", "401k", "IRA", "Roth IRA", "TFSA", "RRSP", "529", "HSA", "Other"],
                     help="Type of investment account"
                 )
             
@@ -571,7 +584,7 @@ with st.sidebar:
                     edit_bank = st.text_input("Bank/Broker", value=prof.get('bank_name', ''))
                 with col_e2:
                     current_acct = prof.get('account_type', '')
-                    acct_types = ["Taxable", "401k", "IRA", "Roth IRA", "529", "HSA", "Other"]
+                    acct_types = ["Taxable", "401k", "IRA", "Roth IRA", "TFSA", "RRSP", "529", "HSA", "Other"]
                     default_idx = acct_types.index(current_acct) if current_acct in acct_types else 0
                     edit_acct = st.selectbox("Account Type", acct_types, index=default_idx)
                 
@@ -1413,6 +1426,9 @@ if view_mode == "🏠 Global Dashboard":
                 
                 st.markdown(f"""
                     <div class="{tile_class}" style="cursor: pointer; padding: 24px; margin-top: 0px;">
+                        <div class="profile-tile-header">
+                            {p_flag} {name}
+                        </div>
                         <div style="margin-bottom: 16px; text-align: center;">
                             {status_badge}
                         </div>
@@ -1551,14 +1567,18 @@ else:  # Portfolio Manager
         st.info("👈 **Add your first asset using the sidebar** to start building your portfolio")
         
         st.markdown("---")
-        st.markdown("### 🚀 Quick Start Guide")
+        st.markdown("### 🚀 Quick Start Guide: Building Your Investment Strategy")
+        
+        st.markdown("""
+        Follow these numbered steps matching the sidebar workflow:
+        """)
         
         st.markdown("""
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                     color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
-            <h4 style="margin-top: 0; color: white;">① Define Your Asset Mix</h4>
+            <h4 style="margin-top: 0; color: white;">① Strategy Setup</h4>
             <p style="margin-bottom: 0;">
-                Add tickers and set target allocation % for each asset. Total must equal 100%.
+                Create your profile with bank/broker, account type, principal, and inception date.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -1566,9 +1586,9 @@ else:  # Portfolio Manager
         st.markdown("""
         <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
                     color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
-            <h4 style="margin-top: 0; color: white;">② Lock Your Asset Mix</h4>
+            <h4 style="margin-top: 0; color: white;">② Drift Strategy</h4>
             <p style="margin-bottom: 0;">
-                Once assets total 100%, lock the mix to enable deployment tracking.
+                Set your drift tolerance % to control when rebalance alerts trigger.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -1576,9 +1596,29 @@ else:  # Portfolio Manager
         st.markdown("""
         <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
                     color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
-            <h4 style="margin-top: 0; color: white;">③ Deploy Capital Into Assets</h4>
+            <h4 style="margin-top: 0; color: white;">③ Benchmark Comparison</h4>
             <p style="margin-bottom: 0;">
-                Record your purchases for each asset until all reach 100% deployment.
+                Select a market index (SPY, QQQ, etc.) to compare your performance.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); 
+                    color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
+            <h4 style="margin-top: 0; color: white;">④ Asset Allocation</h4>
+            <p style="margin-bottom: 0;">
+                Add tickers and set target allocation % for each asset (total must = 100%).
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); 
+                    color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
+            <h4 style="margin-top: 0; color: white;">⑤ Lock Asset Mix</h4>
+            <p style="margin-bottom: 0;">
+                Once assets total 100%, lock the mix to finalize and enable deployment.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -1586,12 +1626,22 @@ else:  # Portfolio Manager
         st.markdown("""
         <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); 
                     color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
-            <h4 style="margin-top: 0; color: white;">④ Monitor & Rebalance</h4>
+            <h4 style="margin-top: 0; color: white;">⑥ Asset Deployment</h4>
             <p style="margin-bottom: 0;">
-                Track drift and use the two-step workflow to rebalance with actual broker prices.
+                Record your capital deployments for each asset until all reach 100%.
             </p>
         </div>
         """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("""
+        ### 💡 Pro Tips
+        - **Follow the numbers:** Complete steps ①→⑥ in order for smooth workflow
+        - **Diversify:** Spread investments across different asset classes
+        - **Deploy Gradually:** Use multiple deployment events to dollar-cost average
+        - **Track History:** All deployments and rebalances are logged
+        - **Stay Disciplined:** Rebalance when drift exceeds tolerance
+        """)
         
         st.markdown("---")
         st.success("👈 **Ready to start?** Add your first asset in the sidebar!")
@@ -2465,7 +2515,7 @@ else:  # Portfolio Manager
 st.divider()
 st.markdown(f"""
     <div style="text-align: center; color: #64748b; padding: 20px;">
-        <p><strong>Long Term Strategy Optimizer</strong> • v{VERSION} - {VERSION_NAME}</p>
+        <p><strong>Long Term Strategy Optimizer</strong> • v5.8 - UI Refinement Release</p>
         <p style="font-size: 0.85rem;">Market data by Yahoo Finance • For informational purposes only</p>
     </div>
 """, unsafe_allow_html=True)
