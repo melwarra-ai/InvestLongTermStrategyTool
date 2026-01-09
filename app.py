@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.8"
+VERSION = "5.8.1"
 VERSION_DATE = "2026-01-09"
-VERSION_NAME = "UI Refinement Release"
+VERSION_NAME = "UI Refinement Release (Bug Fix)"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1414,18 +1414,20 @@ if view_mode == "🏠 Global Dashboard":
                 status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
             
             with cols[i % 2]:
+                # v5.8.1: Button for navigation (profile name shown in tile header)
                 if st.button(
-                    f"{p_flag} **{name}**", 
+                    "📂 Open Profile", 
                     key=f"nav_{name}", 
                     use_container_width=True,
-                    type="primary",
-                    help=f"Click to view {name} details"
+                    type="secondary",
+                    help=f"Click to view {name} portfolio details"
                 ):
                     st.session_state.active_profile = name
                     st.rerun()
                 
+                # Profile tile with teal header containing name
                 st.markdown(f"""
-                    <div class="{tile_class}" style="cursor: pointer; padding: 24px; margin-top: 0px;">
+                    <div class="{tile_class}" style="padding: 24px; margin-top: 8px;">
                         <div class="profile-tile-header">
                             {p_flag} {name}
                         </div>
@@ -2015,74 +2017,75 @@ else:  # Portfolio Manager
                 💡 Use the two-step workflow below to rebalance with real broker prices
                 """)
             
+            # v5.8.1: Column config with ℹ️ info icons
             column_config = {
                 "Fund Name": st.column_config.TextColumn(
-                    "Fund Name",
+                    "Fund Name ℹ️",
                     help="Full name of the investment fund or security",
                     width="large"
                 ),
                 "Ticker": st.column_config.TextColumn(
-                    "Ticker",
+                    "Ticker ℹ️",
                     help="Stock ticker symbol",
                     width="small"
                 ),
                 "Target %": st.column_config.TextColumn(
-                    "Target %",
+                    "Target % ℹ️",
                     help="Your desired allocation percentage for this asset",
                     width="small"
                 ),
                 "Allocated %": st.column_config.TextColumn(
-                    "Allocated %",
+                    "Allocated % ℹ️",
                     help="Percentage of target that has been deployed (100% = fully deployed)",
                     width="small"
                 ),
                 "Actual %": st.column_config.TextColumn(
-                    "Actual %",
+                    "Actual % ℹ️",
                     help="Current portfolio percentage based on market values",
                     width="small"
                 ),
                 "Drift": st.column_config.TextColumn(
-                    "Drift",
+                    "Drift ℹ️",
                     help="Difference between Actual % and Target % (🔴 = exceeds tolerance)",
                     width="small"
                 ),
                 "Status": st.column_config.TextColumn(
-                    "Status",
+                    "Status ℹ️",
                     help="Deployment status or drift monitoring state",
                     width="medium"
                 ),
                 "Avg Cost": st.column_config.TextColumn(
-                    "Avg Cost",
+                    "Avg Cost ℹ️",
                     help="Weighted average cost per unit (available when 100% deployed)",
                     width="small"
                 ),
                 "Units": st.column_config.TextColumn(
-                    "Units",
+                    "Units ℹ️",
                     help="Total shares/units owned",
                     width="small"
                 ),
                 "Current Price": st.column_config.TextColumn(
-                    "Current Price",
+                    "Current Price ℹ️",
                     help="Latest market price per unit",
                     width="small"
                 ),
                 "%Daily Change": st.column_config.TextColumn(
-                    "%Daily Change",
+                    "%Daily Change ℹ️",
                     help="Price change from previous trading day",
                     width="small"
                 ),
                 "Amount": st.column_config.TextColumn(
-                    "Amount",
+                    "Amount ℹ️",
                     help="Current market value (Units × Current Price)",
                     width="medium"
                 ),
                 "Buy/Sell Amt": st.column_config.TextColumn(
-                    "Buy/Sell Amt",
+                    "Buy/Sell Amt ℹ️",
                     help="Dollar amount to trade for rebalancing",
                     width="medium"
                 ),
                 "Buy/Sell Shares": st.column_config.TextColumn(
-                    "Buy/Sell Shares",
+                    "Buy/Sell Shares ℹ️",
                     help="Number of shares to buy (+) or sell (-)",
                     width="small"
                 )
@@ -2515,7 +2518,7 @@ else:  # Portfolio Manager
 st.divider()
 st.markdown(f"""
     <div style="text-align: center; color: #64748b; padding: 20px;">
-        <p><strong>Long Term Strategy Optimizer</strong> • v5.8 - UI Refinement Release</p>
+        <p><strong>Long Term Strategy Optimizer</strong> • v{VERSION} - {VERSION_NAME}</p>
         <p style="font-size: 0.85rem;">Market data by Yahoo Finance • For informational purposes only</p>
     </div>
 """, unsafe_allow_html=True)
