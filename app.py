@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.8.1"
+VERSION = "5.8.2"
 VERSION_DATE = "2026-01-09"
-VERSION_NAME = "UI Refinement Release (Bug Fix)"
+VERSION_NAME = "Professional Dashboard Navigation"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -78,12 +78,26 @@ st.markdown("""
     .profile-tile-optimized {
         border-left: 4px solid #10b981;
         background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .profile-tile-optimized:hover {
+        box-shadow: 0 8px 16px rgba(16, 185, 129, 0.2);
+        transform: translateY(-2px);
     }
     
     .profile-tile-warning {
         border-left: 4px solid #ef4444;
         background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
         animation: pulse-border 2s infinite;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .profile-tile-warning:hover {
+        box-shadow: 0 8px 16px rgba(239, 68, 68, 0.2);
+        transform: translateY(-2px);
     }
     
     @keyframes pulse-border {
@@ -262,9 +276,10 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     
-    /* v5.8 NEW: Professional profile tile header */
+    /* v5.8.2 NEW: Professional fintech profile tile header - Slate/Charcoal */
+    /* Green reserved ONLY for status indicators (deployment, rebalance success) */
     .profile-tile-header {
-        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+        background: linear-gradient(135deg, #475569 0%, #334155 100%);
         color: white;
         padding: 12px 20px;
         border-radius: 8px;
@@ -272,6 +287,7 @@ st.markdown("""
         font-weight: 600;
         font-size: 1.1rem;
         text-align: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
     
     </style>
@@ -1368,7 +1384,7 @@ if view_mode == "🏠 Global Dashboard":
         
         # Portfolio Grid
         st.markdown("### 🔍 Portfolio Strategies")
-        st.caption("Click any profile name to view detailed analytics and manage assets")
+        st.caption("Click any profile tile or 'Open' button to view detailed analytics and manage assets")
         
         cols = st.columns(2)
         for i, (name, p_data) in enumerate(profiles.items()):
@@ -1414,50 +1430,53 @@ if view_mode == "🏠 Global Dashboard":
                 status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
             
             with cols[i % 2]:
-                # v5.8.1: Button for navigation (profile name shown in tile header)
-                if st.button(
-                    "📂 Open Profile", 
-                    key=f"nav_{name}", 
-                    use_container_width=True,
-                    type="secondary",
-                    help=f"Click to view {name} portfolio details"
-                ):
-                    st.session_state.active_profile = name
-                    st.rerun()
+                # v5.8.2: Clickable profile tile - entire tile navigates to profile view
+                with st.container():
+                    # Tile content with integrated navigation
+                    st.markdown(f"""
+                        <div class="{tile_class}" style="padding: 24px; margin-top: 0px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;">
+                            <div class="profile-tile-header">
+                                {p_flag} {name}
+                            </div>
+                            <div style="margin-bottom: 16px; text-align: center;">
+                                {status_badge}
+                            </div>
+                            <div style="margin: 20px 0; text-align: center;">
+                                <div class="stat-label">Portfolio Value</div>
+                                <div class="stat-value" style="font-size: 2rem;">${curr_v:,.0f}</div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; color: #64748b;">
+                                <div>
+                                    <div style="font-size: 0.75rem; opacity: 0.8;">Goal</div>
+                                    <div style="font-weight: 600;">{p_data['yearly_goal_pct']}%/yr</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.75rem; opacity: 0.8;">CAGR</div>
+                                    <div style="font-weight: 700; color: {'#10b981' if cagr >= 0 else '#ef4444'};">
+                                        {cagr:+.1f}%
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 0.75rem; opacity: 0.8;">ROI</div>
+                                    <div style="font-weight: 700; color: {'#10b981' if roi_pct >= 0 else '#ef4444'};">
+                                        {roi_pct:+.1f}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Invisible full-width button for click detection
+                    if st.button(
+                        "📂 Click to Open →",
+                        key=f"open_{name}",
+                        use_container_width=True,
+                        type="primary",
+                        help=f"Open {name} portfolio manager"
+                    ):
+                        st.session_state.active_profile = name
+                        st.rerun()
                 
-                # Profile tile with teal header containing name
-                st.markdown(f"""
-                    <div class="{tile_class}" style="padding: 24px; margin-top: 8px;">
-                        <div class="profile-tile-header">
-                            {p_flag} {name}
-                        </div>
-                        <div style="margin-bottom: 16px; text-align: center;">
-                            {status_badge}
-                        </div>
-                        <div style="margin: 20px 0; text-align: center;">
-                            <div class="stat-label">Portfolio Value</div>
-                            <div class="stat-value" style="font-size: 2rem;">${curr_v:,.0f}</div>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; color: #64748b;">
-                            <div>
-                                <div style="font-size: 0.75rem; opacity: 0.8;">Goal</div>
-                                <div style="font-weight: 600;">{p_data['yearly_goal_pct']}%/yr</div>
-                            </div>
-                            <div style="text-align: center;">
-                                <div style="font-size: 0.75rem; opacity: 0.8;">CAGR</div>
-                                <div style="font-weight: 700; color: {'#10b981' if cagr >= 0 else '#ef4444'};">
-                                    {cagr:+.1f}%
-                                </div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="font-size: 0.75rem; opacity: 0.8;">ROI</div>
-                                <div style="font-weight: 700; color: {'#10b981' if roi_pct >= 0 else '#ef4444'};">
-                                    {roi_pct:+.1f}%
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
                 
                 if needs_rebal and drift_details:
                     with st.expander("⚠️ View Drift Details", expanded=False):
