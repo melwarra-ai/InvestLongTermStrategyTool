@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.6"
+VERSION = "5.7"
 VERSION_DATE = "2026-01-09"
-VERSION_NAME = "UX Enhancement Release"
+VERSION_NAME = "Slippage Management Release"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -232,6 +232,19 @@ st.markdown("""
         margin-bottom: 20px;
     }
     
+    .recommendation-box {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border: 3px solid #f59e0b;
+        padding: 20px;
+        border-radius: 12px;
+        margin: 16px 0;
+    }
+    
+    .recommendation-box h3 {
+        color: #92400e;
+        margin-top: 0;
+    }
+    
     h1, h2, h3 {
         font-weight: 600;
         color: #1e293b;
@@ -268,7 +281,7 @@ def load_db():
                     p.setdefault("last_rebalanced", None)
                     p.setdefault("benchmark", None)
                     
-                    # v5.6 NEW: Bank/Broker fields
+                    # v5.6 fields
                     p.setdefault("bank_name", "")
                     p.setdefault("account_type", "")
                     
@@ -323,12 +336,6 @@ def calculate_average_cost(asset_data):
     """
     Calculate weighted average cost for an asset.
     Only returns value when asset is 100% allocated.
-    
-    Args:
-        asset_data: Asset dict with 'purchases' and 'allocated_pct'
-    
-    Returns:
-        float or None: Average cost per unit, or None if not fully allocated
     """
     allocated_pct = asset_data.get("allocated_pct", 0)
     if allocated_pct < 100.0:
@@ -362,25 +369,20 @@ def calculate_drift_status(p_data, prices):
     has_rebalanced = p_data.get("last_rebalanced") is not None
     recently_rebalanced = check_recently_rebalanced(p_data.get("last_rebalanced"))
     
-    # Recently rebalanced = don't check drift yet
     if recently_rebalanced:
         return False, []
     
-    # Check drift for each asset that has units
     drift_details = []
     for t in p_assets:
         allocated_pct = p_assets[t].get("allocated_pct", 0)
         cur_units = float(p_assets[t].get("units", 0))
         
-        # If allocated_pct not tracked BUT has units, assume 100% deployed (legacy)
         if allocated_pct == 0 and cur_units > 0:
             allocated_pct = 100.0
         
-        # Skip if asset not deployed (no units)
         if cur_units == 0:
             continue
         
-        # Check drift for this deployed asset (regardless of rebalance history)
         actual_pct = float((p_assets[t]["units"] * prices.get(t, 0) / curr_v * 100))
         target_pct = float(p_assets[t]["target"])
         drift = abs(actual_pct - target_pct)
@@ -390,16 +392,7 @@ def calculate_drift_status(p_data, prices):
     return len(drift_details) > 0, drift_details
 
 def validate_deployment_date(deploy_date, inception_date_str):
-    """
-    v5.6 NEW: Validate that deployment date is not before inception date.
-    
-    Args:
-        deploy_date: date object for deployment
-        inception_date_str: string date in YYYY-MM-DD format
-    
-    Returns:
-        tuple: (is_valid: bool, error_message: str)
-    """
+    """v5.6: Validate deployment date constraints"""
     try:
         inception_date = datetime.strptime(inception_date_str, '%Y-%m-%d').date()
         
@@ -413,6 +406,19 @@ def validate_deployment_date(deploy_date, inception_date_str):
     except:
         return False, "Invalid date format"
 
+# v5.7 NEW: Rebalance recommendation storage
+def store_rebalance_recommendation(prof, recommendations):
+    """Store recommended rebalance trades for later execution"""
+    prof["pending_rebalance"] = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "recommendations": recommendations
+    }
+
+def clear_rebalance_recommendation(prof):
+    """Clear stored rebalance recommendation"""
+    if "pending_rebalance" in prof:
+        del prof["pending_rebalance"]
+
 # ===== SESSION STATE =====
 if "db" not in st.session_state:
     st.session_state.db = load_db()
@@ -420,6 +426,11 @@ if "current_page" not in st.session_state:
     st.session_state.current_page = "Global Dashboard"
 if "active_profile" not in st.session_state:
     st.session_state.active_profile = None
+# v5.7 NEW: Rebalance workflow state
+if "show_rebalance_recommendation" not in st.session_state:
+    st.session_state.show_rebalance_recommendation = False
+if "show_execute_form" not in st.session_state:
+    st.session_state.show_execute_form = False
 
 # ===== SIDEBAR =====
 with st.sidebar:
@@ -437,13 +448,12 @@ with st.sidebar:
     
     st.divider()
     
-    # ① Profile Creation - v5.6 ENHANCED with numbered steps
+    # ① Profile Creation
     st.markdown("### ① Strategy Setup")
     with st.expander("🆕 Create New Profile", expanded=False):
         with st.form("new_profile_form"):
             n_name = st.text_input("Profile Name*", placeholder="e.g., Retirement USD")
             
-            # v5.6 NEW: Bank/Broker and Account Type
             col1, col2 = st.columns(2)
             with col1:
                 n_bank = st.text_input(
@@ -462,7 +472,6 @@ with st.sidebar:
             n_p = st.number_input("Principal ($)*", value=10000.0, step=1000.0, min_value=0.0)
             n_goal = st.number_input("Annual Growth Goal (%)*", value=10.0, step=0.5, min_value=0.0)
             
-            # v5.6 NEW: Date validation enforcement
             n_start = st.date_input(
                 "Inception Date*", 
                 value=date.today() - timedelta(days=365),
@@ -473,7 +482,6 @@ with st.sidebar:
             submitted = st.form_submit_button("🚀 Initialize Profile", use_container_width=True)
             
             if submitted:
-                # v5.6 NEW: Enhanced validation
                 if not n_name:
                     st.error("❌ Profile name is required")
                 elif not n_bank:
@@ -531,10 +539,9 @@ with st.sidebar:
         prof = st.session_state.db["profiles"][st.session_state.active_profile]
         p_flag = "🇺🇸" if prof.get("currency") == "USD" else "🇨🇦"
         
-        # v5.6 NEW: Show Bank/Broker info
         st.caption(f"🏦 {prof.get('bank_name', 'N/A')} • {prof.get('account_type', 'N/A')}")
         
-        # v5.6 NEW: CRUD Actions
+        # CRUD Actions
         st.divider()
         st.markdown("### ⚙️ Profile Actions")
         
@@ -552,7 +559,7 @@ with st.sidebar:
             if st.button("🗑️ Delete", use_container_width=True, key="delete_profile", type="secondary"):
                 st.session_state.delete_confirm = True
         
-        # v5.6 NEW: Edit Profile Dialog
+        # Edit Dialog
         if st.session_state.get("editing_profile", False):
             st.markdown("#### ✏️ Edit Profile")
             with st.form("edit_profile_form"):
@@ -587,7 +594,7 @@ with st.sidebar:
                         st.session_state.editing_profile = False
                         st.rerun()
         
-        # v5.6 NEW: Reset Confirmation Dialog
+        # Reset Confirmation
         if st.session_state.get("reset_confirm", False):
             st.warning("⚠️ **Reset Profile?**")
             st.caption("This will delete all assets, deployments, and rebalance history. Profile metadata will be preserved.")
@@ -600,6 +607,7 @@ with st.sidebar:
                     prof['rebalance_stats'] = []
                     prof['last_rebalanced'] = None
                     prof['asset_mix_locked'] = False
+                    clear_rebalance_recommendation(prof)  # v5.7 NEW
                     save_db(st.session_state.db)
                     log_profile(prof, "Profile reset - all asset data cleared")
                     st.session_state.reset_confirm = False
@@ -611,7 +619,7 @@ with st.sidebar:
                     st.session_state.reset_confirm = False
                     st.rerun()
         
-        # v5.6 NEW: Delete Confirmation Dialog
+        # Delete Confirmation
         if st.session_state.get("delete_confirm", False):
             st.error("🗑️ **Delete Profile?**")
             st.caption(f"This will permanently delete '{st.session_state.active_profile}'. This action cannot be undone.")
@@ -741,7 +749,7 @@ with st.sidebar:
         # Calculate current allocation
         current_alloc = sum(a.get('target', 0) for a in prof.get("assets", {}).values())
         
-        # Allocation progress bar with color coding
+        # Allocation progress bar
         progress_color = "🟢" if current_alloc >= 100 else "🟡"
         bar_color = "#10b981" if current_alloc >= 100 else "#f97316"
         
@@ -786,7 +794,7 @@ with st.sidebar:
         last_price = 1.0
         ticker_name = ""
         
-        # Validate ticker - Block asset modification if locked
+        # Validate ticker
         if prof.get("asset_mix_locked", False) and not is_existing and a_sym:
             st.error("🔒 **Asset mix is locked**")
             st.caption("Cannot add new assets during deployment phase.")
@@ -888,7 +896,7 @@ with st.sidebar:
             for ticker, data in prof["assets"].items():
                 st.caption(f"**{ticker}**: {data['target']}% ({data['units']:.4f} units)")
         
-        # ⑤ Asset Mix Locking Controls
+        # ⑤ Asset Mix Locking
         st.divider()
         st.markdown("### ⑤ Lock Asset Mix")
         
@@ -927,16 +935,14 @@ with st.sidebar:
         
         st.divider()
         
-        # ⑥ Asset Deployment Section
+        # ⑥ Asset Deployment
         st.markdown("### ⑥ Asset Deployment")
         st.caption("Deploy capital into individual assets over time")
         
-        # Only show deployment UI if asset mix is locked
         if not prof.get("asset_mix_locked", False):
             st.info("🔒 **Lock your asset mix first** to enable deployment")
             st.caption("Complete asset definitions (totaling 100%) and lock the mix before deploying capital.")
         else:
-            # Get assets that still need deployment
             assets = prof.get("assets", {})
             deployable_assets = {
                 ticker: data 
@@ -944,7 +950,6 @@ with st.sidebar:
                 if data.get("allocated_pct", 0) < 100.0
             }
             
-            # Show overall deployment progress
             fully_deployed_count = sum(
                 1 for a in assets.values() 
                 if a.get("allocated_pct", 0) >= 100.0
@@ -953,13 +958,11 @@ with st.sidebar:
             
             st.markdown(f"**Progress:** {fully_deployed_count}/{total_assets} assets fully deployed")
             
-            # v5.6 ENHANCED: Progress bar with dynamic colors
             if total_assets > 0:
                 deployment_progress = fully_deployed_count / total_assets
                 
-                # Dynamic color - Orange during progress, Green at 100%
                 if deployment_progress >= 1.0:
-                    bar_color = "#10b981"  # Green
+                    bar_color = "#10b981"
                     st.markdown("""
                         <style>
                         div[data-testid="stProgress"] > div > div > div {
@@ -968,7 +971,7 @@ with st.sidebar:
                         </style>
                     """, unsafe_allow_html=True)
                 else:
-                    bar_color = "#f97316"  # Orange
+                    bar_color = "#f97316"
                     st.markdown("""
                         <style>
                         div[data-testid="stProgress"] > div > div > div {
@@ -979,20 +982,15 @@ with st.sidebar:
                 
                 st.progress(deployment_progress)
                 
-                # Status text with matching color
                 status_text = "✅ All Deployed" if deployment_progress >= 1.0 else f"⏳ In Progress ({fully_deployed_count}/{total_assets})"
                 st.markdown(f"**{status_text}**")
             
             if not deployable_assets:
-                # All assets 100% deployed
                 st.success("✅ **All assets 100% deployed!**")
                 st.caption("Portfolio-level drift monitoring is now active.")
                 
-                # Show deployment history
                 with st.expander("✏️ View Deployment History", expanded=False):
-                    st.markdown("""
-                    Review your deployment history for each asset. All assets are fully deployed.
-                    """)
+                    st.markdown("Review your deployment history for each asset. All assets are fully deployed.")
                     
                     for ticker, asset_data in assets.items():
                         fund_name = asset_data.get("fund_name", ticker)
@@ -1022,7 +1020,6 @@ with st.sidebar:
                         st.markdown("---")
                         
             else:
-                # Some assets still need deployment - Deployment form
                 with st.expander("➕ Record Asset Deployment", expanded=False):
                     st.markdown("""
                     **Deploy capital into a specific asset** at market prices from a selected date.
@@ -1033,7 +1030,6 @@ with st.sidebar:
                     - **Portfolio drift** activates when ALL assets reach 100%
                     """)
                     
-                    # Asset selector dropdown
                     selected_ticker = st.selectbox(
                         "Select Asset to Deploy",
                         options=list(deployable_assets.keys()),
@@ -1049,7 +1045,6 @@ with st.sidebar:
                         target_pct = asset_data.get("target", 0)
                         fund_name = asset_data.get("fund_name", selected_ticker)
                         
-                        # Display asset information
                         st.markdown(f"""
                             **Asset Information:**  
                             • **Fund:** {fund_name}  
@@ -1059,7 +1054,6 @@ with st.sidebar:
                             • **Remaining:** {remaining_pct:.1f}% of this asset's target
                         """)
                         
-                        # Show existing deployments if any
                         existing_purchases = asset_data.get("purchases", [])
                         if existing_purchases:
                             st.markdown("**Previous Deployments:**")
@@ -1068,7 +1062,6 @@ with st.sidebar:
                         
                         st.divider()
                         
-                        # Deployment percentage input
                         deploy_pct = st.number_input(
                             "Deploy % (of this asset's target allocation)",
                             min_value=0.1,
@@ -1079,12 +1072,10 @@ with st.sidebar:
                             key="deploy_pct_input"
                         )
                         
-                        # v5.6 NEW: Validation - Cannot exceed remaining %
                         if deploy_pct > remaining_pct:
                             st.error(f"❌ Cannot deploy {deploy_pct:.1f}% - only {remaining_pct:.1f}% remaining for this asset")
                             deploy_pct = remaining_pct
                         
-                        # v5.6 NEW: Enforce deployment date >= inception date
                         inception_date = datetime.strptime(prof.get('start_date'), '%Y-%m-%d').date()
                         
                         deploy_date = st.date_input(
@@ -1096,11 +1087,9 @@ with st.sidebar:
                             key="deploy_date_input"
                         )
                         
-                        # Calculate dollar amount
                         portfolio_pct = (deploy_pct / 100) * target_pct
                         deploy_amount = (portfolio_pct / 100) * prof['principal']
                         
-                        # Show calculation breakdown
                         st.info(f"""
                             **📊 Deployment Calculation:**  
                             • {deploy_pct:.1f}% of {selected_ticker}'s {target_pct}% target  
@@ -1108,7 +1097,6 @@ with st.sidebar:
                             • = **${deploy_amount:,.2f}** to be invested
                         """)
                         
-                        # Price source indicator
                         if deploy_date == date.today():
                             st.caption("💹 Will use today's closing price")
                         else:
@@ -1116,16 +1104,13 @@ with st.sidebar:
                         
                         st.divider()
                         
-                        # Deploy button
                         if st.button("🔥 Record Deployment", type="primary", use_container_width=True, key="record_deploy_btn"):
                             try:
                                 with st.spinner(f"Fetching price for {selected_ticker} on {deploy_date}..."):
-                                    # Fetch historical price using yfinance
                                     t_obj = yf.Ticker(selected_ticker)
                                     deploy_datetime = pd.to_datetime(deploy_date)
                                     today_dt = pd.to_datetime(date.today())
                                     
-                                    # Determine data range to fetch
                                     if deploy_datetime.date() == today_dt.date():
                                         hist = t_obj.history(period="1d")
                                     else:
@@ -1136,14 +1121,12 @@ with st.sidebar:
                                     if hist.empty:
                                         st.error(f"❌ Could not fetch price data for {selected_ticker}")
                                     else:
-                                        # Find price for deployment date
                                         hist.index = pd.to_datetime(hist.index).date
                                         
                                         if deploy_datetime.date() in hist.index:
                                             price = float(hist.loc[deploy_datetime.date()]['Close'])
                                             price_date = deploy_datetime.date()
                                         else:
-                                            # Weekend or holiday - use closest prior trading day
                                             available_dates = [d for d in hist.index if d <= deploy_datetime.date()]
                                             if available_dates:
                                                 price_date = max(available_dates)
@@ -1157,10 +1140,8 @@ with st.sidebar:
                                                 price_date = None
                                         
                                         if price is not None:
-                                            # Calculate quantity
                                             quantity = deploy_amount / price
                                             
-                                            # Create purchase record
                                             purchase = {
                                                 "date": str(deploy_date),
                                                 "deploy_pct": deploy_pct,
@@ -1169,26 +1150,21 @@ with st.sidebar:
                                                 "quantity": quantity
                                             }
                                             
-                                            # Update asset data
                                             asset_data.setdefault("purchases", []).append(purchase)
                                             asset_data["units"] = asset_data.get("units", 0) + quantity
                                             asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)
                                             
-                                            # Log the deployment
                                             log_msg = (
                                                 f"Deployed {deploy_pct:.1f}% of {selected_ticker} "
                                                 f"(${deploy_amount:,.2f} @ ${price:.2f}/unit = {quantity:.4f} units)"
                                             )
                                             log_profile(prof, log_msg)
                                             
-                                            # Save to database
                                             save_db(st.session_state.db)
                                             
-                                            # Success messages
                                             st.success(f"✅ Deployed {deploy_pct:.1f}% of {selected_ticker}")
                                             st.info(f"📊 {selected_ticker} is now {asset_data['allocated_pct']:.1f}% deployed")
                                             
-                                            # Check if asset is now fully deployed
                                             if asset_data['allocated_pct'] >= 100.0:
                                                 st.balloons()
                                                 st.success(f"🎉 {selected_ticker} is now 100% deployed! Average cost will be calculated.")
@@ -1257,7 +1233,7 @@ if view_mode == "🏠 Global Dashboard":
                 <div class="premium-card">
                     <h4>⚖️ Smart Rebalancing</h4>
                     <p style="color: #64748b;">
-                        Automated calculations show exactly what to buy or sell to restore balance.
+                        Two-step workflow with slippage management for real-world trading accuracy.
                     </p>
                 </div>
             """, unsafe_allow_html=True)
@@ -1330,7 +1306,7 @@ if view_mode == "🏠 Global Dashboard":
         
         st.divider()
         
-        # v5.6 NEW: Profile Comparison Tool
+        # Profile Comparison Tool
         st.markdown("### 📊 Portfolio Comparison")
         with st.expander("Compare Multiple Profiles", expanded=False):
             if len(profiles) < 2:
@@ -1350,13 +1326,11 @@ if view_mode == "🏠 Global Dashboard":
                         p_data = profiles[p_name]
                         p_assets = p_data.get("assets", {})
                         
-                        # Calculate current value
                         curr_val = 0
                         for ticker, asset_info in p_assets.items():
                             if ticker in prices:
                                 curr_val += asset_info["units"] * prices[ticker]
                         
-                        # Calculate metrics
                         start_val = float(p_data.get('principal', 0))
                         roi = ((curr_val / start_val) - 1) * 100 if start_val > 0 else 0
                         
@@ -1392,7 +1366,6 @@ if view_mode == "🏠 Global Dashboard":
             recently_rebalanced = check_recently_rebalanced(p_data.get("last_rebalanced"))
             needs_rebal, drift_details = calculate_drift_status(p_data, prices)
             
-            # Calculate ROI and CAGR
             start_val = float(p_data.get('principal', 0))
             roi_pct = ((curr_v / start_val) - 1) * 100 if start_val > 0 else 0
             
@@ -1402,13 +1375,11 @@ if view_mode == "🏠 Global Dashboard":
             
             p_flag = "🇺🇸" if p_data.get("currency") == "USD" else "🇨🇦"
             
-            # Check if all assets are 100% deployed
             all_deployed = all(
                 asset.get("allocated_pct", 0) >= 100.0 
                 for asset in p_assets.values()
             ) if p_assets else False
             
-            # Determine status - Check drift/rebalance need FIRST
             if recently_rebalanced:
                 tile_class = "profile-tile-optimized"
                 status_badge = '<span class="success-badge">✅ Balanced</span>'
@@ -1430,7 +1401,6 @@ if view_mode == "🏠 Global Dashboard":
                 status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
             
             with cols[i % 2]:
-                # v5.6 NEW: Clickable profile name button
                 if st.button(
                     f"{p_flag} **{name}**", 
                     key=f"nav_{name}", 
@@ -1441,7 +1411,6 @@ if view_mode == "🏠 Global Dashboard":
                     st.session_state.active_profile = name
                     st.rerun()
                 
-                # Profile tile
                 st.markdown(f"""
                     <div class="{tile_class}" style="cursor: pointer; padding: 24px; margin-top: 0px;">
                         <div style="margin-bottom: 16px; text-align: center;">
@@ -1480,7 +1449,6 @@ if view_mode == "🏠 Global Dashboard":
                 st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
 
 else:  # Portfolio Manager
-    # v5.6 NEW: Neutral state when no profile selected
     if not st.session_state.active_profile:
         st.title("📊 Portfolio Manager")
         
@@ -1495,7 +1463,6 @@ else:  # Portfolio Manager
         
         st.divider()
         
-        # Show available profiles
         profiles = st.session_state.db.get("profiles", {})
         if profiles:
             st.markdown("### 📁 Available Profiles")
@@ -1509,7 +1476,6 @@ else:  # Portfolio Manager
         
         st.stop()
     
-    # Validate active profile exists
     if st.session_state.active_profile not in st.session_state.db["profiles"]:
         st.error("⚠️ Selected profile no longer exists. Please select another.")
         st.session_state.active_profile = None
@@ -1538,7 +1504,7 @@ else:  # Portfolio Manager
         elif assets and all_deployed:
             st.success("✅ **All assets deployed** - Portfolio drift monitoring active")
     
-    # Portfolio Summary at top
+    # Portfolio Summary
     has_rebalanced = prof.get("last_rebalanced") is not None
     recently_rebalanced = check_recently_rebalanced(prof.get("last_rebalanced"))
     
@@ -1585,13 +1551,8 @@ else:  # Portfolio Manager
         st.info("👈 **Add your first asset using the sidebar** to start building your portfolio")
         
         st.markdown("---")
-        st.markdown("### 🚀 Quick Start Guide: Building Your Investment Strategy")
+        st.markdown("### 🚀 Quick Start Guide")
         
-        st.markdown("""
-        Follow these steps to set up your complete investment workflow:
-        """)
-        
-        # Step guides...
         st.markdown("""
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                     color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
@@ -1627,7 +1588,7 @@ else:  # Portfolio Manager
                     color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
             <h4 style="margin-top: 0; color: white;">④ Monitor & Rebalance</h4>
             <p style="margin-bottom: 0;">
-                Track drift and rebalance when allocations deviate from targets.
+                Track drift and use the two-step workflow to rebalance with actual broker prices.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -1669,7 +1630,6 @@ else:  # Portfolio Manager
             curr_v = float(daily_val.iloc[-1])
             start_val = float(prof['principal'])
             
-            # Check for zero portfolio value
             if curr_v <= 0:
                 st.warning("⚠️ **Portfolio value is zero**")
                 st.info("""
@@ -1687,11 +1647,9 @@ else:  # Portfolio Manager
             years = max((data.index[-1] - data.index[0]).days / 365.25, 0.01)
             target_val = start_val * (1 + (float(prof['yearly_goal_pct'])/100))**years
             
-            # Safe division with zero checks
             perc_diff = ((curr_v / target_val) - 1) * 100 if target_val > 0 else 0
             roi_pct = ((curr_v / start_val) - 1) * 100 if start_val > 0 else 0
             
-            # Calculate CAGR
             prof_start_date = datetime.strptime(prof.get('start_date', str(date.today())), '%Y-%m-%d')
             prof_years = max((date.today() - prof_start_date.date()).days / 365.25, 0.01)
             profile_cagr = ((curr_v / start_val) ** (1 / prof_years) - 1) * 100 if start_val > 0 else 0
@@ -1834,7 +1792,7 @@ else:  # Portfolio Manager
             
             fig = go.Figure()
             
-            # v5.6 FIXED: Benchmark comparison with proper data handling
+            # Benchmark comparison
             benchmark_ticker = prof.get('benchmark')
             benchmark_comparison_msg = None
             
@@ -1844,28 +1802,23 @@ else:  # Portfolio Manager
                     if not benchmark_raw.empty:
                         benchmark_data = benchmark_raw['Close']
                         
-                        # Handle both DataFrame and Series from yfinance
                         if isinstance(benchmark_data, pd.DataFrame):
                             benchmark_data = benchmark_data.squeeze()
                         
-                        # Ensure we have a proper Series with numeric values
                         benchmark_data = benchmark_data.dropna()
                         
                         if len(benchmark_data) == 0:
                             st.warning(f"⚠️ No valid benchmark data for {benchmark_ticker}")
                         else:
-                            # Normalize benchmark to start value
                             first_price = float(benchmark_data.iloc[0])
                             last_price = float(benchmark_data.iloc[-1])
                             benchmark_normalized = (benchmark_data / first_price) * start_val
                             bench_return = ((last_price / first_price) - 1) * 100
                             bench_final_value = float(benchmark_normalized.iloc[-1])
                             
-                            # v5.6 FIX: Convert to lists for Plotly compatibility
                             bench_dates = benchmark_normalized.index.tolist()
                             bench_values = benchmark_normalized.values.tolist()
                             
-                            # Add benchmark trace FIRST (renders in background)
                             fig.add_trace(go.Scatter(
                                 x=bench_dates,
                                 y=bench_values,
@@ -1885,7 +1838,6 @@ else:  # Portfolio Manager
                                              '<extra></extra>'
                             ))
                             
-                            # Comparison message
                             portfolio_vs_bench = curr_v - bench_final_value
                             if portfolio_vs_bench > 0:
                                 benchmark_comparison_msg = ("success", f"📊 Your portfolio outperformed {benchmark_ticker} by ${portfolio_vs_bench:,.0f} ({((curr_v/bench_final_value - 1)*100):+.1f}%)" if bench_final_value > 0 else f"📊 Your portfolio: ${curr_v:,.0f}")
@@ -1896,7 +1848,7 @@ else:  # Portfolio Manager
                 except Exception as e:
                     st.error(f"⚠️ Benchmark error: {str(e)}")
             
-            # Actual portfolio (renders ON TOP of benchmark)
+            # Actual portfolio
             fig.add_trace(go.Scatter(
                 x=data.index,
                 y=daily_val,
@@ -1966,7 +1918,6 @@ else:  # Portfolio Manager
             
             st.plotly_chart(fig, use_container_width=True)
             
-            # Chart Legend Explanation
             with st.expander("📊 Understanding This Chart", expanded=False):
                 st.markdown("""
                 **What the lines represent:**
@@ -1986,7 +1937,6 @@ else:  # Portfolio Manager
                 - Use the toolbar to zoom, pan, or save the chart
                 """)
             
-            # Show benchmark comparison if available
             if benchmark_comparison_msg:
                 msg_type, msg_text = benchmark_comparison_msg
                 if msg_type == "success":
@@ -1996,7 +1946,7 @@ else:  # Portfolio Manager
             
             st.divider()
             
-            # v5.6 ENHANCED: Rebalance Analysis with improved column order and tooltips
+            # Rebalance Analysis
             st.markdown("### ⚖️ Rebalance Analysis")
             st.caption("Review asset allocation drift and required trades to restore target percentages")
             with st.expander("ℹ️ Understanding the rebalance table", expanded=False):
@@ -2012,10 +1962,9 @@ else:  # Portfolio Manager
                     - 🟢 Green = within tolerance (good)
                 - **Status**: Deployment or drift monitoring state
                 
-                💡 Execute rebalancing when you see 🔴 red drift indicators
+                💡 Use the two-step workflow below to rebalance with real broker prices
                 """)
             
-            # v5.6 NEW: Column configuration with tooltips
             column_config = {
                 "Fund Name": st.column_config.TextColumn(
                     "Fund Name",
@@ -2131,12 +2080,10 @@ else:  # Portfolio Manager
                 total_turnover += abs(val_diff)
                 total_current_val += act_val
                 
-                # v5.6 ENHANCED: Drift display - DISABLED until 100% deployed
                 if allocated_pct < 100.0:
                     drift_display = "—"
                     status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
                 else:
-                    # Asset fully deployed - show drift
                     drift_display = f"{drift:+.2f}%"
                     if abs(drift) >= prof.get("drift_tolerance", 5.0):
                         drift_display = f"🔴 {drift:+.2f}%"
@@ -2148,7 +2095,6 @@ else:  # Portfolio Manager
                 
                 daily_change_display = f"{daily_change_pct:+.2f}%"
                 
-                # v5.6 NEW: Column order - Target %, Allocated %, Actual %, Drift
                 rows.append({
                     "Fund Name": fund_name,
                     "Ticker": t,
@@ -2166,7 +2112,6 @@ else:  # Portfolio Manager
                     "Buy/Sell Shares": f"{unit_diff:+.0f}"
                 })
             
-            # Total row
             rows.append({
                 "Fund Name": "**TOTAL**",
                 "Ticker": "",
@@ -2186,7 +2131,6 @@ else:  # Portfolio Manager
             
             df_rebalance = pd.DataFrame(rows)
             
-            # v5.6 NEW: Display with column config and tooltips
             st.dataframe(
                 df_rebalance, 
                 use_container_width=True, 
@@ -2194,7 +2138,6 @@ else:  # Portfolio Manager
                 column_config=column_config
             )
             
-            # Info about drift activation
             all_deployed = all(a.get("allocated_pct", 0) >= 100.0 for a in asset_dict.values())
             if not all_deployed:
                 st.info("ℹ️ **Portfolio-level drift monitoring** activates when all assets reach 100% deployment")
@@ -2207,91 +2150,225 @@ else:  # Portfolio Manager
             
             st.divider()
             
-            # Execution
+            # v5.7 NEW: Two-Step Rebalance Workflow
+            st.markdown("### 🚀 Two-Step Rebalance Workflow")
+            st.caption("Professional slippage management: Get recommendations, execute at broker, then enter actual prices")
+            
+            with st.expander("ℹ️ How the two-step workflow works", expanded=False):
+                st.markdown("""
+                **Why two steps?**
+                
+                Market prices change constantly. The prices shown above are **estimates** from the app.  
+                Your **actual broker fills** may differ due to slippage, spreads, and market movement.
+                
+                **The Workflow:**
+                
+                1. **📋 Recommend Rebalance**: View suggested trades at current market prices
+                2. **🏦 Execute at Broker**: Go to your broker and execute the trades manually
+                3. **✅ Enter Actual Prices**: Return here and enter the **exact prices you received**
+                4. **💾 Commit**: App updates your portfolio with real-world data (not estimates)
+                
+                **Benefits:**
+                - Accurate portfolio tracking with actual fill prices
+                - No errors from market slippage
+                - Professional-grade record keeping
+                - Realistic performance metrics
+                """)
+            
             col_exec1, col_exec2 = st.columns(2)
             
             with col_exec1:
-                st.markdown("### 🚀 Execute Rebalance")
-                st.caption("Adjust portfolio units to match target allocation")
-                with st.expander("ℹ️ What happens when you rebalance?", expanded=False):
-                    st.markdown("""
-                    **Rebalancing** updates your portfolio to match target allocations.
-                    
-                    - Unit counts are automatically adjusted
-                    - Status changes to ✅ **Balanced** 
-                    - 24-hour grace period before drift checking resumes
-                    - All trades are logged in the history below
-                    
-                    ⚠️ **Note:** This updates the app—you must execute trades manually in your brokerage
-                    """)
+                st.markdown("#### 📋 Phase A: Get Recommendation")
+                st.caption("View suggested trades based on current market prices")
                 
                 if needs_rebalance:
                     st.warning("⚠️ **Rebalancing recommended**")
                 
-                if st.button("⚡ Execute Rebalancing", type="primary", use_container_width=True, disabled=not needs_rebalance):
-                    detail_log = f"{datetime.now().strftime('%Y-%m-%d %H:%M')} - "
-                    changes = []
-                    
+                # v5.7 NEW: Recommend button
+                if st.button("📋 Recommend Rebalance", 
+                            type="primary" if needs_rebalance else "secondary", 
+                            use_container_width=True, 
+                            disabled=not needs_rebalance,
+                            key="recommend_rebalance"):
+                    # Calculate recommendations
+                    recommendations = []
                     for t in v_t:
                         old_units = float(asset_dict[t]["units"])
                         new_units = float((asset_dict[t]["target"] / 100 * curr_v) / data[t].iloc[-1])
-                        asset_dict[t]["units"] = new_units
                         
-                        change_val = new_units - old_units
-                        if abs(change_val) > 0.0001:
-                            action_color = "🟢" if change_val > 0 else "🔴"
-                            action_text = "BUY" if change_val > 0 else "SELL"
-                            changes.append(f"{action_color} {t} {action_text} {abs(change_val):.4f}")
+                        change_units = new_units - old_units
+                        if abs(change_units) > 0.0001:
+                            action = "BUY" if change_units > 0 else "SELL"
+                            current_price = float(data[t].iloc[-1])
+                            
+                            recommendations.append({
+                                "ticker": t,
+                                "action": action,
+                                "shares": abs(change_units),
+                                "estimated_price": current_price,
+                                "estimated_value": abs(change_units) * current_price
+                            })
                     
-                    detail_log += ", ".join(changes) if changes else "No changes needed"
-                    
-                    prof.setdefault("rebalance_stats", []).insert(0, detail_log)
-                    prof["rebalance_stats"] = prof["rebalance_stats"][:50]
-                    prof["last_rebalanced"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    log_profile(prof, "Portfolio rebalanced to target allocations - Status: Balanced")
+                    store_rebalance_recommendation(prof, recommendations)
                     save_db(st.session_state.db)
-                    
-                    st.success("✅ Portfolio rebalanced successfully! Status: **Balanced** ✅")
-                    st.balloons()
+                    st.session_state.show_rebalance_recommendation = True
                     st.rerun()
                 
                 if not needs_rebalance:
                     st.info("✓ Portfolio is optimally balanced")
             
             with col_exec2:
-                st.markdown("### 💡 Quick Actions")
-                st.caption("Helpful shortcuts and information")
+                st.markdown("#### ✅ Phase C: Execute with Actuals")
+                st.caption("After trading, enter your actual fill prices")
                 
-                st.markdown("#### 📋 Current Status")
-                if recently_rebalanced:
-                    st.success("✅ **Balanced** (within 24 hours)")
-                elif needs_rebalance:
-                    st.warning("⚠️ **Rebalancing needed** (drift detected)")
-                elif has_rebalanced:
-                    st.success("✅ **Balanced** (all assets within tolerance)")
+                has_recommendation = "pending_rebalance" in prof
+                
+                # v5.7 NEW: Execute button
+                if st.button("✅ Execute Rebalance Now", 
+                            type="primary", 
+                            use_container_width=True,
+                            disabled=not has_recommendation,
+                            key="execute_rebalance"):
+                    st.session_state.show_execute_form = True
+                    st.rerun()
+                
+                if not has_recommendation:
+                    st.info("📋 Generate recommendation first")
                 else:
-                    st.info("📊 **Deployed** (monitoring for drift)")
+                    rec_time = prof["pending_rebalance"]["timestamp"]
+                    st.caption(f"📌 Recommendation from: {rec_time}")
+            
+            # v5.7 NEW: Show recommendation
+            if st.session_state.get("show_rebalance_recommendation", False) and "pending_rebalance" in prof:
+                st.markdown("---")
+                st.markdown("""
+                    <div class="recommendation-box">
+                        <h3>📋 Rebalance Recommendation</h3>
+                        <p style="color: #78350f; margin-bottom: 16px;">
+                            <strong>IMPORTANT:</strong> These are <u>estimated prices</u> from the market.  
+                            Your actual broker fills may differ. Execute these trades at your broker, then return here to enter the <strong>actual prices you received</strong>.
+                        </p>
+                    </div>
+                """, unsafe_allow_html=True)
                 
-                st.divider()
+                recommendations = prof["pending_rebalance"]["recommendations"]
                 
-                st.markdown("#### 🎯 Quick Tips")
-                st.caption("• Check drift alerts regularly")
-                st.caption("• Rebalance when assets exceed tolerance")
-                st.caption("• Review Activity Log in sidebar")
-                st.caption("• Compare against benchmark")
+                if recommendations:
+                    st.markdown("**Recommended Trades:**")
+                    
+                    for rec in recommendations:
+                        action_color = "🟢" if rec["action"] == "BUY" else "🔴"
+                        st.markdown(f"""
+                        **{action_color} {rec['action']} {rec['ticker']}**  
+                        • Shares: {rec['shares']:.4f}  
+                        • Est. Price: ${rec['estimated_price']:.2f}  
+                        • Est. Value: ${rec['estimated_value']:,.2f}
+                        """)
+                    
+                    st.markdown("---")
+                    st.markdown("""
+                    **🏦 Phase B: Next Steps**
+                    
+                    1. Go to your broker (Fidelity, IBKR, etc.)
+                    2. Execute the trades listed above
+                    3. Note the **actual prices** you received for each trade
+                    4. Return here and click **"✅ Execute Rebalance Now"**
+                    5. Enter your actual prices in the form
+                    """)
+                else:
+                    st.info("No trades needed - portfolio already balanced")
+                    clear_rebalance_recommendation(prof)
+                    save_db(st.session_state.db)
+                    st.session_state.show_rebalance_recommendation = False
+            
+            # v5.7 NEW: Actual price entry form
+            if st.session_state.get("show_execute_form", False) and "pending_rebalance" in prof:
+                st.markdown("---")
+                st.markdown("### 💰 Enter Actual Broker Prices")
+                st.caption("Enter the exact prices you received when executing the trades at your broker")
                 
-                st.divider()
+                recommendations = prof["pending_rebalance"]["recommendations"]
                 
-                st.markdown("#### 📞 Need Help?")
-                st.caption("View section descriptions (ℹ️ icons)")
-                st.caption("Check rebalance history at bottom")
+                with st.form("actual_prices_form"):
+                    st.markdown("**For each trade, enter the actual price you received:**")
+                    
+                    actual_prices = {}
+                    
+                    for rec in recommendations:
+                        st.markdown(f"**{rec['action']} {rec['ticker']}** ({rec['shares']:.4f} shares)")
+                        st.caption(f"Estimated price was: ${rec['estimated_price']:.2f}")
+                        
+                        actual_price = st.number_input(
+                            f"Actual price received for {rec['ticker']}",
+                            min_value=0.01,
+                            value=float(rec['estimated_price']),
+                            step=0.01,
+                            format="%.2f",
+                            key=f"actual_price_{rec['ticker']}",
+                            help="Enter the exact fill price from your broker confirmation"
+                        )
+                        
+                        actual_prices[rec['ticker']] = actual_price
+                        
+                        # Show slippage
+                        slippage = ((actual_price / rec['estimated_price']) - 1) * 100
+                        slippage_color = "🟢" if abs(slippage) < 0.5 else "🟡" if abs(slippage) < 2 else "🔴"
+                        st.caption(f"{slippage_color} Slippage: {slippage:+.2f}%")
+                        
+                        st.markdown("---")
+                    
+                    col_submit, col_cancel = st.columns(2)
+                    
+                    with col_submit:
+                        submitted = st.form_submit_button("💾 Commit Rebalance", type="primary", use_container_width=True)
+                    
+                    with col_cancel:
+                        cancelled = st.form_submit_button("❌ Cancel", use_container_width=True)
+                    
+                    if submitted:
+                        # v5.7 NEW: Update portfolio with actual prices
+                        detail_log = f"{datetime.now().strftime('%Y-%m-%d %H:%M')} - "
+                        changes = []
+                        
+                        for rec in recommendations:
+                            ticker = rec['ticker']
+                            actual_price = actual_prices[ticker]
+                            
+                            if rec['action'] == "BUY":
+                                # Add shares
+                                asset_dict[ticker]["units"] = float(asset_dict[ticker]["units"]) + rec['shares']
+                                changes.append(f"🟢 {ticker} BUY {rec['shares']:.4f} @ ${actual_price:.2f}")
+                            else:
+                                # Remove shares
+                                asset_dict[ticker]["units"] = float(asset_dict[ticker]["units"]) - rec['shares']
+                                changes.append(f"🔴 {ticker} SELL {rec['shares']:.4f} @ ${actual_price:.2f}")
+                        
+                        detail_log += ", ".join(changes) if changes else "No changes needed"
+                        
+                        prof.setdefault("rebalance_stats", []).insert(0, detail_log)
+                        prof["rebalance_stats"] = prof["rebalance_stats"][:50]
+                        prof["last_rebalanced"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        
+                        clear_rebalance_recommendation(prof)
+                        log_profile(prof, "Portfolio rebalanced with actual broker prices - Status: Balanced")
+                        save_db(st.session_state.db)
+                        
+                        st.session_state.show_execute_form = False
+                        st.session_state.show_rebalance_recommendation = False
+                        
+                        st.success("✅ Portfolio rebalanced successfully with actual broker prices! Status: **Balanced** ✅")
+                        st.balloons()
+                        st.rerun()
+                    
+                    if cancelled:
+                        st.session_state.show_execute_form = False
+                        st.rerun()
         
         except Exception as e:
             st.error(f"❌ Error analyzing portfolio: {str(e)}")
             st.info("💡 Please check your internet connection and verify all ticker symbols are valid.")
     
-    # Rebalance History at Bottom
+    # Rebalance History
     if tickers and st.session_state.active_profile:
         prof = st.session_state.db["profiles"][st.session_state.active_profile]
         rebalance_events = prof.get('rebalance_stats', [])
@@ -2299,17 +2376,17 @@ else:  # Portfolio Manager
         if rebalance_events:
             st.divider()
             st.markdown("## 📜 Rebalance History")
-            st.caption("Complete history of all rebalancing events, organized by time period")
+            st.caption("Complete history of all rebalancing events with actual broker prices")
             
             with st.expander("ℹ️ How to read rebalance history", expanded=False):
                 st.markdown("""
                 **Each entry shows the trades executed** during that rebalance.
                 
-                - 🟢 **BUY**: Shares purchased to increase allocation
-                - 🔴 **SELL**: Shares sold to decrease allocation
-                - **Format**: `Date - 🟢 AAPL BUY 5.2345, 🔴 MSFT SELL 3.1234`
+                - 🟢 **BUY**: Shares purchased with actual broker price
+                - 🔴 **SELL**: Shares sold with actual broker price
+                - **Format**: `Date - 🟢 AAPL BUY 5.2345 @ $150.25, 🔴 MSFT SELL 3.1234 @ $380.50`
                 
-                Use filters below to view specific time periods.
+                All prices shown are the **actual fill prices** received from your broker, not estimates.
                 """)
             
             col_filter1, col_filter2 = st.columns([3, 1])
