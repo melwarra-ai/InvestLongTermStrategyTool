@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.9.0"
+VERSION = "5.9.2"
 VERSION_DATE = "2026-01-09"
-VERSION_NAME = "Dashboard Analytics: Comparison Table + Action Items"
+VERSION_NAME = "Navigation Fix: Proper view switching from Dashboard"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -460,6 +460,9 @@ if "show_rebalance_recommendation" not in st.session_state:
     st.session_state.show_rebalance_recommendation = False
 if "show_execute_form" not in st.session_state:
     st.session_state.show_execute_form = False
+# v5.9.2 FIX: Navigation trigger - set True when clicking profile from dashboard
+if "trigger_portfolio_view" not in st.session_state:
+    st.session_state.trigger_portfolio_view = False
 
 # ===== SIDEBAR =====
 with st.sidebar:
@@ -468,7 +471,15 @@ with st.sidebar:
     
     st.divider()
     
-    # Navigation - v5.8.3 FIX: Auto-switch to Portfolio Manager when profile clicked
+    # Navigation - v5.9.2 FIX: Handle navigation trigger from dashboard profile clicks
+    # Check if we need to force switch to Portfolio Manager
+    if st.session_state.get("trigger_portfolio_view", False):
+        # Clear the trigger and force Portfolio Manager view
+        st.session_state.trigger_portfolio_view = False
+        # Delete the cached radio value so it picks up the new index
+        if "nav_radio" in st.session_state:
+            del st.session_state["nav_radio"]
+    
     # Determine default index based on whether a profile is selected
     if st.session_state.get("active_profile"):
         default_nav_index = 1  # Portfolio Manager
@@ -848,7 +859,7 @@ with st.sidebar:
                             ticker_name = ticker_info.get('longName', a_sym)
                         except:
                             ticker_name = a_sym
-                        st.success(f"✓ {ticker_name}")
+                        st.success(f"✔ {ticker_name}")
                         st.caption(f"**Current Price:** {p_flag} ${last_price:,.2f}")
                         valid_ticker = True
                     else:
@@ -1623,6 +1634,8 @@ if view_mode == "🏠 Global Dashboard":
                         help=f"Open {name} portfolio manager"
                     ):
                         st.session_state.active_profile = name
+                        # v5.9.2 FIX: Set trigger to switch navigation on next rerun
+                        st.session_state.trigger_portfolio_view = True
                         st.rerun()
                 
                 
@@ -1650,7 +1663,7 @@ else:  # Portfolio Manager
         
         profiles = st.session_state.db.get("profiles", {})
         if profiles:
-            st.markdown("### 📁 Available Profiles")
+            st.markdown("### 🔍 Available Profiles")
             
             for name in profiles.keys():
                 if st.button(f"📂 {name}", key=f"select_{name}", use_container_width=True):
@@ -2435,7 +2448,7 @@ else:  # Portfolio Manager
                     st.rerun()
                 
                 if not needs_rebalance:
-                    st.info("✓ Portfolio is optimally balanced")
+                    st.info("✔ Portfolio is optimally balanced")
             
             with col_exec2:
                 st.markdown("#### ✅ Phase C: Execute with Actuals")
