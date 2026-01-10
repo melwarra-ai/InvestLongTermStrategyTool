@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.10.0"
+VERSION = "5.10.2"
 VERSION_DATE = "2026-01-10"
-VERSION_NAME = "Complete Analytics Suite: Performance Breakdown + Asset Health + Attribution"
+VERSION_NAME = "Analytics Suite + Enhanced Validation: 5 rules to detect allocated_pct corruption"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2716,17 +2716,35 @@ else:  # Portfolio Manager
                 st.markdown("""
                 **This table shows what trades are needed** to restore your target allocation.
                 
-                - **Target %**: Your desired allocation for this asset
-                - **Allocated %**: How much of this asset's target has been deployed
-                - **Actual %**: Current portfolio percentage based on market values
+                **Column Explanations:**
+                - **Target %**: Your desired allocation for this asset (e.g., 25% means you want this asset to be 25% of your total portfolio)
+                - **Deployed**: Deployment progress from 0-100% showing how much of YOUR PLANNED CAPITAL for this specific asset has been invested
+                    - 0% = haven't started buying this asset yet
+                    - 50% = halfway through planned purchases
+                    - 100% = finished all planned purchases for this asset
+                    - ⚠️ **NOTE:** This is NOT portfolio allocation percentage!
+                - **Actual %**: Current portfolio percentage based on market values (changes with price movements)
                 - **Drift**: Difference between Actual % and Target %
                     - 🔴 Red = exceeds tolerance (action needed)
                     - 🟡 Yellow = warning (close to tolerance)
                     - 🟢 Green = within tolerance (good)
-                - **Status**: Deployment or drift monitoring state
+                    - ⚠️ Gray = during deployment (drift tracking informational)
+                - **Status**: Current state (Deploying = adding capital, Deployed = monitoring drift)
+                
+                **Example to clarify Deployed vs Actual %:**
+                - You set Target % = 25% for SPXL (you want it to be 25% of your $100k portfolio = $25k)
+                - You've bought $5k worth so far
+                - Deployed = 20% (because $5k is 20% of your planned $25k target)
+                - Actual % might be 4.7% (because $5k is 4.7% of your $100k portfolio right now)
+                - As you buy more, Deployed increases toward 100%
+                - When Deployed reaches 100%, you've invested the full $25k
+                - Then Actual % will be near 25% (depending on whether other assets are also deployed)
+                
+                💡 **Key Insight:** "Deployed" tracks YOUR deployment progress (0-100%), while "Actual %" shows current market-based portfolio allocation
                 
                 💡 Use the two-step workflow below to rebalance with real broker prices
                 """)
+            
             
             # v5.8.1: Column config with ℹ️ info icons
             column_config = {
@@ -2742,32 +2760,32 @@ else:  # Portfolio Manager
                 ),
                 "Target %": st.column_config.TextColumn(
                     "Target % ℹ️",
-                    help="Your desired allocation percentage for this asset",
+                    help="Your desired allocation percentage for this asset in the portfolio",
                     width="small"
                 ),
-                "Allocated %": st.column_config.TextColumn(
-                    "Allocated % ℹ️",
-                    help="Percentage of target that has been deployed (100% = fully deployed)",
+                "Deployed": st.column_config.TextColumn(
+                    "Deployed ℹ️",
+                    help="Deployment progress: 0-100% shows how much of your planned capital for THIS ASSET has been deployed (NOT portfolio allocation). 100% = fully deployed.",
                     width="small"
                 ),
                 "Actual %": st.column_config.TextColumn(
                     "Actual % ℹ️",
-                    help="Current portfolio percentage based on market values",
+                    help="Current portfolio percentage based on market values (this will differ from Target % due to price movements)",
                     width="small"
                 ),
                 "Drift": st.column_config.TextColumn(
                     "Drift ℹ️",
-                    help="Difference between Actual % and Target % (🔴 = exceeds tolerance)",
+                    help="Difference between Actual % and Target % (🔴 = exceeds tolerance and needs rebalancing, ⚠️ = still deploying)",
                     width="small"
                 ),
                 "Status": st.column_config.TextColumn(
                     "Status ℹ️",
-                    help="Deployment status or drift monitoring state",
+                    help="Current state: Deploying = still adding capital, Deployed = fully funded and monitoring drift",
                     width="medium"
                 ),
                 "Avg Cost": st.column_config.TextColumn(
                     "Avg Cost ℹ️",
-                    help="Weighted average cost per unit (available when 100% deployed)",
+                    help="Weighted average cost per unit (calculated when 100% deployed)",
                     width="small"
                 ),
                 "Units": st.column_config.TextColumn(
@@ -2805,6 +2823,7 @@ else:  # Portfolio Manager
             rows = []
             total_turnover = 0
             total_current_val = 0
+            data_corrected = False  # Track if any validation fixes were applied
             
             for t in v_t:
                 current_price = float(data[t].iloc[-1])
@@ -2828,6 +2847,52 @@ else:  # Portfolio Manager
                 tar_w = float(asset_dict[t]['target'])
                 allocated_pct = asset_dict[t].get("allocated_pct", 0)
                 
+                # ENHANCED VALIDATION: Ensure allocated_pct is correct deployment progress (0-100%)
+                # allocated_pct should represent "% of target capital deployed", NOT portfolio allocation
+                
+                # Calculate actual portfolio allocation for comparison
+                act_val_temp = cur_u * float(data[t].iloc[-1]) if cur_u > 0 else 0
+                act_w_temp = (act_val_temp / curr_v * 100) if curr_v > 0 else 0
+                
+                validation_applied = False
+                
+                # Rule 1: allocated_pct must be 0-100 (it's a deployment percentage, not portfolio %)
+                if allocated_pct > 100:
+                    st.warning(f"⚠️ Data validation: {t} allocated_pct was {allocated_pct:.1f}% (impossible), correcting to 100%")
+                    allocated_pct = 100.0
+                    validation_applied = True
+                
+                # Rule 2: If allocated_pct suspiciously matches target allocation % (common corruption)
+                elif abs(allocated_pct - tar_w) < 0.1 and tar_w < 100:
+                    st.warning(f"⚠️ Data validation: {t} allocated_pct ({allocated_pct:.1f}%) matches target allocation ({tar_w:.1f}%). This suggests data corruption. Auto-correcting...")
+                    # If has units, assume fully deployed; otherwise 0
+                    allocated_pct = 100.0 if cur_u > 0 else 0.0
+                    validation_applied = True
+                
+                # Rule 3: If allocated_pct is suspiciously close to actual portfolio % (common corruption)
+                elif cur_u > 0 and abs(allocated_pct - act_w_temp) < 2.0 and allocated_pct < 100:
+                    st.warning(f"⚠️ Data validation: {t} allocated_pct ({allocated_pct:.1f}%) matches actual portfolio allocation ({act_w_temp:.1f}%). This suggests data corruption. Auto-correcting to 100% (has units).")
+                    allocated_pct = 100.0
+                    validation_applied = True
+                
+                # Rule 4: If has units but allocated_pct is 0 (forgot to track deployment)
+                elif cur_u > 0 and allocated_pct == 0:
+                    st.info(f"ℹ️ Auto-detection: {t} has units but 0% deployment tracking. Setting to 100% deployed.")
+                    allocated_pct = 100.0
+                    validation_applied = True
+                
+                # Rule 5: If allocated_pct is between 100-200, might be stored as 0-200 scale
+                elif allocated_pct > 100 and allocated_pct <= 200:
+                    # Some legacy systems might store 0-200 where 100 = fully deployed
+                    st.warning(f"⚠️ Data validation: {t} allocated_pct ({allocated_pct:.1f}%) appears to use 0-200 scale. Converting to 0-100 scale...")
+                    allocated_pct = min(100.0, allocated_pct / 2.0)
+                    validation_applied = True
+                
+                # Apply corrections to database
+                if validation_applied:
+                    asset_dict[t]["allocated_pct"] = allocated_pct
+                    data_corrected = True
+                
                 avg_cost = calculate_average_cost(asset_dict[t])
                 avg_cost_display = f"${avg_cost:.2f}" if avg_cost is not None else "Pending"
                 
@@ -2844,8 +2909,9 @@ else:  # Portfolio Manager
                 total_turnover += abs(val_diff)
                 total_current_val += act_val
                 
+                # IMPROVED: Always show drift, but mark during deployment
                 if allocated_pct < 100.0:
-                    drift_display = "—"
+                    drift_display = f"⚠️ {drift:+.2f}%"
                     status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
                 else:
                     drift_display = f"{drift:+.2f}%"
@@ -2859,11 +2925,16 @@ else:  # Portfolio Manager
                 
                 daily_change_display = f"{daily_change_pct:+.2f}%"
                 
+                # Deployed display: Show as percentage with warning if suspicious
+                deployed_display = f"{allocated_pct:.0f}%"
+                if allocated_pct > 100:
+                    deployed_display = "⚠️ >100%"
+                
                 rows.append({
                     "Fund Name": fund_name,
                     "Ticker": t,
                     "Target %": f"{tar_w:.2f}%",
-                    "Allocated %": f"{allocated_pct:.1f}%",
+                    "Deployed": deployed_display,
                     "Actual %": f"{act_w:.2f}%",
                     "Drift": drift_display,
                     "Status": status_display,
@@ -2880,7 +2951,7 @@ else:  # Portfolio Manager
                 "Fund Name": "**TOTAL**",
                 "Ticker": "",
                 "Target %": "**100.00%**",
-                "Allocated %": "",
+                "Deployed": "",
                 "Actual %": "**100.00%**",
                 "Drift": "—",
                 "Status": "",
@@ -2893,6 +2964,11 @@ else:  # Portfolio Manager
                 "Buy/Sell Shares": "—"
             })
             
+            # Save database if any validation corrections were applied
+            if data_corrected:
+                save_db(st.session_state.db)
+                st.success("✅ Data validation corrections saved")
+            
             df_rebalance = pd.DataFrame(rows)
             
             st.dataframe(
@@ -2904,7 +2980,7 @@ else:  # Portfolio Manager
             
             all_deployed = all(a.get("allocated_pct", 0) >= 100.0 for a in asset_dict.values())
             if not all_deployed:
-                st.info("ℹ️ **Portfolio-level drift monitoring** activates when all assets reach 100% deployment")
+                st.info("ℹ️ **Note:** Drift shown during deployment is informational only. Complete deployments for full drift monitoring.")
             
             col_metric1, col_metric2 = st.columns(2)
             with col_metric1:
