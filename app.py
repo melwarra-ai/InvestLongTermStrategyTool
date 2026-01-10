@@ -1342,6 +1342,107 @@ if view_mode == "🏠 Global Dashboard":
         
         st.divider()
         
+        # ===== DATA AGGREGATION: Calculate shared data used by multiple sections =====
+        # This section runs FIRST to prepare data for Health Score, Performance Insights, 
+        # Action Items, Comparison Table, and Pie Chart sections below
+        
+        comparison_data = []
+        action_items = []
+        global_assets = {}
+        
+        for p_name, p_data in profiles.items():
+            p_assets = p_data.get("assets", {})
+            
+            # Calculate current value
+            curr_val = float(sum(p_assets[t]["units"] * prices.get(t, 0) for t in p_assets))
+            
+            # Calculate ROI
+            start_val = float(p_data.get('principal', 0))
+            roi = ((curr_val / start_val) - 1) * 100 if start_val > 0 else 0
+            
+            # Calculate CAGR
+            start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d')
+            years = max((date.today() - start_date.date()).days / 365.25, 0.01)
+            cagr = ((curr_val / start_val) ** (1 / years) - 1) * 100 if start_val > 0 else 0
+            
+            # Check drift status
+            needs_rebal, drift_details = calculate_drift_status(p_data, prices)
+            
+            # Check deployment status
+            all_deployed = all(a.get("allocated_pct", 0) >= 100.0 for a in p_assets.values()) if p_assets else False
+            deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
+            total_assets = len(p_assets)
+            
+            # Determine status
+            if needs_rebal:
+                status = "🚨 Rebalance"
+                status_priority = 1
+            elif not all_deployed and total_assets > 0:
+                status = f"🔥 Deploying ({deployed_count}/{total_assets})"
+                status_priority = 2
+            elif all_deployed:
+                status = "✅ Balanced"
+                status_priority = 3
+            else:
+                status = "⚪ New"
+                status_priority = 4
+            
+            # Build comparison row
+            comparison_data.append({
+                "Profile": p_name,
+                "Account": f"{p_data.get('bank_name', 'N/A')} {p_data.get('account_type', '')}",
+                "Value": curr_val,
+                "Value_Display": f"${curr_val:,.0f}",
+                "CAGR": cagr,
+                "CAGR_Display": f"{cagr:+.1f}%",
+                "ROI": roi,
+                "ROI_Display": f"{roi:+.1f}%",
+                "Goal": f"{p_data.get('yearly_goal_pct', 0):.1f}%/yr",
+                "Assets": total_assets,
+                "Status": status,
+                "Status_Priority": status_priority
+            })
+            
+            # Collect action items
+            if needs_rebal:
+                drift_count = len(drift_details)
+                max_drift = max([d[1] for d in drift_details]) if drift_details else 0
+                action_items.append({
+                    "priority": 1,
+                    "type": "rebalance",
+                    "profile": p_name,
+                    "message": f"🚨 URGENT - {p_name} needs rebalancing ({drift_count} asset{'s' if drift_count > 1 else ''} drifted, max: {max_drift:.1f}%)",
+                    "detail": f"{drift_count} assets exceed {p_data.get('drift_tolerance', 5.0)}% tolerance",
+                    "action": "Click profile to view details and execute rebalance"
+                })
+            elif not all_deployed and total_assets > 0:
+                remaining_assets = [(t, a.get("allocated_pct", 0)) for t, a in p_assets.items() if a.get("allocated_pct", 0) < 100.0]
+                action_items.append({
+                    "priority": 2,
+                    "type": "deployment",
+                    "profile": p_name,
+                    "message": f"🔥 IN PROGRESS - {p_name} deployment ({deployed_count}/{total_assets} assets fully deployed)",
+                    "detail": ", ".join([f"{t} needs {100-pct:.0f}% more" for t, pct in remaining_assets[:3]]),
+                    "action": "Complete remaining asset deployments"
+                })
+            
+            # Aggregate global assets
+            for ticker, asset_data in p_assets.items():
+                if ticker in prices:
+                    asset_value = asset_data["units"] * prices[ticker]
+                    
+                    if ticker not in global_assets:
+                        global_assets[ticker] = {
+                            "value": 0,
+                            "units": 0,
+                            "portfolios": [],
+                            "fund_name": asset_data.get("fund_name", ticker)
+                        }
+                    
+                    global_assets[ticker]["value"] += asset_value
+                    global_assets[ticker]["units"] += asset_data["units"]
+                    global_assets[ticker]["portfolios"].append(p_name)
+        
         # ===== NEW v5.10.0: PORTFOLIO HEALTH SCORE =====
         st.markdown("### 💪 Portfolio Health Score")
         st.caption("Comprehensive assessment of your portfolio's overall health")
@@ -1945,86 +2046,7 @@ if view_mode == "🏠 Global Dashboard":
         st.markdown("### 📊 Portfolio Comparison Table")
         st.caption("Compare all portfolios at a glance with sortable metrics")
         
-        # Collect data for all profiles
-        comparison_data = []
-        action_items = []  # For Action Items Dashboard
-        
-        for p_name, p_data in profiles.items():
-            p_assets = p_data.get("assets", {})
-            
-            # Calculate current value
-            curr_val = float(sum(p_assets[t]["units"] * prices.get(t, 0) for t in p_assets))
-            
-            # Calculate ROI
-            start_val = float(p_data.get('principal', 0))
-            roi = ((curr_val / start_val) - 1) * 100 if start_val > 0 else 0
-            
-            # Calculate CAGR
-            start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d')
-            years = max((date.today() - start_date.date()).days / 365.25, 0.01)
-            cagr = ((curr_val / start_val) ** (1 / years) - 1) * 100 if start_val > 0 else 0
-            
-            # Check drift status
-            needs_rebal, drift_details = calculate_drift_status(p_data, prices)
-            
-            # Check deployment status
-            all_deployed = all(a.get("allocated_pct", 0) >= 100.0 for a in p_assets.values()) if p_assets else False
-            deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
-            total_assets = len(p_assets)
-            
-            # Determine status
-            if needs_rebal:
-                status = "🚨 Rebalance"
-                status_priority = 1
-            elif not all_deployed and total_assets > 0:
-                status = f"🔥 Deploying ({deployed_count}/{total_assets})"
-                status_priority = 2
-            elif all_deployed:
-                status = "✅ Balanced"
-                status_priority = 3
-            else:
-                status = "⚪ New"
-                status_priority = 4
-            
-            # Build comparison row
-            comparison_data.append({
-                "Profile": p_name,
-                "Account": f"{p_data.get('bank_name', 'N/A')} {p_data.get('account_type', '')}",
-                "Value": curr_val,
-                "Value_Display": f"${curr_val:,.0f}",
-                "CAGR": cagr,
-                "CAGR_Display": f"{cagr:+.1f}%",
-                "ROI": roi,
-                "ROI_Display": f"{roi:+.1f}%",
-                "Goal": f"{p_data.get('yearly_goal_pct', 0):.1f}%/yr",
-                "Assets": total_assets,
-                "Status": status,
-                "Status_Priority": status_priority
-            })
-            
-            # Collect action items
-            if needs_rebal:
-                drift_count = len(drift_details)
-                max_drift = max([d[1] for d in drift_details]) if drift_details else 0
-                action_items.append({
-                    "priority": 1,
-                    "type": "rebalance",
-                    "profile": p_name,
-                    "message": f"🚨 URGENT - {p_name} needs rebalancing ({drift_count} asset{'s' if drift_count > 1 else ''} drifted, max: {max_drift:.1f}%)",
-                    "detail": f"{drift_count} assets exceed {p_data.get('drift_tolerance', 5.0)}% tolerance",
-                    "action": "Click profile to view details and execute rebalance"
-                })
-            elif not all_deployed and total_assets > 0:
-                remaining_assets = [(t, a.get("allocated_pct", 0)) for t, a in p_assets.items() if a.get("allocated_pct", 0) < 100.0]
-                action_items.append({
-                    "priority": 2,
-                    "type": "deployment",
-                    "profile": p_name,
-                    "message": f"🔥 IN PROGRESS - {p_name} deployment ({deployed_count}/{total_assets} assets fully deployed)",
-                    "detail": ", ".join([f"{t} needs {100-pct:.0f}% more" for t, pct in remaining_assets[:3]]),
-                    "action": "Complete remaining asset deployments"
-                })
-        
+        # Data already calculated in aggregation section above
         # Sort comparison data by Value (descending)
         comparison_df = pd.DataFrame(comparison_data)
         comparison_df = comparison_df.sort_values("Value", ascending=False)
@@ -2074,26 +2096,7 @@ if view_mode == "🏠 Global Dashboard":
         st.markdown("### 🥧 Global Asset Allocation")
         st.caption("Your total exposure across all portfolios")
         
-        # Aggregate assets across all portfolios
-        global_assets = {}
-        for p_name, p_data in profiles.items():
-            p_assets = p_data.get("assets", {})
-            for ticker, asset_data in p_assets.items():
-                if ticker in prices:
-                    asset_value = asset_data["units"] * prices[ticker]
-                    
-                    if ticker not in global_assets:
-                        global_assets[ticker] = {
-                            "value": 0,
-                            "units": 0,
-                            "portfolios": [],
-                            "fund_name": asset_data.get("fund_name", ticker)
-                        }
-                    
-                    global_assets[ticker]["value"] += asset_value
-                    global_assets[ticker]["units"] += asset_data["units"]
-                    global_assets[ticker]["portfolios"].append(p_name)
-        
+        # Data already calculated in aggregation section above
         if global_assets:
             # Calculate total value for percentages
             total_global_value = sum(a["value"] for a in global_assets.values())
