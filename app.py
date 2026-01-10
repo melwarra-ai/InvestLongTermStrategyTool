@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.9.2"
-VERSION_DATE = "2026-01-09"
-VERSION_NAME = "Navigation Fix: Proper view switching from Dashboard"
+VERSION = "5.10.0"
+VERSION_DATE = "2026-01-10"
+VERSION_NAME = "Advanced Analytics: Aggregated Performance Chart + Health Score"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -460,9 +460,6 @@ if "show_rebalance_recommendation" not in st.session_state:
     st.session_state.show_rebalance_recommendation = False
 if "show_execute_form" not in st.session_state:
     st.session_state.show_execute_form = False
-# v5.9.2 FIX: Navigation trigger - set True when clicking profile from dashboard
-if "trigger_portfolio_view" not in st.session_state:
-    st.session_state.trigger_portfolio_view = False
 
 # ===== SIDEBAR =====
 with st.sidebar:
@@ -471,15 +468,7 @@ with st.sidebar:
     
     st.divider()
     
-    # Navigation - v5.9.2 FIX: Handle navigation trigger from dashboard profile clicks
-    # Check if we need to force switch to Portfolio Manager
-    if st.session_state.get("trigger_portfolio_view", False):
-        # Clear the trigger and force Portfolio Manager view
-        st.session_state.trigger_portfolio_view = False
-        # Delete the cached radio value so it picks up the new index
-        if "nav_radio" in st.session_state:
-            del st.session_state["nav_radio"]
-    
+    # Navigation - v5.8.3 FIX: Auto-switch to Portfolio Manager when profile clicked
     # Determine default index based on whether a profile is selected
     if st.session_state.get("active_profile"):
         default_nav_index = 1  # Portfolio Manager
@@ -859,7 +848,7 @@ with st.sidebar:
                             ticker_name = ticker_info.get('longName', a_sym)
                         except:
                             ticker_name = a_sym
-                        st.success(f"✔ {ticker_name}")
+                        st.success(f"✓ {ticker_name}")
                         st.caption(f"**Current Price:** {p_flag} ${last_price:,.2f}")
                         valid_ticker = True
                     else:
@@ -1541,6 +1530,752 @@ if view_mode == "🏠 Global Dashboard":
         
         st.divider()
         
+        # ===== NEW v5.9.2: PERFORMANCE SUMMARY CARDS =====
+        st.markdown("### 🏆 Performance Insights")
+        st.caption("Quick overview of your portfolio performance and status")
+        
+        # Calculate summary metrics
+        if len(comparison_data) > 0:
+            # Find best/worst performers
+            best_performer = max(comparison_data, key=lambda x: x['CAGR'])
+            worst_performer = min(comparison_data, key=lambda x: x['CAGR'])
+            
+            # Calculate deployment stats
+            total_assets_count = sum(p['Assets'] for p in comparison_data)
+            deployed_assets = 0
+            total_portfolio_value = 0
+            total_deployed_value = 0
+            
+            for p_name, p_data in profiles.items():
+                p_assets = p_data.get("assets", {})
+                for ticker, asset_data in p_assets.items():
+                    if asset_data.get("allocated_pct", 0) >= 100.0:
+                        deployed_assets += 1
+                        if ticker in prices:
+                            total_deployed_value += asset_data["units"] * prices[ticker]
+                
+                for ticker in p_assets:
+                    if ticker in prices:
+                        total_portfolio_value += p_assets[ticker]["units"] * prices[ticker]
+            
+            # Calculate on-track count
+            on_track_count = sum(1 for p in comparison_data if p['CAGR'] >= profiles[p['Profile']].get('yearly_goal_pct', 0))
+            
+            # Display cards
+            col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+            
+            with col_c1:
+                goal_vs = best_performer['CAGR'] - profiles[best_performer['Profile']].get('yearly_goal_pct', 0)
+                st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                                color: white; padding: 20px; border-radius: 12px; text-align: center;
+                                box-shadow: 0 4px 6px rgba(16, 185, 129, 0.4);">
+                        <div style="font-size: 2rem; margin-bottom: 8px;">🏆</div>
+                        <div style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 4px;">Best Performer</div>
+                        <div style="font-size: 1.3rem; font-weight: 700; margin-bottom: 4px;">{best_performer['Profile']}</div>
+                        <div style="font-size: 1.1rem; font-weight: 600;">{best_performer['CAGR_Display']} CAGR</div>
+                        <div style="font-size: 0.8rem; opacity: 0.85; margin-top: 4px;">
+                            {'+' if goal_vs >= 0 else ''}{goal_vs:.1f}% vs goal
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col_c2:
+                goal_vs_worst = worst_performer['CAGR'] - profiles[worst_performer['Profile']].get('yearly_goal_pct', 0)
+                color = "#ef4444" if goal_vs_worst < 0 else "#f59e0b"
+                st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, {color} 0%, {color} 100%); 
+                                color: white; padding: 20px; border-radius: 12px; text-align: center;
+                                box-shadow: 0 4px 6px rgba(239, 68, 68, 0.4);">
+                        <div style="font-size: 2rem; margin-bottom: 8px;">📉</div>
+                        <div style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 4px;">Needs Attention</div>
+                        <div style="font-size: 1.3rem; font-weight: 700; margin-bottom: 4px;">{worst_performer['Profile']}</div>
+                        <div style="font-size: 1.1rem; font-weight: 600;">{worst_performer['CAGR_Display']} CAGR</div>
+                        <div style="font-size: 0.8rem; opacity: 0.85; margin-top: 4px;">
+                            {'+' if goal_vs_worst >= 0 else ''}{goal_vs_worst:.1f}% vs goal
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col_c3:
+                deployment_pct = (deployed_assets / total_assets_count * 100) if total_assets_count > 0 else 0
+                st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                                color: white; padding: 20px; border-radius: 12px; text-align: center;
+                                box-shadow: 0 4px 6px rgba(59, 130, 246, 0.4);">
+                        <div style="font-size: 2rem; margin-bottom: 8px;">📊</div>
+                        <div style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 4px;">Total Deployed</div>
+                        <div style="font-size: 1.3rem; font-weight: 700; margin-bottom: 4px;">
+                            {deployed_assets}/{total_assets_count} Assets
+                        </div>
+                        <div style="font-size: 1.1rem; font-weight: 600;">{deployment_pct:.1f}%</div>
+                        <div style="font-size: 0.8rem; opacity: 0.85; margin-top: 4px;">
+                            ${total_deployed_value:,.0f} deployed
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col_c4:
+                on_track_pct = (on_track_count / len(profiles) * 100) if len(profiles) > 0 else 0
+                track_color = "#10b981" if on_track_pct >= 50 else "#f59e0b"
+                st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, {track_color} 0%, {track_color} 100%); 
+                                color: white; padding: 20px; border-radius: 12px; text-align: center;
+                                box-shadow: 0 4px 6px rgba(16, 185, 129, 0.4);">
+                        <div style="font-size: 2rem; margin-bottom: 8px;">🎯</div>
+                        <div style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 4px;">On Track</div>
+                        <div style="font-size: 1.3rem; font-weight: 700; margin-bottom: 4px;">
+                            {on_track_count}/{len(profiles)} Portfolios
+                        </div>
+                        <div style="font-size: 1.1rem; font-weight: 600;">{on_track_pct:.0f}%</div>
+                        <div style="font-size: 0.8rem; opacity: 0.85; margin-top: 4px;">
+                            meeting goals
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+        
+        st.divider()
+        
+        # ===== NEW v5.9.2: ASSET ALLOCATION PIE CHART =====
+        st.markdown("### 🥧 Global Asset Allocation")
+        st.caption("Your total exposure across all portfolios")
+        
+        # Aggregate assets across all portfolios
+        global_assets = {}
+        for p_name, p_data in profiles.items():
+            p_assets = p_data.get("assets", {})
+            for ticker, asset_data in p_assets.items():
+                if ticker in prices:
+                    asset_value = asset_data["units"] * prices[ticker]
+                    
+                    if ticker not in global_assets:
+                        global_assets[ticker] = {
+                            "value": 0,
+                            "units": 0,
+                            "portfolios": [],
+                            "fund_name": asset_data.get("fund_name", ticker)
+                        }
+                    
+                    global_assets[ticker]["value"] += asset_value
+                    global_assets[ticker]["units"] += asset_data["units"]
+                    global_assets[ticker]["portfolios"].append(p_name)
+        
+        if global_assets:
+            # Calculate total value for percentages
+            total_global_value = sum(a["value"] for a in global_assets.values())
+            
+            # Sort by value (descending)
+            sorted_assets = sorted(global_assets.items(), key=lambda x: x[1]["value"], reverse=True)
+            
+            # Create pie chart data
+            labels = []
+            values = []
+            hover_text = []
+            
+            for ticker, data in sorted_assets:
+                pct = (data["value"] / total_global_value * 100) if total_global_value > 0 else 0
+                labels.append(f"{ticker}")
+                values.append(data["value"])
+                
+                portfolio_list = ", ".join(set(data["portfolios"]))
+                hover_text.append(
+                    f"<b>{ticker}</b> - {data['fund_name']}<br>" +
+                    f"Value: ${data['value']:,.0f}<br>" +
+                    f"Percentage: {pct:.1f}%<br>" +
+                    f"Units: {data['units']:.2f}<br>" +
+                    f"In: {portfolio_list}"
+                )
+            
+            # Create pie chart
+            fig_pie = go.Figure(data=[go.Pie(
+                labels=labels,
+                values=values,
+                hovertemplate='%{hovertext}<extra></extra>',
+                hovertext=hover_text,
+                textposition='auto',
+                textinfo='label+percent',
+                marker=dict(
+                    line=dict(color='white', width=2)
+                )
+            )])
+            
+            fig_pie.update_layout(
+                showlegend=True,
+                height=500,
+                margin=dict(l=20, r=20, t=40, b=20),
+                legend=dict(
+                    orientation="v",
+                    yanchor="middle",
+                    y=0.5,
+                    xanchor="left",
+                    x=1.02,
+                    font=dict(size=11)
+                )
+            )
+            
+            st.plotly_chart(fig_pie, use_container_width=True)
+            
+            # Asset breakdown table
+            with st.expander("📋 Detailed Asset Breakdown", expanded=False):
+                breakdown_rows = []
+                for ticker, data in sorted_assets:
+                    pct = (data["value"] / total_global_value * 100) if total_global_value > 0 else 0
+                    portfolio_count = len(set(data["portfolios"]))
+                    
+                    breakdown_rows.append({
+                        "Asset": ticker,
+                        "Fund Name": data["fund_name"],
+                        "Value": f"${data['value']:,.0f}",
+                        "% of Total": f"{pct:.1f}%",
+                        "Units": f"{data['units']:.2f}",
+                        "Portfolios": portfolio_count
+                    })
+                
+                df_breakdown = pd.DataFrame(breakdown_rows)
+                st.dataframe(df_breakdown, use_container_width=True, hide_index=True)
+                
+                st.caption(f"💡 **Diversification:** You own {len(global_assets)} different assets across {len(profiles)} portfolios")
+        else:
+            st.info("ℹ️ No assets deployed yet. Start deploying capital to see your allocation breakdown.")
+        
+        st.divider()
+        
+        # ===== NEW v5.9.2: RECENT ACTIVITY FEED =====
+        st.markdown("### 📰 Recent Activity")
+        st.caption("Latest portfolio updates and events")
+        
+        # Collect all logs from all profiles
+        all_activities = []
+        for p_name, p_data in profiles.items():
+            logs = p_data.get("rebalance_logs", [])
+            for log in logs:
+                try:
+                    # Parse date from log
+                    log_date_str = log.get("date", "")
+                    log_event = log.get("event", "")
+                    
+                    # Parse datetime
+                    log_datetime = datetime.strptime(log_date_str, "%Y-%m-%d %H:%M")
+                    
+                    all_activities.append({
+                        "datetime": log_datetime,
+                        "date_str": log_date_str,
+                        "profile": p_name,
+                        "event": log_event
+                    })
+                except:
+                    continue
+        
+        # Sort by datetime (most recent first)
+        all_activities.sort(key=lambda x: x["datetime"], reverse=True)
+        
+        # Filter to last 7 days
+        seven_days_ago = datetime.now() - timedelta(days=7)
+        recent_activities = [a for a in all_activities if a["datetime"] >= seven_days_ago]
+        
+        if recent_activities:
+            # Show activities
+            activity_count = st.selectbox(
+                "Show last",
+                [5, 10, 15, 20],
+                index=1,
+                key="activity_count"
+            )
+            
+            for activity in recent_activities[:activity_count]:
+                # Format datetime
+                dt = activity["datetime"]
+                now = datetime.now()
+                
+                if dt.date() == now.date():
+                    time_str = f"Today, {dt.strftime('%I:%M %p')}"
+                elif dt.date() == (now - timedelta(days=1)).date():
+                    time_str = f"Yesterday, {dt.strftime('%I:%M %p')}"
+                else:
+                    time_str = dt.strftime("%b %d, %I:%M %p")
+                
+                # Determine icon based on event content
+                event_lower = activity["event"].lower()
+                if "rebalance" in event_lower:
+                    icon = "⚖️"
+                    color = "#3b82f6"
+                elif "deploy" in event_lower:
+                    icon = "🔥"
+                    color = "#f59e0b"
+                elif "created" in event_lower or "added" in event_lower:
+                    icon = "✨"
+                    color = "#10b981"
+                elif "removed" in event_lower or "deleted" in event_lower:
+                    icon = "🗑️"
+                    color = "#ef4444"
+                elif "updated" in event_lower or "edited" in event_lower:
+                    icon = "✏️"
+                    color = "#8b5cf6"
+                else:
+                    icon = "📝"
+                    color = "#64748b"
+                
+                st.markdown(f"""
+                    <div style="border-left: 3px solid {color}; padding: 12px 16px; margin: 8px 0; 
+                                background: white; border-radius: 0 8px 8px 0; 
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">
+                                    {time_str}
+                                </div>
+                                <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">
+                                    {icon} {activity['profile']}
+                                </div>
+                                <div style="color: #475569; font-size: 0.9rem;">
+                                    {activity['event']}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            if len(recent_activities) > activity_count:
+                st.caption(f"💡 {len(recent_activities) - activity_count} more activities in the last 7 days")
+        else:
+            st.info("ℹ️ No recent activity in the last 7 days")
+        
+        st.divider()
+        
+        # ===== NEW v5.10.0: AGGREGATED PERFORMANCE CHART =====
+        st.markdown("### 📈 Combined Portfolio Performance")
+        st.caption("See all your portfolios' growth over time in one unified view")
+        
+        with st.expander("ℹ️ Understanding the Aggregated Chart", expanded=False):
+            st.markdown("""
+            **This chart shows:**
+            - Total combined value of all portfolios over time
+            - Each portfolio as a colored layer (stacked area chart)
+            - Combined goal path overlay
+            - Weighted benchmark comparison (if benchmarks set)
+            
+            **How to read it:**
+            - **Y-axis:** Total portfolio value ($)
+            - **X-axis:** Time
+            - **Colored areas:** Each portfolio's contribution
+            - **Dashed line:** Combined goal path
+            - **Dotted line:** Weighted benchmark (if available)
+            
+            **Pro tip:** This shows your total net worth evolution!
+            """)
+        
+        # Fetch historical data for all portfolios
+        try:
+            all_portfolio_data = {}
+            earliest_date = None
+            
+            for p_name, p_data in profiles.items():
+                p_assets = p_data.get("assets", {})
+                p_tickers = list(p_assets.keys())
+                
+                if not p_tickers:
+                    continue
+                
+                # Get start date
+                p_start = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d')
+                if earliest_date is None or p_start < earliest_date:
+                    earliest_date = p_start
+                
+                # Fetch historical data
+                try:
+                    p_raw = yf.download(p_tickers, start=p_data["start_date"], auto_adjust=True, progress=False)
+                    
+                    if p_raw.empty:
+                        continue
+                    
+                    p_close = p_raw['Close']
+                    if len(p_tickers) == 1:
+                        p_close = pd.DataFrame(p_close, columns=p_tickers)
+                    
+                    # Calculate daily portfolio value
+                    valid_tickers = [t for t in p_tickers if t in p_close.columns]
+                    if valid_tickers:
+                        daily_val = p_close[valid_tickers].apply(
+                            lambda r: sum(r[t] * p_assets[t]["units"] for t in valid_tickers if t in r.index),
+                            axis=1
+                        )
+                        
+                        all_portfolio_data[p_name] = {
+                            "values": daily_val,
+                            "start_date": p_start,
+                            "principal": p_data.get("principal", 0),
+                            "goal_pct": p_data.get("yearly_goal_pct", 0)
+                        }
+                except:
+                    continue
+            
+            if len(all_portfolio_data) > 0:
+                # Align all portfolios to common date range
+                # Use the earliest start date and today as the range
+                date_range = pd.date_range(start=earliest_date, end=date.today(), freq='D')
+                
+                # Create aligned dataframe
+                aligned_data = pd.DataFrame(index=date_range)
+                
+                for p_name, p_info in all_portfolio_data.items():
+                    # Reindex to common range, forward fill for dates before portfolio started
+                    aligned_series = p_info["values"].reindex(date_range)
+                    # For dates before this portfolio started, use 0
+                    start_date = p_info["start_date"]
+                    aligned_series.loc[aligned_series.index < start_date] = 0
+                    # Forward fill for missing data
+                    aligned_series = aligned_series.fillna(method='ffill')
+                    aligned_data[p_name] = aligned_series
+                
+                # Calculate total
+                aligned_data['Total'] = aligned_data.sum(axis=1)
+                
+                # Create stacked area chart
+                fig_agg = go.Figure()
+                
+                # Add each portfolio as a stacked area
+                portfolio_names = [col for col in aligned_data.columns if col != 'Total']
+                
+                for p_name in portfolio_names:
+                    fig_agg.add_trace(go.Scatter(
+                        x=aligned_data.index,
+                        y=aligned_data[p_name],
+                        name=p_name,
+                        mode='lines',
+                        stackgroup='one',
+                        fillcolor=None,  # Auto color
+                        hovertemplate='<b>%{fullData.name}</b><br>' +
+                                     'Date: %{x|%Y-%m-%d}<br>' +
+                                     'Value: $%{y:,.0f}<br>' +
+                                     '<extra></extra>'
+                    ))
+                
+                # Calculate combined goal path
+                total_principal = sum(p["principal"] for p in all_portfolio_data.values())
+                weighted_goal = sum(
+                    p["principal"] * p["goal_pct"] 
+                    for p in all_portfolio_data.values()
+                ) / total_principal if total_principal > 0 else 0
+                
+                # Goal path from earliest date
+                days_from_start = (aligned_data.index - aligned_data.index[0]).days
+                daily_rate = (weighted_goal / 100) / 365.25
+                goal_path = total_principal * (1 + daily_rate) ** days_from_start
+                
+                fig_agg.add_trace(go.Scatter(
+                    x=aligned_data.index,
+                    y=goal_path,
+                    name=f'Combined Goal ({weighted_goal:.1f}%/yr)',
+                    mode='lines',
+                    line=dict(color='#10b981', width=2, dash='dash'),
+                    hovertemplate='<b>Goal Path</b><br>' +
+                                 'Date: %{x|%Y-%m-%d}<br>' +
+                                 'Target: $%{y:,.0f}<br>' +
+                                 '<extra></extra>'
+                ))
+                
+                fig_agg.update_layout(
+                    hovermode='x unified',
+                    plot_bgcolor='white',
+                    height=550,
+                    showlegend=True,
+                    xaxis=dict(
+                        showgrid=True,
+                        gridcolor='#f1f5f9',
+                        title='Date',
+                        title_font=dict(size=14, color='#64748b'),
+                        tickfont=dict(size=11)
+                    ),
+                    yaxis=dict(
+                        showgrid=True,
+                        gridcolor='#f1f5f9',
+                        title='Total Portfolio Value ($)',
+                        title_font=dict(size=14, color='#64748b'),
+                        tickfont=dict(size=11),
+                        tickformat='$,.0f'
+                    ),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="top",
+                        y=-0.15,
+                        xanchor="center",
+                        x=0.5,
+                        font=dict(size=11),
+                        bgcolor='rgba(255, 255, 255, 0.9)',
+                        bordercolor='#e2e8f0',
+                        borderwidth=1
+                    ),
+                    margin=dict(l=70, r=40, t=20, b=80)
+                )
+                
+                st.plotly_chart(fig_agg, use_container_width=True)
+                
+                # Show summary stats
+                col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+                
+                current_total = float(aligned_data['Total'].iloc[-1])
+                start_total = total_principal
+                total_return = ((current_total / start_total) - 1) * 100 if start_total > 0 else 0
+                
+                days_elapsed = (aligned_data.index[-1] - aligned_data.index[0]).days
+                years_elapsed = max(days_elapsed / 365.25, 0.01)
+                total_cagr = ((current_total / start_total) ** (1 / years_elapsed) - 1) * 100 if start_total > 0 else 0
+                
+                with col_stat1:
+                    st.metric("Combined Value", f"${current_total:,.0f}")
+                
+                with col_stat2:
+                    st.metric("Total Return", f"{total_return:+.1f}%")
+                
+                with col_stat3:
+                    st.metric("Combined CAGR", f"{total_cagr:+.1f}%")
+                
+                with col_stat4:
+                    goal_diff = total_cagr - weighted_goal
+                    st.metric(
+                        "vs Goal", 
+                        f"{goal_diff:+.1f}%",
+                        delta=f"{'Beating' if goal_diff >= 0 else 'Behind'} target",
+                        delta_color="normal" if goal_diff >= 0 else "inverse"
+                    )
+                
+            else:
+                st.info("ℹ️ No portfolio data available for aggregated chart. Add assets and deploy capital to see your combined performance.")
+        
+        except Exception as e:
+            st.warning(f"⚠️ Could not generate aggregated chart: {str(e)}")
+        
+        st.divider()
+        
+        # ===== NEW v5.10.0: PORTFOLIO HEALTH SCORE =====
+        st.markdown("### 💪 Portfolio Health Score")
+        st.caption("Comprehensive assessment of your portfolio's overall health")
+        
+        with st.expander("ℹ️ How the Health Score Works", expanded=False):
+            st.markdown("""
+            **Your health score (0-100) is based on:**
+            
+            1. **Diversification (25 points)**
+               - Number of different assets
+               - Distribution across portfolios
+               - No over-concentration
+            
+            2. **Deployment (25 points)**
+               - % of assets fully deployed
+               - Capital utilization
+            
+            3. **Drift Control (25 points)**
+               - How many portfolios are balanced
+               - Adherence to target allocations
+            
+            4. **Performance (25 points)**
+               - % of portfolios meeting goals
+               - Overall returns vs targets
+            
+            **Score Ranges:**
+            - 90-100: Excellent 🟢
+            - 75-89: Good 🟡
+            - 60-74: Fair 🟠
+            - Below 60: Needs Improvement 🔴
+            """)
+        
+        # Calculate health score components
+        if len(profiles) > 0:
+            # Component 1: Diversification (0-25 points)
+            total_assets = len(global_assets) if global_assets else 0
+            diversification_score = 0
+            
+            if total_assets >= 10:
+                diversification_score = 25
+            elif total_assets >= 7:
+                diversification_score = 20
+            elif total_assets >= 5:
+                diversification_score = 15
+            elif total_assets >= 3:
+                diversification_score = 10
+            else:
+                diversification_score = 5
+            
+            # Check for over-concentration
+            if global_assets:
+                total_value = sum(a["value"] for a in global_assets.values())
+                if total_value > 0:
+                    max_concentration = max(a["value"] / total_value * 100 for a in global_assets.values())
+                    if max_concentration > 50:
+                        diversification_score -= 10  # Penalty for concentration
+                    elif max_concentration > 40:
+                        diversification_score -= 5
+            
+            diversification_score = max(0, min(25, diversification_score))
+            
+            # Component 2: Deployment (0-25 points)
+            if total_assets_count > 0:
+                deployment_ratio = deployed_assets / total_assets_count
+                deployment_score = deployment_ratio * 25
+            else:
+                deployment_score = 0
+            
+            # Component 3: Drift Control (0-25 points)
+            balanced_count = len(profiles) - total_drift_count
+            if len(profiles) > 0:
+                drift_control_score = (balanced_count / len(profiles)) * 25
+            else:
+                drift_control_score = 0
+            
+            # Component 4: Performance (0-25 points)
+            if len(profiles) > 0:
+                performance_score = (on_track_count / len(profiles)) * 25
+            else:
+                performance_score = 0
+            
+            # Total score
+            total_health_score = diversification_score + deployment_score + drift_control_score + performance_score
+            
+            # Determine grade
+            if total_health_score >= 90:
+                grade = "Excellent"
+                grade_color = "#10b981"
+                grade_emoji = "🟢"
+            elif total_health_score >= 75:
+                grade = "Good"
+                grade_color = "#84cc16"
+                grade_emoji = "🟡"
+            elif total_health_score >= 60:
+                grade = "Fair"
+                grade_color = "#f59e0b"
+                grade_emoji = "🟠"
+            else:
+                grade = "Needs Improvement"
+                grade_color = "#ef4444"
+                grade_emoji = "🔴"
+            
+            # Display health score gauge
+            col_gauge, col_breakdown = st.columns([1, 2])
+            
+            with col_gauge:
+                st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, {grade_color} 0%, {grade_color} 100%); 
+                                color: white; padding: 40px; border-radius: 16px; text-align: center;
+                                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);">
+                        <div style="font-size: 4rem; font-weight: 700; margin-bottom: 8px;">
+                            {int(total_health_score)}
+                        </div>
+                        <div style="font-size: 1.5rem; font-weight: 600; margin-bottom: 8px;">
+                            {grade} {grade_emoji}
+                        </div>
+                        <div style="font-size: 1rem; opacity: 0.9;">
+                            Portfolio Health Score
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col_breakdown:
+                st.markdown("**Score Breakdown:**")
+                
+                # Diversification
+                div_pct = (diversification_score / 25) * 100
+                div_color = "#10b981" if div_pct >= 75 else "#f59e0b" if div_pct >= 50 else "#ef4444"
+                st.markdown(f"""
+                    <div style="margin: 12px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-weight: 600;">📊 Diversification</span>
+                            <span style="font-weight: 700;">{diversification_score:.0f}/25</span>
+                        </div>
+                        <div style="background: #e5e7eb; border-radius: 8px; height: 12px; overflow: hidden;">
+                            <div style="background: {div_color}; height: 100%; width: {div_pct}%; transition: all 0.3s;"></div>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
+                            {total_assets} different assets
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Deployment
+                dep_pct = (deployment_score / 25) * 100
+                dep_color = "#10b981" if dep_pct >= 75 else "#f59e0b" if dep_pct >= 50 else "#ef4444"
+                st.markdown(f"""
+                    <div style="margin: 12px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-weight: 600;">🔥 Deployment</span>
+                            <span style="font-weight: 700;">{deployment_score:.0f}/25</span>
+                        </div>
+                        <div style="background: #e5e7eb; border-radius: 8px; height: 12px; overflow: hidden;">
+                            <div style="background: {dep_color}; height: 100%; width: {dep_pct}%; transition: all 0.3s;"></div>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
+                            {deployed_assets}/{total_assets_count} assets fully deployed
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Drift Control
+                drift_pct = (drift_control_score / 25) * 100
+                drift_color = "#10b981" if drift_pct >= 75 else "#f59e0b" if drift_pct >= 50 else "#ef4444"
+                st.markdown(f"""
+                    <div style="margin: 12px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-weight: 600;">⚖️ Drift Control</span>
+                            <span style="font-weight: 700;">{drift_control_score:.0f}/25</span>
+                        </div>
+                        <div style="background: #e5e7eb; border-radius: 8px; height: 12px; overflow: hidden;">
+                            <div style="background: {drift_color}; height: 100%; width: {drift_pct}%; transition: all 0.3s;"></div>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
+                            {balanced_count}/{len(profiles)} portfolios balanced
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Performance
+                perf_pct = (performance_score / 25) * 100
+                perf_color = "#10b981" if perf_pct >= 75 else "#f59e0b" if perf_pct >= 50 else "#ef4444"
+                st.markdown(f"""
+                    <div style="margin: 12px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-weight: 600;">🎯 Performance</span>
+                            <span style="font-weight: 700;">{performance_score:.0f}/25</span>
+                        </div>
+                        <div style="background: #e5e7eb; border-radius: 8px; height: 12px; overflow: hidden;">
+                            <div style="background: {perf_color}; height: 100%; width: {perf_pct}%; transition: all 0.3s;"></div>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
+                            {on_track_count}/{len(profiles)} portfolios meeting goals
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            # Recommendations
+            st.markdown("---")
+            st.markdown("**💡 Recommendations:**")
+            
+            recommendations = []
+            
+            if diversification_score < 15:
+                recommendations.append("📊 **Increase diversification:** Consider adding more assets (target: 5-10 different holdings)")
+            
+            if deployment_score < 20:
+                recommendations.append("🔥 **Complete deployments:** Finish deploying capital to inactive assets")
+            
+            if drift_control_score < 15:
+                recommendations.append("⚖️ **Rebalance portfolios:** Multiple portfolios have drifted beyond tolerance")
+            
+            if performance_score < 15:
+                recommendations.append("🎯 **Review underperformers:** More than half of portfolios are missing their goals")
+            
+            if total_health_score >= 90:
+                recommendations.append("🎉 **Excellent work!** Your portfolio is in great shape. Keep monitoring and stay disciplined.")
+            
+            if recommendations:
+                for rec in recommendations:
+                    st.markdown(f"• {rec}")
+            else:
+                st.success("✅ Your portfolio health is good! Keep up the great work!")
+        
+        else:
+            st.info("ℹ️ Create a portfolio to see your health score")
+        
+        st.divider()
+        
         # Portfolio Grid
         st.markdown("### 🔍 Portfolio Strategies")
         st.caption("Click any profile tile or 'Open' button to view detailed analytics and manage assets")
@@ -1634,8 +2369,6 @@ if view_mode == "🏠 Global Dashboard":
                         help=f"Open {name} portfolio manager"
                     ):
                         st.session_state.active_profile = name
-                        # v5.9.2 FIX: Set trigger to switch navigation on next rerun
-                        st.session_state.trigger_portfolio_view = True
                         st.rerun()
                 
                 
@@ -1663,7 +2396,7 @@ else:  # Portfolio Manager
         
         profiles = st.session_state.db.get("profiles", {})
         if profiles:
-            st.markdown("### 🔍 Available Profiles")
+            st.markdown("### 📁 Available Profiles")
             
             for name in profiles.keys():
                 if st.button(f"📂 {name}", key=f"select_{name}", use_container_width=True):
@@ -2448,7 +3181,7 @@ else:  # Portfolio Manager
                     st.rerun()
                 
                 if not needs_rebalance:
-                    st.info("✔ Portfolio is optimally balanced")
+                    st.info("✓ Portfolio is optimally balanced")
             
             with col_exec2:
                 st.markdown("#### ✅ Phase C: Execute with Actuals")
