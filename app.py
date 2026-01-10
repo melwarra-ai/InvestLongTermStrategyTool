@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.10.2"
+VERSION = "5.11.0"
 VERSION_DATE = "2026-01-10"
-VERSION_NAME = "Analytics Suite + Enhanced Validation: 5 rules to detect allocated_pct corruption"
+VERSION_NAME = "Dashboard Reimagined: Context cards, Action Items, Pie chart, Fixed attribution"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1365,9 +1365,9 @@ if view_mode == "🏠 Global Dashboard":
             start_val = float(p_data.get('principal', 0))
             start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d').date()
             
-            if start_val > 0 and curr_val > 0:
+            if start_val > 0:  # Allow current value to be any amount
                 days_elapsed = (date.today() - start_date).days
-                total_return_pct = ((curr_val / start_val) - 1) * 100
+                total_return_pct = ((curr_val / start_val) - 1) * 100 if start_val > 0 else 0
                 
                 performance_data.append({
                     'name': p_name,
@@ -1391,81 +1391,147 @@ if view_mode == "🏠 Global Dashboard":
             avg_years = avg_days / 365.25
             
             # Calculate annualized return (CAGR)
-            if avg_years > 0 and total_current > 0 and total_invested > 0:
+            if avg_years > 0 and total_invested > 0:
                 cagr = ((total_current / total_invested) ** (1 / avg_years) - 1) * 100
             else:
                 cagr = 0
             
-            # Display time period performance cards
-            col_p1, col_p2, col_p3, col_p4 = st.columns(4)
+            # NEW: Context Cards showing the journey
+            st.markdown("#### 💰 Performance Journey")
+            col_j1, col_j2, col_j3, col_j4 = st.columns(4)
             
-            with col_p1:
-                st.metric(
-                    label="💰 Total Gain",
-                    value=f"${total_gain:,.0f}",
-                    delta=f"{total_return_pct:+.1f}%"
+            with col_j1:
+                st.markdown("""
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                padding: 20px; border-radius: 12px; color: white; text-align: center;">
+                        <div style="font-size: 14px; opacity: 0.9;">🎯 Starting Value</div>
+                        <div style="font-size: 28px; font-weight: 700; margin: 8px 0;">${:,.0f}</div>
+                        <div style="font-size: 12px; opacity: 0.8;">{} days ago</div>
+                    </div>
+                """.format(total_invested, int(avg_days)), unsafe_allow_html=True)
+            
+            with col_j2:
+                arrow_color = "#10b981" if total_gain >= 0 else "#ef4444"
+                arrow_icon = "📈" if total_gain >= 0 else "📉"
+                st.markdown("""
+                    <div style="background: {}; padding: 20px; border-radius: 12px; 
+                                color: white; text-align: center;">
+                        <div style="font-size: 14px; opacity: 0.9;">{} Change</div>
+                        <div style="font-size: 28px; font-weight: 700; margin: 8px 0;">${:,.0f}</div>
+                        <div style="font-size: 12px; opacity: 0.8;">{:+.1f}%</div>
+                    </div>
+                """.format(arrow_color, arrow_icon, total_gain, total_return_pct), unsafe_allow_html=True)
+            
+            with col_j3:
+                st.markdown("""
+                    <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                                padding: 20px; border-radius: 12px; color: white; text-align: center;">
+                        <div style="font-size: 14px; opacity: 0.9;">📊 Current Value</div>
+                        <div style="font-size: 28px; font-weight: 700; margin: 8px 0;">${:,.0f}</div>
+                        <div style="font-size: 12px; opacity: 0.8;">Live market value</div>
+                    </div>
+                """.format(total_current), unsafe_allow_html=True)
+            
+            with col_j4:
+                cagr_color = "#10b981" if cagr >= 0 else "#ef4444"
+                st.markdown("""
+                    <div style="background: {}; padding: 20px; border-radius: 12px; 
+                                color: white; text-align: center;">
+                        <div style="font-size: 14px; opacity: 0.9;">📈 CAGR</div>
+                        <div style="font-size: 28px; font-weight: 700; margin: 8px 0;">{:.1f}%</div>
+                        <div style="font-size: 12px; opacity: 0.8;">Annualized return</div>
+                    </div>
+                """.format(cagr_color, cagr), unsafe_allow_html=True)
+            
+            st.markdown("")  # Spacing
+            
+            # Portfolio Performance Comparison - Improved for single/multiple portfolios
+            if len(performance_data) > 1:
+                st.markdown("#### 📈 Portfolio Performance Comparison")
+                
+                # Sort by performance
+                perf_sorted = sorted(performance_data, key=lambda x: x['total_return_pct'], reverse=True)
+                
+                colors = ['#10b981' if p['total_return_pct'] >= 0 else '#ef4444' for p in perf_sorted]
+                
+                fig_perf = go.Figure()
+                fig_perf.add_trace(go.Bar(
+                    x=[p['name'] for p in perf_sorted],
+                    y=[p['total_return_pct'] for p in perf_sorted],
+                    marker_color=colors,
+                    text=[f"{p['total_return_pct']:+.1f}%" for p in perf_sorted],
+                    textposition='outside',
+                    hovertemplate='<b>%{x}</b><br>' +
+                                 'Return: %{y:.1f}%<br>' +
+                                 '<extra></extra>'
+                ))
+                
+                fig_perf.update_layout(
+                    height=300,
+                    margin=dict(l=20, r=20, t=20, b=20),
+                    showlegend=False,
+                    xaxis=dict(title="Portfolio"),
+                    yaxis=dict(
+                        title="Total Return (%)",
+                        gridcolor='#f3f4f6'
+                    ),
+                    plot_bgcolor='white',
+                    paper_bgcolor='white'
                 )
-            
-            with col_p2:
-                st.metric(
-                    label="📈 Annualized Return (CAGR)",
-                    value=f"{cagr:.1f}%/yr",
-                    delta="All portfolios combined"
+                
+                st.plotly_chart(fig_perf, use_container_width=True)
+            else:
+                # Single portfolio - show horizontal gauge instead
+                st.markdown("#### 📊 Performance Overview")
+                portfolio = performance_data[0]
+                
+                # Create horizontal gauge/bar
+                fig_gauge = go.Figure()
+                
+                # Determine color based on performance
+                if portfolio['total_return_pct'] >= 10:
+                    color = '#10b981'
+                    status = "Excellent"
+                elif portfolio['total_return_pct'] >= 0:
+                    color = '#3b82f6'
+                    status = "Positive"
+                elif portfolio['total_return_pct'] >= -10:
+                    color = '#f59e0b'
+                    status = "Slight Loss"
+                else:
+                    color = '#ef4444'
+                    status = "Significant Loss"
+                
+                # Add indicator with better visualization
+                fig_gauge.add_trace(go.Indicator(
+                    mode="gauge+number+delta",
+                    value=portfolio['total_return_pct'],
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': f"{portfolio['name']} - {status}"},
+                    delta={'reference': 0, 'suffix': '%'},
+                    gauge={
+                        'axis': {'range': [None, max(10, abs(portfolio['total_return_pct']) * 1.2)]},
+                        'bar': {'color': color},
+                        'steps': [
+                            {'range': [min(-50, portfolio['total_return_pct'] * 1.2), 0], 'color': 'rgba(239, 68, 68, 0.1)'},
+                            {'range': [0, max(50, portfolio['total_return_pct'] * 1.2)], 'color': 'rgba(16, 185, 129, 0.1)'}
+                        ],
+                        'threshold': {
+                            'line': {'color': "gray", 'width': 4},
+                            'thickness': 0.75,
+                            'value': 0
+                        }
+                    }
+                ))
+                
+                fig_gauge.update_layout(
+                    height=250,
+                    margin=dict(l=20, r=20, t=60, b=20),
+                    paper_bgcolor='white',
+                    font={'size': 14}
                 )
-            
-            with col_p3:
-                avg_return = total_return_pct / len(performance_data) if performance_data else 0
-                st.metric(
-                    label="📊 Average Portfolio Return",
-                    value=f"{avg_return:.1f}%",
-                    delta=f"Across {len(performance_data)} portfolios"
-                )
-            
-            with col_p4:
-                # Best performing portfolio
-                best_portfolio = max(performance_data, key=lambda x: x['total_return_pct'])
-                st.metric(
-                    label="🏆 Best Performer",
-                    value=best_portfolio['name'],
-                    delta=f"+{best_portfolio['total_return_pct']:.1f}%"
-                )
-            
-            # Performance comparison chart
-            st.markdown("#### 📈 Portfolio Performance Comparison")
-            
-            # Create bar chart comparing portfolio returns
-            fig_perf = go.Figure()
-            
-            # Sort by performance
-            perf_sorted = sorted(performance_data, key=lambda x: x['total_return_pct'], reverse=True)
-            
-            colors = ['#10b981' if p['total_return_pct'] >= 0 else '#ef4444' for p in perf_sorted]
-            
-            fig_perf.add_trace(go.Bar(
-                x=[p['name'] for p in perf_sorted],
-                y=[p['total_return_pct'] for p in perf_sorted],
-                marker_color=colors,
-                text=[f"{p['total_return_pct']:+.1f}%" for p in perf_sorted],
-                textposition='outside',
-                hovertemplate='<b>%{x}</b><br>' +
-                             'Return: %{y:.1f}%<br>' +
-                             '<extra></extra>'
-            ))
-            
-            fig_perf.update_layout(
-                height=300,
-                margin=dict(l=20, r=20, t=20, b=20),
-                showlegend=False,
-                xaxis=dict(title="Portfolio"),
-                yaxis=dict(
-                    title="Total Return (%)",
-                    gridcolor='#f3f4f6'
-                ),
-                plot_bgcolor='white',
-                paper_bgcolor='white'
-            )
-            
-            st.plotly_chart(fig_perf, use_container_width=True)
+                
+                st.plotly_chart(fig_gauge, use_container_width=True)
             
             # Performance statistics table
             with st.expander("📋 Detailed Performance Statistics", expanded=False):
@@ -1478,10 +1544,10 @@ if view_mode == "🏠 Global Dashboard":
                         'Portfolio': p['name'],
                         'Invested': f"${p['start_val']:,.0f}",
                         'Current': f"${p['curr_val']:,.0f}",
-                        'Gain': f"${p['total_return']:,.0f}",
+                        'Gain/Loss': f"${p['total_return']:,.0f}",
                         'Total Return': f"{p['total_return_pct']:.1f}%",
                         'CAGR': f"{p_cagr:.1f}%",
-                        'Days': p['days_elapsed']
+                        'Days Invested': p['days_elapsed']
                     })
                 
                 df_perf = pd.DataFrame(perf_table)
@@ -1489,225 +1555,258 @@ if view_mode == "🏠 Global Dashboard":
         
         st.divider()
         
-        # ===== NEW v5.10.0: ASSET-LEVEL HEALTH SCORES =====
-        st.markdown("### 💊 Asset-Level Health Scores")
-        st.caption("Granular health assessment for each individual asset across all portfolios")
+        # ===== v5.11.0: ACTION ITEMS DASHBOARD (Replaces Asset Health Scores) =====
+        st.markdown("### 🎯 Portfolio Action Items")
+        st.caption("Clear, actionable insights based on your portfolio's current state")
         
-        with st.expander("ℹ️ How Asset Health Scores Work", expanded=False):
-            st.markdown("""
-            Each asset receives a health score (0-100) based on four key components:
-            
-            **1. Deployment Status (0-25 points)**
-            - Is the asset fully deployed (100% of planned capital)?
-            - 100% deployed = 25 pts | 75-99% = 20 pts | 50-74% = 15 pts | <50% = 10 pts
-            
-            **2. Drift Status (0-25 points)**
-            - How close is the asset to its target allocation?
-            - Within tolerance = 25 pts | Slight drift = 20 pts | Moderate = 15 pts | High drift = 10 pts
-            
-            **3. Performance Score (0-25 points)**
-            - Is the asset contributing positively to portfolio returns?
-            - Based on price appreciation since first purchase
-            
-            **4. Allocation Efficiency (0-25 points)**
-            - Is the asset properly sized within the portfolio?
-            - Balanced allocation = 25 pts | Minor issues = 20 pts | Major issues = 15 pts
-            
-            **Health Grades:**
-            - 90-100: 🟢 Excellent
-            - 75-89: 🟡 Good
-            - 60-74: 🟠 Fair
-            - Below 60: 🔴 Needs Attention
-            """)
+        # Collect action items across all portfolios
+        urgent_actions = []
+        watch_items = []
+        healthy_items = []
         
-        # Calculate asset-level health scores
-        asset_health_map = {}
+        # Also prepare data for pie chart
+        allocation_data = []
         
         for p_name, p_data in profiles.items():
             p_assets = p_data.get("assets", {})
+            tolerance = p_data.get('rebalance_threshold_pct', 5.0)
+            
+            # Calculate portfolio total
+            p_total = sum(p_assets[t]['units'] * prices.get(t, 0) for t in p_assets)
             
             for ticker, asset_data in p_assets.items():
-                if ticker not in asset_health_map:
-                    asset_health_map[ticker] = {
-                        'ticker': ticker,
-                        'portfolios': [],
-                        'total_units': 0,
-                        'total_value': 0,
-                        'deployment_scores': [],
-                        'drift_scores': [],
-                        'performance_scores': [],
-                        'allocation_scores': []
-                    }
-                
-                asset_health_map[ticker]['portfolios'].append(p_name)
-                asset_health_map[ticker]['total_units'] += asset_data.get('units', 0)
-                
-                # Current value
                 current_price = prices.get(ticker, 0)
                 asset_value = asset_data.get('units', 0) * current_price
-                asset_health_map[ticker]['total_value'] += asset_value
-                
-                # Component 1: Deployment Status (0-25)
-                allocated_pct = asset_data.get('allocated_pct', 0)
-                if allocated_pct >= 100:
-                    deploy_score = 25
-                elif allocated_pct >= 75:
-                    deploy_score = 20
-                elif allocated_pct >= 50:
-                    deploy_score = 15
-                else:
-                    deploy_score = 10
-                asset_health_map[ticker]['deployment_scores'].append(deploy_score)
-                
-                # Component 2: Drift Status (0-25)
                 target_alloc = asset_data.get('target_alloc_pct', 0)
-                
-                # Calculate portfolio total value
-                p_total = sum(p_assets[t]['units'] * prices.get(t, 0) for t in p_assets)
                 current_alloc = (asset_value / p_total * 100) if p_total > 0 else 0
+                drift_pct = current_alloc - target_alloc
+                abs_drift = abs(drift_pct)
                 
-                drift_pct = abs(current_alloc - target_alloc)
-                tolerance = p_data.get('rebalance_threshold_pct', 5.0)
+                # Prepare pie chart data
+                allocation_data.append({
+                    'Asset': ticker,
+                    'Current %': current_alloc,
+                    'Target %': target_alloc,
+                    'Value': asset_value,
+                    'Drift': drift_pct
+                })
                 
-                if drift_pct <= tolerance:
-                    drift_score = 25
-                elif drift_pct <= tolerance * 1.5:
-                    drift_score = 20
-                elif drift_pct <= tolerance * 2:
-                    drift_score = 15
+                # Calculate recommended trade amount
+                target_value = (target_alloc / 100) * p_total
+                trade_amount = target_value - asset_value
+                
+                # Categorize by urgency
+                if abs_drift >= tolerance:
+                    # Urgent - exceeds tolerance
+                    action = "SELL" if drift_pct > 0 else "BUY"
+                    urgent_actions.append({
+                        'Asset': ticker,
+                        'Portfolio': p_name,
+                        'Action': action,
+                        'Amount': abs(trade_amount),
+                        'Current': current_alloc,
+                        'Target': target_alloc,
+                        'Drift': drift_pct,
+                        'Reason': f"{abs_drift:.1f}% drift (tolerance: {tolerance}%)"
+                    })
+                elif abs_drift >= tolerance * 0.5:
+                    # Watch - getting close to tolerance
+                    watch_items.append({
+                        'Asset': ticker,
+                        'Portfolio': p_name,
+                        'Current': current_alloc,
+                        'Target': target_alloc,
+                        'Drift': drift_pct,
+                        'Reason': f"{abs_drift:.1f}% drift (approaching {tolerance}% limit)"
+                    })
                 else:
-                    drift_score = 10
-                asset_health_map[ticker]['drift_scores'].append(drift_score)
+                    # Healthy - within acceptable range
+                    healthy_items.append({
+                        'Asset': ticker,
+                        'Portfolio': p_name,
+                        'Current': current_alloc,
+                        'Target': target_alloc,
+                        'Drift': drift_pct
+                    })
+        
+        # Display summary metrics
+        col_a1, col_a2, col_a3, col_a4 = st.columns(4)
+        
+        with col_a1:
+            st.metric(
+                "🔴 Urgent Actions", 
+                len(urgent_actions),
+                delta="Needs rebalancing" if urgent_actions else "All good!"
+            )
+        
+        with col_a2:
+            st.metric(
+                "🟡 Watch List",
+                len(watch_items),
+                delta="Approaching limits"
+            )
+        
+        with col_a3:
+            st.metric(
+                "🟢 Healthy Assets",
+                len(healthy_items),
+                delta=f"{len(healthy_items)/len(allocation_data)*100:.0f}% of portfolio" if allocation_data else "N/A"
+            )
+        
+        with col_a4:
+            total_rebalance_amount = sum(a['Amount'] for a in urgent_actions)
+            st.metric(
+                "💰 Total Rebalancing",
+                f"${total_rebalance_amount:,.0f}",
+                delta="Trade volume needed"
+            )
+        
+        # Display urgent actions
+        if urgent_actions:
+            st.markdown("#### 🔴 Urgent: Rebalancing Required")
+            
+            for action in sorted(urgent_actions, key=lambda x: abs(x['Drift']), reverse=True):
+                color = "#ef4444" if action['Action'] == "SELL" else "#3b82f6"
+                action_icon = "📉" if action['Action'] == "SELL" else "📈"
                 
-                # Component 3: Performance Score (0-25)
-                # Simple: if asset has gains, higher score
-                avg_cost = asset_data.get('average_cost', current_price)
-                if avg_cost > 0:
-                    price_change_pct = ((current_price - avg_cost) / avg_cost) * 100
-                    if price_change_pct >= 20:
-                        perf_score = 25
-                    elif price_change_pct >= 10:
-                        perf_score = 22
-                    elif price_change_pct >= 0:
-                        perf_score = 20
-                    elif price_change_pct >= -10:
-                        perf_score = 15
+                st.markdown(f"""
+                    <div style="background: white; border-left: 4px solid {color}; 
+                                padding: 16px; margin: 8px 0; border-radius: 8px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="font-size: 18px; font-weight: 700; color: {color};">
+                                    {action_icon} {action['Action']} {action['Asset']}
+                                </span>
+                                <div style="color: #64748b; margin-top: 4px;">
+                                    {action['Reason']}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 24px; font-weight: 700; color: {color};">
+                                    ${action['Amount']:,.0f}
+                                </div>
+                                <div style="color: #64748b; font-size: 12px;">
+                                    {action['Current']:.1f}% → {action['Target']:.1f}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.success("✅ **No urgent actions needed!** All assets are within tolerance.")
+        
+        # Display watch items
+        if watch_items:
+            with st.expander(f"🟡 Watch List ({len(watch_items)} assets approaching limits)", expanded=False):
+                for item in sorted(watch_items, key=lambda x: abs(x['Drift']), reverse=True):
+                    st.info(f"**{item['Asset']}** in {item['Portfolio']}: {item['Current']:.1f}% (target: {item['Target']:.1f}%) - {item['Reason']}")
+        
+        # Display healthy assets
+        if healthy_items:
+            with st.expander(f"🟢 Healthy Assets ({len(healthy_items)} on target)", expanded=False):
+                for item in healthy_items:
+                    st.success(f"**{item['Asset']}** in {item['Portfolio']}: {item['Current']:.1f}% (target: {item['Target']:.1f}%) - Within tolerance ✅")
+        
+        # NEW: Asset Allocation Pie Chart
+        if allocation_data:
+            st.markdown("#### 🥧 Asset Allocation Overview")
+            
+            col_pie1, col_pie2 = st.columns([2, 1])
+            
+            with col_pie1:
+                # Create pie chart
+                fig_pie = go.Figure()
+                
+                # Prepare data
+                labels = [item['Asset'] for item in allocation_data]
+                values = [item['Current %'] for item in allocation_data]
+                targets = [item['Target %'] for item in allocation_data]
+                
+                # Color code based on drift
+                colors_pie = []
+                for item in allocation_data:
+                    if abs(item['Drift']) >= tolerance:
+                        colors_pie.append('#ef4444')  # Red - needs rebalancing
+                    elif abs(item['Drift']) >= tolerance * 0.5:
+                        colors_pie.append('#f59e0b')  # Orange - watch
                     else:
-                        perf_score = 10
-                else:
-                    perf_score = 20  # neutral if no cost basis
-                asset_health_map[ticker]['performance_scores'].append(perf_score)
+                        colors_pie.append('#10b981')  # Green - healthy
                 
-                # Component 4: Allocation Efficiency (0-25)
-                # Based on whether allocation is reasonable (not too concentrated, not too small)
-                if target_alloc >= 5 and target_alloc <= 30:
-                    alloc_score = 25  # ideal range
-                elif target_alloc >= 2 and target_alloc <= 40:
-                    alloc_score = 20  # acceptable
-                elif target_alloc >= 1 and target_alloc <= 50:
-                    alloc_score = 15  # suboptimal
-                else:
-                    alloc_score = 10  # problematic
-                asset_health_map[ticker]['allocation_scores'].append(alloc_score)
-        
-        # Calculate aggregate scores for each asset
-        asset_health_list = []
-        for ticker, data in asset_health_map.items():
-            # Average scores across all portfolios where this asset appears
-            avg_deploy = sum(data['deployment_scores']) / len(data['deployment_scores'])
-            avg_drift = sum(data['drift_scores']) / len(data['drift_scores'])
-            avg_perf = sum(data['performance_scores']) / len(data['performance_scores'])
-            avg_alloc = sum(data['allocation_scores']) / len(data['allocation_scores'])
+                fig_pie.add_trace(go.Pie(
+                    labels=labels,
+                    values=values,
+                    marker=dict(colors=colors_pie, line=dict(color='white', width=2)),
+                    textinfo='label+percent',
+                    textposition='auto',
+                    hovertemplate='<b>%{label}</b><br>' +
+                                  'Current: %{value:.1f}%<br>' +
+                                  '<extra></extra>'
+                ))
+                
+                fig_pie.update_layout(
+                    height=400,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    title=dict(
+                        text="Current Portfolio Allocation",
+                        x=0.5,
+                        xanchor='center'
+                    ),
+                    showlegend=True,
+                    legend=dict(
+                        orientation="v",
+                        yanchor="middle",
+                        y=0.5,
+                        xanchor="left",
+                        x=1.02
+                    )
+                )
+                
+                st.plotly_chart(fig_pie, use_container_width=True)
             
-            total_health = avg_deploy + avg_drift + avg_perf + avg_alloc
-            
-            # Determine grade
-            if total_health >= 90:
-                grade = "🟢 Excellent"
-                grade_emoji = "🟢"
-            elif total_health >= 75:
-                grade = "🟡 Good"
-                grade_emoji = "🟡"
-            elif total_health >= 60:
-                grade = "🟠 Fair"
-                grade_emoji = "🟠"
-            else:
-                grade = "🔴 Needs Attention"
-                grade_emoji = "🔴"
-            
-            asset_health_list.append({
-                'Asset': ticker,
-                'Grade': grade_emoji,
-                'Health Score': f"{total_health:.0f}/100",
-                'Deployment': f"{avg_deploy:.0f}/25",
-                'Drift Control': f"{avg_drift:.0f}/25",
-                'Performance': f"{avg_perf:.0f}/25",
-                'Allocation': f"{avg_alloc:.0f}/25",
-                'Total Value': f"${data['total_value']:,.0f}",
-                'Portfolios': ', '.join(data['portfolios']),
-                '_health_num': total_health  # For sorting
-            })
-        
-        if asset_health_list:
-            # Sort by health score (descending)
-            asset_health_list_sorted = sorted(asset_health_list, key=lambda x: x['_health_num'], reverse=True)
-            
-            # Remove the numeric column used for sorting
-            for item in asset_health_list_sorted:
-                del item['_health_num']
-            
-            # Display summary metrics
-            col_h1, col_h2, col_h3, col_h4 = st.columns(4)
-            
-            # Calculate summary metrics from raw data
-            asset_health_scores = []
-            for ticker, data in asset_health_map.items():
-                avg_deploy = sum(data['deployment_scores']) / len(data['deployment_scores'])
-                avg_drift = sum(data['drift_scores']) / len(data['drift_scores'])
-                avg_perf = sum(data['performance_scores']) / len(data['performance_scores'])
-                avg_alloc = sum(data['allocation_scores']) / len(data['allocation_scores'])
-                asset_health_scores.append(avg_deploy + avg_drift + avg_perf + avg_alloc)
-            
-            healthy_assets = sum(1 for score in asset_health_scores if score >= 75)
-            needs_attention = sum(1 for score in asset_health_scores if score < 60)
-            avg_health = sum(asset_health_scores) / len(asset_health_scores) if asset_health_scores else 0
-            
-            with col_h1:
-                st.metric("📊 Total Assets", len(asset_health_list))
-            
-            with col_h2:
-                st.metric("🟢 Healthy Assets", healthy_assets, delta=f"{healthy_assets/len(asset_health_list)*100:.0f}%")
-            
-            with col_h3:
-                st.metric("🔴 Needs Attention", needs_attention)
-            
-            with col_h4:
-                st.metric("💊 Average Health", f"{avg_health:.0f}/100")
-            
-            # Display asset health table
-            st.markdown("#### 📋 Asset Health Details")
-            df_health = pd.DataFrame(asset_health_list_sorted)
-            st.dataframe(df_health, use_container_width=True, hide_index=True)
-            
-            # Identify best and worst assets
-            best_asset = asset_health_list_sorted[0]
-            worst_asset = asset_health_list_sorted[-1]
-            
-            col_ba1, col_ba2 = st.columns(2)
-            
-            with col_ba1:
-                st.success(f"**🏆 Healthiest Asset:** {best_asset['Asset']} - {best_asset['Health Score']}")
-            
-            with col_ba2:
-                st.error(f"**⚠️ Needs Most Attention:** {worst_asset['Asset']} - {worst_asset['Health Score']}")
+            with col_pie2:
+                st.markdown("**Color Legend:**")
+                st.markdown("🔴 **Red** = Needs rebalancing")
+                st.markdown("🟠 **Orange** = Watch closely")  
+                st.markdown("🟢 **Green** = On target")
+                
+                st.markdown("")
+                st.markdown("**Current vs Target:**")
+                for item in allocation_data:
+                    drift_icon = "🔴" if abs(item['Drift']) >= tolerance else ("🟠" if abs(item['Drift']) >= tolerance * 0.5 else "🟢")
+                    st.markdown(f"{drift_icon} **{item['Asset']}**: {item['Current %']:.1f}% (target: {item['Target %']:.1f}%)")
         
         st.divider()
         
-        # ===== NEW v5.10.0: PERFORMANCE ATTRIBUTION ANALYSIS =====
+        # ===== v5.11.0: PERFORMANCE ATTRIBUTION ANALYSIS (Fixed Cost Basis) =====
         st.markdown("### 🎯 Performance Attribution Analysis")
         st.caption("Understand which assets drove your returns (or losses)")
         
-        # Calculate attribution for each asset
+        with st.expander("ℹ️ What is Attribution Analysis?", expanded=False):
+            st.markdown("""
+            **Attribution analysis** answers the question: *"Which assets caused my portfolio to gain or lose money?"*
+            
+            **Key Concepts:**
+            - **Cost Basis:** Total amount you invested in an asset (sum of all purchases)
+            - **Current Value:** What the asset is worth now at market prices
+            - **Gain/Loss:** Current Value - Cost Basis (your profit or loss on this asset)
+            - **Contributors:** Assets with positive gains (made you money) 💚
+            - **Detractors:** Assets with negative gains (lost you money) 💔
+            - **Contribution %:** What % of your total portfolio gain/loss came from this asset
+            
+            **Example:**
+            - Portfolio started with $100,000, now worth $57,500 = **-$42,500 total loss**
+            - Asset SPXL: Invested $25,000, now worth $18,000 = **-$7,000 loss**
+            - SPXL is a **detractor** that caused **16.5%** of your total loss
+            
+            **Why This Matters:**
+            - Identifies your winners and losers
+            - Shows which assets are pulling their weight
+            - Helps decide what to trim or add more of
+            - Reveals concentration of gains/losses
+            """)
+        
+        # Calculate attribution for each asset with FIXED cost basis calculation
         attribution_data = []
         
         for p_name, p_data in profiles.items():
@@ -1720,17 +1819,37 @@ if view_mode == "🏠 Global Dashboard":
             
             for ticker, asset_data in p_assets.items():
                 units = asset_data.get('units', 0)
-                avg_cost = asset_data.get('average_cost', 0)
                 current_price = prices.get(ticker, 0)
-                
-                # Calculate asset-level metrics
-                cost_basis = units * avg_cost
                 current_value = units * current_price
+                
+                # FIXED: Properly calculate cost basis from purchases array
+                purchases = asset_data.get('purchases', [])
+                if purchases:
+                    # Calculate from actual purchase history
+                    cost_basis = sum(p.get('amount', 0) for p in purchases)
+                else:
+                    # Fallback: use average_cost if available
+                    avg_cost = calculate_average_cost(asset_data)
+                    if avg_cost:
+                        cost_basis = units * avg_cost
+                    else:
+                        # Last resort: estimate from current value and assume 0 gain
+                        # This happens when there's no purchase history
+                        cost_basis = current_value
+                
+                # Calculate asset gain/loss
                 asset_gain = current_value - cost_basis
                 
-                # Attribution: how much did this asset contribute to portfolio's total gain?
+                # Calculate contribution percentage
+                # Handle negative portfolio gains correctly
                 if p_gain != 0:
-                    contribution_pct = (asset_gain / p_gain) * 100 if p_gain > 0 else 0
+                    # If portfolio lost money, detractors have negative contribution
+                    # If portfolio gained money, contributors have positive contribution
+                    contribution_pct = (asset_gain / abs(p_gain)) * 100
+                    if p_gain < 0:
+                        # Portfolio is losing - invert signs for clarity
+                        # Assets with losses contribute to the total loss
+                        contribution_pct = abs(contribution_pct) if asset_gain < 0 else -abs(contribution_pct)
                 else:
                     contribution_pct = 0
                 
@@ -1764,13 +1883,19 @@ if view_mode == "🏠 Global Dashboard":
                 ticker_attribution[ticker]['total_current_value'] += item['current_value']
                 ticker_attribution[ticker]['portfolios'].append(item['portfolio'])
             
-            # Calculate global contribution percentages
-            total_portfolio_gain = sum(p['portfolio_total_gain'] for p in attribution_data)
+            # Calculate portfolio-level metrics
+            total_portfolio_gain = sum(set(p['portfolio_total_gain'] for p in attribution_data))
+            is_loss = total_portfolio_gain < 0
             
             attribution_list = []
             for ticker, data in ticker_attribution.items():
-                contrib_pct = (data['total_gain'] / total_portfolio_gain * 100) if total_portfolio_gain != 0 else 0
                 gain_pct = ((data['total_current_value'] / data['total_cost_basis']) - 1) * 100 if data['total_cost_basis'] > 0 else 0
+                
+                # Calculate contribution percentage
+                if total_portfolio_gain != 0:
+                    contrib_pct = (data['total_gain'] / abs(total_portfolio_gain)) * 100
+                else:
+                    contrib_pct = 0
                 
                 attribution_list.append({
                     'Asset': ticker,
@@ -1778,104 +1903,143 @@ if view_mode == "🏠 Global Dashboard":
                     'Current Value': f"${data['total_current_value']:,.0f}",
                     'Gain/Loss': f"${data['total_gain']:,.0f}",
                     'Return %': f"{gain_pct:+.1f}%",
-                    'Contribution to Portfolio': f"{contrib_pct:+.1f}%",
+                    'Contribution': f"{abs(contrib_pct):.1f}%",
                     'In Portfolios': ', '.join(set(data['portfolios'])),
                     '_gain': data['total_gain'],
-                    '_contrib': contrib_pct
+                    '_contrib': contrib_pct,
+                    '_cost_basis': data['total_cost_basis'],
+                    '_current_value': data['total_current_value']
                 })
             
-            # Sort by contribution (descending)
-            attribution_list_sorted = sorted(attribution_list, key=lambda x: x['_gain'], reverse=True)
+            # Sort by absolute gain (descending)
+            attribution_list_sorted = sorted(attribution_list, key=lambda x: abs(x['_gain']), reverse=True)
             
             # Separate into contributors and detractors
             contributors = [a for a in attribution_list_sorted if a['_gain'] > 0]
             detractors = [a for a in attribution_list_sorted if a['_gain'] < 0]
             
-            # Display summary
+            # Display summary with clearer labels
             col_a1, col_a2, col_a3 = st.columns(3)
             
             with col_a1:
-                total_gains = sum(a['_gain'] for a in contributors)
-                st.metric("💚 Total Contributions", f"${total_gains:,.0f}", delta=f"{len(contributors)} assets")
+                if contributors:
+                    total_gains = sum(a['_gain'] for a in contributors)
+                    st.metric("💚 Assets With Gains", f"${total_gains:,.0f}", delta=f"{len(contributors)} assets")
+                else:
+                    st.metric("💚 Assets With Gains", "$0", delta="0 assets")
             
             with col_a2:
-                total_losses = sum(a['_gain'] for a in detractors)
-                st.metric("💔 Total Detractors", f"${total_losses:,.0f}", delta=f"{len(detractors)} assets")
+                if detractors:
+                    total_losses = sum(a['_gain'] for a in detractors)
+                    st.metric("💔 Assets With Losses", f"${total_losses:,.0f}", delta=f"{len(detractors)} assets")
+                else:
+                    st.metric("💔 Assets With Losses", "$0", delta="0 assets")
             
             with col_a3:
-                net_attribution = total_gains + total_losses
-                st.metric("📊 Net Attribution", f"${net_attribution:,.0f}")
+                net_attribution = sum(a['_gain'] for a in attribution_list_sorted)
+                net_color = "normal" if net_attribution >= 0 else "inverse"
+                st.metric("📊 Net Gain/Loss", f"${net_attribution:,.0f}", delta=f"{((net_attribution / sum(a['_cost_basis'] for a in attribution_list_sorted)) * 100):+.1f}%" if sum(a['_cost_basis'] for a in attribution_list_sorted) > 0 else "N/A", delta_color=net_color)
             
-            # Display top contributors and detractors
-            st.markdown("#### 🏆 Top 5 Contributors")
-            top_5_contributors = contributors[:5]
+            # Show impact summary
+            if is_loss:
+                st.info("💡 **Portfolio is currently at a loss.** The analysis below shows which assets contributed most to this loss.")
             
-            if top_5_contributors:
-                for i, asset in enumerate(top_5_contributors, 1):
+            # Display top contributors (assets with gains)
+            if contributors:
+                st.markdown("#### 💚 Assets With Gains (Contributors)")
+                st.caption("These assets made you money (current value > cost basis)")
+                
+                for i, asset in enumerate(contributors[:5], 1):
                     col_c1, col_c2, col_c3 = st.columns([2, 2, 1])
                     with col_c1:
                         st.write(f"**{i}. {asset['Asset']}**")
                     with col_c2:
                         st.write(f"Gain: {asset['Gain/Loss']} ({asset['Return %']})")
                     with col_c3:
-                        st.write(f"📊 {asset['Contribution to Portfolio']}")
+                        st.write(f"📊 {asset['Contribution']} of {'gain' if total_portfolio_gain >= 0 else 'loss offset'}")
             else:
-                st.info("No positive contributors yet")
+                st.markdown("#### 💚 Assets With Gains")
+                st.info("No assets currently have gains (all are at break-even or losses)")
             
-            st.markdown("#### ⚠️ Top 5 Detractors")
-            top_5_detractors = sorted(detractors, key=lambda x: x['_gain'])[:5]
-            
-            if top_5_detractors:
-                for i, asset in enumerate(top_5_detractors, 1):
+            # Display top detractors (assets with losses)
+            if detractors:
+                st.markdown("#### 💔 Assets With Losses (Detractors)")
+                st.caption("These assets lost you money (current value < cost basis)")
+                
+                # Sort detractors by loss amount (most negative first)
+                detractors_sorted = sorted(detractors, key=lambda x: x['_gain'])
+                
+                for i, asset in enumerate(detractors_sorted[:5], 1):
                     col_d1, col_d2, col_d3 = st.columns([2, 2, 1])
                     with col_d1:
                         st.write(f"**{i}. {asset['Asset']}**")
                     with col_d2:
                         st.write(f"Loss: {asset['Gain/Loss']} ({asset['Return %']})")
                     with col_d3:
-                        st.write(f"📉 {asset['Contribution to Portfolio']}")
+                        st.write(f"📉 {asset['Contribution']} of {'loss' if total_portfolio_gain < 0 else 'gain reduction'}")
             else:
-                st.info("No detractors - all assets performing positively!")
+                st.markdown("#### 💔 Assets With Losses")
+                st.success("✅ No detractors - all assets are profitable or break-even!")
             
-            # Full attribution table
+            # Full attribution table with waterfall chart
             with st.expander("📋 Complete Attribution Analysis", expanded=False):
-                # Remove helper columns for display
-                for item in attribution_list_sorted:
-                    del item['_gain']
-                    del item['_contrib']
+                st.markdown("##### 📊 All Assets Breakdown")
                 
-                df_attribution = pd.DataFrame(attribution_list_sorted)
+                # Create display copy without helper columns
+                attribution_display = []
+                for item in attribution_list_sorted:
+                    attribution_display.append({
+                        'Asset': item['Asset'],
+                        'Cost Basis': item['Cost Basis'],
+                        'Current Value': item['Current Value'],
+                        'Gain/Loss': item['Gain/Loss'],
+                        'Return %': item['Return %'],
+                        'Contribution': item['Contribution'],
+                        'Portfolios': item['In Portfolios']
+                    })
+                
+                df_attribution = pd.DataFrame(attribution_display)
                 st.dataframe(df_attribution, use_container_width=True, hide_index=True)
                 
-                # Waterfall chart option
+                # Waterfall chart showing contribution
                 st.markdown("##### 📊 Contribution Waterfall Chart")
-                
-                # Create waterfall chart data
-                waterfall_data = attribution_list_sorted[:10]  # Top 10 for readability
+                st.caption("Visual breakdown of how each asset contributed to your portfolio's performance")
                 
                 fig_waterfall = go.Figure()
                 
-                # Add bars for each contribution
-                for asset in waterfall_data:
-                    gain_str = asset['Gain/Loss'].replace('$', '').replace(',', '')
-                    gain_val = float(gain_str)
+                # Use top 10 for readability
+                top_assets = attribution_list_sorted[:min(10, len(attribution_list_sorted))]
+                
+                for asset in top_assets:
+                    gain_val = asset['_gain']
                     color = '#10b981' if gain_val > 0 else '#ef4444'
                     
                     fig_waterfall.add_trace(go.Bar(
                         x=[asset['Asset']],
                         y=[gain_val],
                         marker_color=color,
-                        text=asset['Gain/Loss'],
+                        text=f"${gain_val:,.0f}",
                         textposition='outside',
-                        showlegend=False
+                        showlegend=False,
+                        hovertemplate=f"<b>{asset['Asset']}</b><br>" +
+                                      f"Gain/Loss: ${gain_val:,.0f}<br>" +
+                                      f"Return: {asset['Return %']}<br>" +
+                                      f"Contribution: {asset['Contribution']}<br>" +
+                                      "<extra></extra>"
                     ))
                 
                 fig_waterfall.update_layout(
                     height=400,
                     margin=dict(l=20, r=20, t=40, b=20),
-                    title="Top 10 Asset Contributions",
+                    title=f"Top {len(top_assets)} Assets by Impact",
                     xaxis=dict(title="Asset"),
-                    yaxis=dict(title="Contribution ($)", gridcolor='#f3f4f6'),
+                    yaxis=dict(
+                        title="Gain/Loss ($)",
+                        gridcolor='#f3f4f6',
+                        zeroline=True,
+                        zerolinewidth=2,
+                        zerolinecolor='#cbd5e1'
+                    ),
                     plot_bgcolor='white',
                     paper_bgcolor='white'
                 )
