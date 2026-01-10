@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.11.0"
+VERSION = "5.11.1"
 VERSION_DATE = "2026-01-10"
-VERSION_NAME = "Dashboard Reimagined: Context cards, Action Items, Pie chart, Fixed attribution"
+VERSION_NAME = "Dashboard Reimagined + Critical Field Name Fix"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1569,7 +1569,7 @@ if view_mode == "🏠 Global Dashboard":
         
         for p_name, p_data in profiles.items():
             p_assets = p_data.get("assets", {})
-            tolerance = p_data.get('rebalance_threshold_pct', 5.0)
+            tolerance = p_data.get('drift_tolerance', 5.0)  # FIXED: Changed from 'rebalance_threshold_pct' to 'drift_tolerance'
             
             # Calculate portfolio total
             p_total = sum(p_assets[t]['units'] * prices.get(t, 0) for t in p_assets)
@@ -1577,7 +1577,7 @@ if view_mode == "🏠 Global Dashboard":
             for ticker, asset_data in p_assets.items():
                 current_price = prices.get(ticker, 0)
                 asset_value = asset_data.get('units', 0) * current_price
-                target_alloc = asset_data.get('target_alloc_pct', 0)
+                target_alloc = asset_data.get('target', 0)  # FIXED: Changed from 'target_alloc_pct' to 'target'
                 current_alloc = (asset_value / p_total * 100) if p_total > 0 else 0
                 drift_pct = current_alloc - target_alloc
                 abs_drift = abs(drift_pct)
