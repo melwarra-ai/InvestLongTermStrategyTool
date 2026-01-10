@@ -1443,6 +1443,34 @@ if view_mode == "🏠 Global Dashboard":
                     global_assets[ticker]["units"] += asset_data["units"]
                     global_assets[ticker]["portfolios"].append(p_name)
         
+        # Calculate additional metrics for Health Score and Performance Insights
+        total_assets_count = sum(p['Assets'] for p in comparison_data) if comparison_data else 0
+        deployed_assets = 0
+        total_portfolio_value = 0
+        total_deployed_value = 0
+        
+        for p_name, p_data in profiles.items():
+            p_assets = p_data.get("assets", {})
+            for ticker, asset_data in p_assets.items():
+                if asset_data.get("allocated_pct", 0) >= 100.0:
+                    deployed_assets += 1
+                    if ticker in prices:
+                        total_deployed_value += asset_data["units"] * prices[ticker]
+            
+            for ticker in p_assets:
+                if ticker in prices:
+                    total_portfolio_value += p_assets[ticker]["units"] * prices[ticker]
+        
+        # Find best/worst performers
+        if comparison_data:
+            best_performer = max(comparison_data, key=lambda x: x['CAGR'])
+            worst_performer = min(comparison_data, key=lambda x: x['CAGR'])
+            on_track_count = sum(1 for p in comparison_data if p['CAGR'] >= profiles[p['Profile']].get('yearly_goal_pct', 0))
+        else:
+            best_performer = None
+            worst_performer = None
+            on_track_count = 0
+        
         # ===== NEW v5.10.0: PORTFOLIO HEALTH SCORE =====
         st.markdown("### 💪 Portfolio Health Score")
         st.caption("Comprehensive assessment of your portfolio's overall health")
@@ -1678,31 +1706,7 @@ if view_mode == "🏠 Global Dashboard":
         
         # Calculate summary metrics
         if len(comparison_data) > 0:
-            # Find best/worst performers
-            best_performer = max(comparison_data, key=lambda x: x['CAGR'])
-            worst_performer = min(comparison_data, key=lambda x: x['CAGR'])
-            
-            # Calculate deployment stats
-            total_assets_count = sum(p['Assets'] for p in comparison_data)
-            deployed_assets = 0
-            total_portfolio_value = 0
-            total_deployed_value = 0
-            
-            for p_name, p_data in profiles.items():
-                p_assets = p_data.get("assets", {})
-                for ticker, asset_data in p_assets.items():
-                    if asset_data.get("allocated_pct", 0) >= 100.0:
-                        deployed_assets += 1
-                        if ticker in prices:
-                            total_deployed_value += asset_data["units"] * prices[ticker]
-                
-                for ticker in p_assets:
-                    if ticker in prices:
-                        total_portfolio_value += p_assets[ticker]["units"] * prices[ticker]
-            
-            # Calculate on-track count
-            on_track_count = sum(1 for p in comparison_data if p['CAGR'] >= profiles[p['Profile']].get('yearly_goal_pct', 0))
-            
+            # Data already calculated in aggregation section above
             # Display cards
             col_c1, col_c2, col_c3, col_c4 = st.columns(4)
             
