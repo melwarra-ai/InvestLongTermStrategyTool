@@ -1659,8 +1659,7 @@ if view_mode == "🏠 Global Dashboard":
             # Display summary metrics
             col_h1, col_h2, col_h3, col_h4 = st.columns(4)
             
-            healthy_assets = sum(1 for a in asset_health_list if a['_health_num'] >= 75 if '_health_num' in a)
-            # Recalculate since we deleted the key
+            # Calculate summary metrics from raw data
             asset_health_scores = []
             for ticker, data in asset_health_map.items():
                 avg_deploy = sum(data['deployment_scores']) / len(data['deployment_scores'])
