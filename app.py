@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.11.6"
+VERSION = "5.11.7"
 VERSION_DATE = "2026-01-10"
-VERSION_NAME = "Dashboard Order: Action Items at top + Pie chart table under chart"
+VERSION_NAME = "Restored 'Click to Open' buttons + All layout fixes"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1556,6 +1556,29 @@ if view_mode == "🏠 Global Dashboard":
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
+                    
+                    # Button to open portfolio
+                    if st.button(
+                        "📂 Click to Open →",
+                        key=f"open_{name}",
+                        use_container_width=True,
+                        type="secondary",
+                        help=f"Open {name} portfolio manager"
+                    ):
+                        st.session_state.active_profile = name
+                        # v5.9.2 FIX: Set trigger to switch navigation on next rerun
+                        st.session_state.trigger_portfolio_view = True
+                        st.rerun()
+                
+                # Show drift details if needed
+                if needs_rebal and drift_details:
+                    with st.expander("⚠️ View Drift Details", expanded=False):
+                        for t, drift, actual, target in drift_details:
+                            st.caption(f"• {t}: {drift:.1f}% drift")
+                
+                st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
+        
+        st.divider()
         
         st.markdown("### 🎯 Portfolio Action Items")
         st.caption("Clear, actionable insights based on your portfolio's current state")
