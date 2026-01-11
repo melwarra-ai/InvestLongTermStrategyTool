@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.11.2"
+VERSION = "5.11.3"
 VERSION_DATE = "2026-01-10"
-VERSION_NAME = "Dashboard Layout Fix: Portfolio Strategies at top, thinner bars, fixed table"
+VERSION_NAME = "Progress Bar Enhancement: Gradient colors for Asset Allocation & Deployment"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -796,9 +796,22 @@ with st.sidebar:
         # Calculate current allocation
         current_alloc = sum(a.get('target', 0) for a in prof.get("assets", {}).values())
         
-        # Allocation progress bar
-        progress_color = "🟢" if current_alloc >= 100 else "🟡"
-        bar_color = "#10b981" if current_alloc >= 100 else "#f97316"
+        # Allocation progress bar with dynamic gradient colors
+        if current_alloc >= 100:
+            progress_color = "🟢"
+            bar_color = "#10b981"  # Green
+        elif current_alloc >= 75:
+            progress_color = "🟢"
+            bar_color = "#84cc16"  # Light green
+        elif current_alloc >= 50:
+            progress_color = "🟡"
+            bar_color = "#fbbf24"  # Yellow
+        elif current_alloc >= 25:
+            progress_color = "🟠"
+            bar_color = "#f97316"  # Orange
+        else:
+            progress_color = "🔴"
+            bar_color = "#ef4444"  # Red
         
         st.markdown(f"""
             <div style="margin: 12px 0;">
@@ -1008,29 +1021,46 @@ with st.sidebar:
             if total_assets > 0:
                 deployment_progress = fully_deployed_count / total_assets
                 
+                # Dynamic color based on progress (like Asset Allocation)
                 if deployment_progress >= 1.0:
-                    bar_color = "#10b981"
-                    st.markdown("""
-                        <style>
-                        div[data-testid="stProgress"] > div > div > div {
-                            background-color: #10b981 !important;
-                        }
-                        </style>
-                    """, unsafe_allow_html=True)
+                    bar_color = "#10b981"  # Green - 100%
+                    status_emoji = "✅"
+                    status_color = "#10b981"
+                elif deployment_progress >= 0.75:
+                    bar_color = "#84cc16"  # Light green - 75-99%
+                    status_emoji = "🟢"
+                    status_color = "#84cc16"
+                elif deployment_progress >= 0.50:
+                    bar_color = "#fbbf24"  # Yellow - 50-74%
+                    status_emoji = "🟡"
+                    status_color = "#fbbf24"
+                elif deployment_progress >= 0.25:
+                    bar_color = "#f97316"  # Orange - 25-49%
+                    status_emoji = "🟠"
+                    status_color = "#f97316"
                 else:
-                    bar_color = "#f97316"
-                    st.markdown("""
-                        <style>
-                        div[data-testid="stProgress"] > div > div > div {
-                            background-color: #f97316 !important;
-                        }
-                        </style>
-                    """, unsafe_allow_html=True)
+                    bar_color = "#ef4444"  # Red - 0-24%
+                    status_emoji = "🔴"
+                    status_color = "#ef4444"
+                
+                # Apply color to progress bar
+                st.markdown(f"""
+                    <style>
+                    div[data-testid="stProgress"] > div > div > div {{
+                        background-color: {bar_color} !important;
+                    }}
+                    </style>
+                """, unsafe_allow_html=True)
                 
                 st.progress(deployment_progress)
                 
-                status_text = "✅ All Deployed" if deployment_progress >= 1.0 else f"⏳ In Progress ({fully_deployed_count}/{total_assets})"
-                st.markdown(f"**{status_text}**")
+                # Status with colored indicator
+                if deployment_progress >= 1.0:
+                    status_text = "✅ All Deployed"
+                else:
+                    status_text = f"{status_emoji} In Progress ({fully_deployed_count}/{total_assets})"
+                
+                st.markdown(f"<p style='font-size: 1.1rem; font-weight: 600; color: {status_color}; margin-top: 8px;'>{status_text}</p>", unsafe_allow_html=True)
             
             if not deployable_assets:
                 st.success("✅ **All assets 100% deployed!**")
