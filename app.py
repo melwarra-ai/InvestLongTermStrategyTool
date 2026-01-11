@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.11.5"
+VERSION = "5.11.6"
 VERSION_DATE = "2026-01-10"
-VERSION_NAME = "Layout: Action Items at top + Cleaned pie chart display grouped by portfolio"
+VERSION_NAME = "Dashboard Order: Action Items at top + Pie chart table under chart"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1377,6 +1377,65 @@ if view_mode == "🏠 Global Dashboard":
         
         st.divider()
         
+        st.markdown("### ⚡ Action Items Dashboard")
+        
+        # Sort action items by priority
+        action_items.sort(key=lambda x: x["priority"])
+        
+        if action_items:
+            st.caption(f"You have **{len(action_items)} action item(s)** requiring attention")
+            
+            for item in action_items:
+                if item["type"] == "rebalance":
+                    # Urgent rebalance needed
+                    st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); 
+                                    border-left: 4px solid #ef4444; padding: 16px; border-radius: 8px; margin: 12px 0;">
+                            <div style="font-weight: 700; color: #991b1b; font-size: 1.05rem; margin-bottom: 8px;">
+                                {item['message']}
+                            </div>
+                            <div style="color: #7f1d1d; font-size: 0.9rem; margin-bottom: 8px;">
+                                📊 {item['detail']}
+                            </div>
+                            <div style="color: #7f1d1d; font-size: 0.85rem; font-style: italic;">
+                                → {item['action']}
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                elif item["type"] == "deployment":
+                    # Deployment in progress
+                    st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); 
+                                    border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 12px 0;">
+                            <div style="font-weight: 700; color: #92400e; font-size: 1.05rem; margin-bottom: 8px;">
+                                {item['message']}
+                            </div>
+                            <div style="color: #78350f; font-size: 0.9rem; margin-bottom: 8px;">
+                                📋 {item['detail']}
+                            </div>
+                            <div style="color: #78350f; font-size: 0.85rem; font-style: italic;">
+                                → {item['action']}
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+        else:
+            # All clear
+            st.markdown("""
+                <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
+                            border-left: 4px solid #10b981; padding: 16px; border-radius: 8px; margin: 12px 0;">
+                    <div style="font-weight: 700; color: #065f46; font-size: 1.05rem; margin-bottom: 8px;">
+                        ✅ ALL CLEAR - No actions required
+                    </div>
+                    <div style="color: #047857; font-size: 0.9rem;">
+                        All portfolios are properly balanced and fully deployed. Great job! 🎉
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        st.divider()
+        
+        
         # ===== PORTFOLIO STRATEGIES (Moved to top) =====
         st.markdown("### 🔍 Portfolio Strategies")
         st.caption("Click any profile tile or 'Open' button to view detailed analytics and manage assets")
@@ -1842,91 +1901,123 @@ if view_mode == "🏠 Global Dashboard":
         if allocation_data:
             st.markdown("#### 🥧 Asset Allocation Overview")
             
-            col_pie1, col_pie2 = st.columns([2, 1])
+            # Create pie chart (full width)
+            fig_pie = go.Figure()
             
-            with col_pie1:
-                # Create pie chart
-                fig_pie = go.Figure()
-                
-                # Prepare data
-                labels = [item['Asset'] for item in allocation_data]
-                values = [item['Current %'] for item in allocation_data]
-                targets = [item['Target %'] for item in allocation_data]
-                
-                # Color code based on drift
-                colors_pie = []
-                for item in allocation_data:
-                    if abs(item['Drift']) >= tolerance:
-                        colors_pie.append('#ef4444')  # Red - needs rebalancing
-                    elif abs(item['Drift']) >= tolerance * 0.5:
-                        colors_pie.append('#f59e0b')  # Orange - watch
-                    else:
-                        colors_pie.append('#10b981')  # Green - healthy
-                
-                fig_pie.add_trace(go.Pie(
-                    labels=labels,
-                    values=values,
-                    marker=dict(colors=colors_pie, line=dict(color='white', width=2)),
-                    textinfo='label+percent',
-                    textposition='auto',
-                    hovertemplate='<b>%{label}</b><br>' +
-                                  'Current: %{value:.1f}%<br>' +
-                                  '<extra></extra>'
-                ))
-                
-                fig_pie.update_layout(
-                    height=400,
-                    margin=dict(l=20, r=20, t=40, b=20),
-                    title=dict(
-                        text="Current Portfolio Allocation",
-                        x=0.5,
-                        xanchor='center'
-                    ),
-                    showlegend=True,
-                    legend=dict(
-                        orientation="v",
-                        yanchor="middle",
-                        y=0.5,
-                        xanchor="left",
-                        x=1.02
-                    )
+            # Prepare data
+            labels = [item['Asset'] for item in allocation_data]
+            values = [item['Current %'] for item in allocation_data]
+            targets = [item['Target %'] for item in allocation_data]
+            
+            # Color code based on drift
+            colors_pie = []
+            for item in allocation_data:
+                if abs(item['Drift']) >= tolerance:
+                    colors_pie.append('#ef4444')  # Red - needs rebalancing
+                elif abs(item['Drift']) >= tolerance * 0.5:
+                    colors_pie.append('#f59e0b')  # Orange - watch
+                else:
+                    colors_pie.append('#10b981')  # Green - healthy
+            
+            fig_pie.add_trace(go.Pie(
+                labels=labels,
+                values=values,
+                marker=dict(colors=colors_pie, line=dict(color='white', width=2)),
+                textinfo='label+percent',
+                textposition='auto',
+                hovertemplate='<b>%{label}</b><br>' +
+                              'Current: %{value:.1f}%<br>' +
+                              '<extra></extra>'
+            ))
+            
+            fig_pie.update_layout(
+                height=500,
+                margin=dict(l=20, r=20, t=40, b=20),
+                title=dict(
+                    text="Current Portfolio Allocation",
+                    x=0.5,
+                    xanchor='center'
+                ),
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.2,
+                    xanchor="center",
+                    x=0.5
                 )
-                
-                st.plotly_chart(fig_pie, use_container_width=True)
+            )
             
-            with col_pie2:
-                st.markdown("**Color Legend:**")
+            st.plotly_chart(fig_pie, use_container_width=True)
+            
+            # Color Legend
+            col_legend1, col_legend2, col_legend3 = st.columns(3)
+            with col_legend1:
                 st.markdown("🔴 **Red** = Needs rebalancing")
+            with col_legend2:
                 st.markdown("🟠 **Orange** = Watch closely")  
+            with col_legend3:
                 st.markdown("🟢 **Green** = On target")
+            
+            st.markdown("")
+            st.markdown("**Current vs Target Allocations:**")
+            
+            # Group allocation_data by portfolio for table
+            portfolio_groups = {}
+            for item in allocation_data:
+                # Find which portfolio this asset belongs to
+                portfolio_name = None
+                for p_name, p_data in profiles.items():
+                    if item['Asset'] in p_data.get('assets', {}):
+                        portfolio_name = p_name
+                        break
                 
-                st.markdown("")
-                st.markdown("**Current vs Target:**")
-                
-                # Group allocation_data by portfolio for cleaner display
-                portfolio_groups = {}
-                for item in allocation_data:
-                    # Find which portfolio this asset belongs to
-                    portfolio_name = None
-                    for p_name, p_data in profiles.items():
-                        if item['Asset'] in p_data.get('assets', {}):
-                            portfolio_name = p_name
-                            break
+                if portfolio_name:
+                    if portfolio_name not in portfolio_groups:
+                        portfolio_groups[portfolio_name] = []
+                    portfolio_groups[portfolio_name].append(item)
+            
+            # Build table data
+            table_data = []
+            for p_name, items in sorted(portfolio_groups.items()):
+                for item in items:
+                    # Get tolerance for this portfolio
+                    p_tolerance = profiles[p_name].get('drift_tolerance', 5.0)
+                    abs_drift = abs(item['Drift'])
                     
-                    if portfolio_name:
-                        if portfolio_name not in portfolio_groups:
-                            portfolio_groups[portfolio_name] = []
-                        portfolio_groups[portfolio_name].append(item)
-                
-                # Display grouped by portfolio
-                for p_name, items in portfolio_groups.items():
-                    st.markdown(f"**{p_name}:**")
-                    for item in items:
-                        # Get tolerance for this portfolio
-                        p_tolerance = profiles[p_name].get('drift_tolerance', 5.0)
-                        drift_icon = "🔴" if abs(item['Drift']) >= p_tolerance else ("🟠" if abs(item['Drift']) >= p_tolerance * 0.5 else "🟢")
-                        st.markdown(f"  {drift_icon} {item['Asset']}: {item['Current %']:.1f}% → {item['Target %']:.1f}%")
-                    st.markdown("")  # Add spacing between portfolios
+                    # Status icon
+                    if abs_drift >= p_tolerance:
+                        status = "🔴 Rebalance"
+                    elif abs_drift >= p_tolerance * 0.5:
+                        status = "🟠 Watch"
+                    else:
+                        status = "🟢 On Target"
+                    
+                    table_data.append({
+                        "Portfolio": p_name,
+                        "Asset": item['Asset'],
+                        "Current %": f"{item['Current %']:.1f}%",
+                        "Target %": f"{item['Target %']:.1f}%",
+                        "Drift": f"{item['Drift']:+.1f}%",
+                        "Status": status
+                    })
+            
+            # Display as table
+            if table_data:
+                df_allocation = pd.DataFrame(table_data)
+                st.dataframe(
+                    df_allocation,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Portfolio": st.column_config.TextColumn("Portfolio", width="medium"),
+                        "Asset": st.column_config.TextColumn("Asset", width="small"),
+                        "Current %": st.column_config.TextColumn("Current %", width="small"),
+                        "Target %": st.column_config.TextColumn("Target %", width="small"),
+                        "Drift": st.column_config.TextColumn("Drift", width="small"),
+                        "Status": st.column_config.TextColumn("Status", width="medium")
+                    }
+                )
         
         st.divider()
         
@@ -2330,63 +2421,6 @@ if view_mode == "🏠 Global Dashboard":
         st.divider()
         
         # ===== NEW v5.9.0: ACTION ITEMS DASHBOARD =====
-        st.markdown("### ⚡ Action Items Dashboard")
-        
-        # Sort action items by priority
-        action_items.sort(key=lambda x: x["priority"])
-        
-        if action_items:
-            st.caption(f"You have **{len(action_items)} action item(s)** requiring attention")
-            
-            for item in action_items:
-                if item["type"] == "rebalance":
-                    # Urgent rebalance needed
-                    st.markdown(f"""
-                        <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); 
-                                    border-left: 4px solid #ef4444; padding: 16px; border-radius: 8px; margin: 12px 0;">
-                            <div style="font-weight: 700; color: #991b1b; font-size: 1.05rem; margin-bottom: 8px;">
-                                {item['message']}
-                            </div>
-                            <div style="color: #7f1d1d; font-size: 0.9rem; margin-bottom: 8px;">
-                                📊 {item['detail']}
-                            </div>
-                            <div style="color: #7f1d1d; font-size: 0.85rem; font-style: italic;">
-                                → {item['action']}
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                
-                elif item["type"] == "deployment":
-                    # Deployment in progress
-                    st.markdown(f"""
-                        <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); 
-                                    border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 12px 0;">
-                            <div style="font-weight: 700; color: #92400e; font-size: 1.05rem; margin-bottom: 8px;">
-                                {item['message']}
-                            </div>
-                            <div style="color: #78350f; font-size: 0.9rem; margin-bottom: 8px;">
-                                📋 {item['detail']}
-                            </div>
-                            <div style="color: #78350f; font-size: 0.85rem; font-style: italic;">
-                                → {item['action']}
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-        else:
-            # All clear
-            st.markdown("""
-                <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
-                            border-left: 4px solid #10b981; padding: 16px; border-radius: 8px; margin: 12px 0;">
-                    <div style="font-weight: 700; color: #065f46; font-size: 1.05rem; margin-bottom: 8px;">
-                        ✅ ALL CLEAR - No actions required
-                    </div>
-                    <div style="color: #047857; font-size: 0.9rem;">
-                        All portfolios are properly balanced and fully deployed. Great job! 🎉
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-        
-        st.divider()
         
         # Portfolio Grid
 
