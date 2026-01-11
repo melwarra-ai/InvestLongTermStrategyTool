@@ -1377,6 +1377,43 @@ if view_mode == "🏠 Global Dashboard":
         
         st.divider()
         
+        # ===== Collect Action Items Data =====
+        action_items = []
+        
+        for p_name, p_data in profiles.items():
+            p_assets = p_data.get("assets", {})
+            
+            # Check drift status
+            needs_rebal, drift_details = calculate_drift_status(p_data, prices)
+            
+            # Check deployment status
+            all_deployed = all(a.get("allocated_pct", 0) >= 100.0 for a in p_assets.values()) if p_assets else False
+            deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
+            total_assets = len(p_assets)
+            
+            # Collect action items
+            if needs_rebal:
+                drift_count = len(drift_details)
+                max_drift = max([d[1] for d in drift_details]) if drift_details else 0
+                action_items.append({
+                    "priority": 1,
+                    "type": "rebalance",
+                    "profile": p_name,
+                    "message": f"🚨 URGENT - {p_name} needs rebalancing ({drift_count} asset{'s' if drift_count > 1 else ''} drifted, max: {max_drift:.1f}%)",
+                    "detail": f"{drift_count} assets exceed {p_data.get('drift_tolerance', 5.0)}% tolerance",
+                    "action": "Click profile to view details and execute rebalance"
+                })
+            elif not all_deployed and total_assets > 0:
+                remaining_assets = [(t, a.get("allocated_pct", 0)) for t, a in p_assets.items() if a.get("allocated_pct", 0) < 100.0]
+                action_items.append({
+                    "priority": 2,
+                    "type": "deployment",
+                    "profile": p_name,
+                    "message": f"🔥 IN PROGRESS - {p_name} deployment ({deployed_count}/{total_assets} assets fully deployed)",
+                    "detail": ", ".join([f"{t} needs {100-pct:.0f}% more" for t, pct in remaining_assets[:3]]),
+                    "action": "Complete remaining asset deployments"
+                })
+        
         st.markdown("### ⚡ Action Items Dashboard")
         
         # Sort action items by priority
@@ -2297,7 +2334,6 @@ if view_mode == "🏠 Global Dashboard":
         
         # Collect data for all profiles
         comparison_data = []
-        action_items = []  # For Action Items Dashboard
         
         for p_name, p_data in profiles.items():
             p_assets = p_data.get("assets", {})
@@ -2351,29 +2387,6 @@ if view_mode == "🏠 Global Dashboard":
                 "Status": status,
                 "Status_Priority": status_priority
             })
-            
-            # Collect action items
-            if needs_rebal:
-                drift_count = len(drift_details)
-                max_drift = max([d[1] for d in drift_details]) if drift_details else 0
-                action_items.append({
-                    "priority": 1,
-                    "type": "rebalance",
-                    "profile": p_name,
-                    "message": f"🚨 URGENT - {p_name} needs rebalancing ({drift_count} asset{'s' if drift_count > 1 else ''} drifted, max: {max_drift:.1f}%)",
-                    "detail": f"{drift_count} assets exceed {p_data.get('drift_tolerance', 5.0)}% tolerance",
-                    "action": "Click profile to view details and execute rebalance"
-                })
-            elif not all_deployed and total_assets > 0:
-                remaining_assets = [(t, a.get("allocated_pct", 0)) for t, a in p_assets.items() if a.get("allocated_pct", 0) < 100.0]
-                action_items.append({
-                    "priority": 2,
-                    "type": "deployment",
-                    "profile": p_name,
-                    "message": f"🔥 IN PROGRESS - {p_name} deployment ({deployed_count}/{total_assets} assets fully deployed)",
-                    "detail": ", ".join([f"{t} needs {100-pct:.0f}% more" for t, pct in remaining_assets[:3]]),
-                    "action": "Complete remaining asset deployments"
-                })
         
         # Sort comparison data by Value (descending)
         comparison_df = pd.DataFrame(comparison_data)
