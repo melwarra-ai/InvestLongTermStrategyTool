@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.11.1"
+VERSION = "5.11.2"
 VERSION_DATE = "2026-01-10"
-VERSION_NAME = "Dashboard Reimagined + Critical Field Name Fix"
+VERSION_NAME = "Dashboard Layout Fix: Portfolio Strategies at top, thinner bars, fixed table"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1353,6 +1353,114 @@ if view_mode == "🏠 Global Dashboard":
         
         st.divider()
         
+        # ===== PORTFOLIO STRATEGIES (Moved to top) =====
+        st.markdown("### 🔍 Portfolio Strategies")
+        st.caption("Click any profile tile or 'Open' button to view detailed analytics and manage assets")
+        
+        cols = st.columns(2)
+        for i, (name, p_data) in enumerate(profiles.items()):
+            p_assets = p_data.get("assets", {})
+            curr_v = float(sum(p_assets[t]["units"] * prices.get(t, 0) for t in p_assets))
+            
+            has_rebalanced = p_data.get("last_rebalanced") is not None
+            recently_rebalanced = check_recently_rebalanced(p_data.get("last_rebalanced"))
+            needs_rebal, drift_details = calculate_drift_status(p_data, prices)
+            
+            start_val = float(p_data.get('principal', 0))
+            roi_pct = ((curr_v / start_val) - 1) * 100 if start_val > 0 else 0
+            
+            start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d')
+            years_elapsed = max((date.today() - start_date.date()).days / 365.25, 0.01)
+            cagr = ((curr_v / start_val) ** (1 / years_elapsed) - 1) * 100 if start_val > 0 and years_elapsed > 0 else 0
+            
+            p_flag = "🇺🇸" if p_data.get("currency") == "USD" else "🇨🇦"
+            
+            all_deployed = all(
+                asset.get("allocated_pct", 0) >= 100.0 
+                for asset in p_assets.values()
+            ) if p_assets else False
+            
+            if recently_rebalanced:
+                tile_class = "profile-tile-optimized"
+                status_badge = '<span class="success-badge">✅ Balanced</span>'
+            elif needs_rebal:
+                tile_class = "profile-tile-warning"
+                status_badge = '<span class="drift-badge">🚨 REBALANCE REQUIRED</span>'
+            elif has_rebalanced:
+                tile_class = "profile-tile-optimized"
+                status_badge = '<span class="success-badge">✅ Balanced</span>'
+            elif not all_deployed and len(p_assets) > 0:
+                tile_class = "profile-tile"
+                deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
+                status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">🔥 Deploying ({deployed_count}/{len(p_assets)})</span>'
+            elif all_deployed:
+                tile_class = "profile-tile-optimized"
+                status_badge = '<span class="success-badge">✅ Deployed</span>'
+            else:
+                tile_class = "profile-tile"
+                status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
+            
+            with cols[i % 2]:
+                # v5.8.2: Clickable profile tile - entire tile navigates to profile view
+                with st.container():
+                    # Tile content with integrated navigation
+                    st.markdown(f"""
+                        <div class="{tile_class}" style="padding: 24px; margin-top: 0px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;">
+                            <div class="profile-tile-header">
+                                {p_flag} {name}
+                            </div>
+                            <div style="margin-bottom: 16px; text-align: center;">
+                                {status_badge}
+                            </div>
+                            <div style="margin: 20px 0; text-align: center;">
+                                <div class="stat-label">Portfolio Value</div>
+                                <div class="stat-value" style="font-size: 2rem;">${curr_v:,.0f}</div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; color: #64748b;">
+                                <div>
+                                    <div style="font-size: 0.75rem; opacity: 0.8;">Goal</div>
+                                    <div style="font-weight: 600;">{p_data['yearly_goal_pct']}%/yr</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.75rem; opacity: 0.8;">CAGR</div>
+                                    <div style="font-weight: 700; color: {'#10b981' if cagr >= 0 else '#ef4444'};">
+                                        {cagr:+.1f}%
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 0.75rem; opacity: 0.8;">ROI</div>
+                                    <div style="font-weight: 700; color: {'#10b981' if roi_pct >= 0 else '#ef4444'};">
+                                        {roi_pct:+.1f}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # v5.8.3 FIX: Changed to 'secondary' to avoid red confusion
+                    if st.button(
+                        "📂 Click to Open →",
+                        key=f"open_{name}",
+                        use_container_width=True,
+                        type="secondary",
+                        help=f"Open {name} portfolio manager"
+                    ):
+                        st.session_state.active_profile = name
+                        # v5.9.2 FIX: Set trigger to switch navigation on next rerun
+                        st.session_state.trigger_portfolio_view = True
+                        st.rerun()
+                
+                
+                if needs_rebal and drift_details:
+                    with st.expander("⚠️ View Drift Details", expanded=False):
+                        for t, drift, actual, target in drift_details:
+                            st.caption(f"• {t}: {drift:.1f}% drift")
+                
+                st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
+        
+        st.divider()
+        
+        
         # ===== NEW v5.10.0: PERFORMANCE BREAKDOWN DASHBOARD =====
         st.markdown("### 📊 Performance Breakdown")
         st.caption("Analyze returns across different time periods with detailed breakdowns")
@@ -1454,6 +1562,15 @@ if view_mode == "🏠 Global Dashboard":
                 
                 colors = ['#10b981' if p['total_return_pct'] >= 0 else '#ef4444' for p in perf_sorted]
                 
+                # Calculate appropriate y-axis range
+                all_returns = [p['total_return_pct'] for p in perf_sorted]
+                min_return = min(all_returns)
+                max_return = max(all_returns)
+                
+                # Add 20% padding to the range
+                y_range_min = min_return * 1.2 if min_return < 0 else min_return * 0.8
+                y_range_max = max_return * 1.2 if max_return > 0 else max_return * 0.8
+                
                 fig_perf = go.Figure()
                 fig_perf.add_trace(go.Bar(
                     x=[p['name'] for p in perf_sorted],
@@ -1461,19 +1578,28 @@ if view_mode == "🏠 Global Dashboard":
                     marker_color=colors,
                     text=[f"{p['total_return_pct']:+.1f}%" for p in perf_sorted],
                     textposition='outside',
+                    width=0.4,  # Make bars thinner (default is ~0.8)
                     hovertemplate='<b>%{x}</b><br>' +
                                  'Return: %{y:.1f}%<br>' +
                                  '<extra></extra>'
                 ))
                 
                 fig_perf.update_layout(
-                    height=300,
-                    margin=dict(l=20, r=20, t=20, b=20),
+                    height=400,  # Increased height for better visibility
+                    margin=dict(l=40, r=40, t=40, b=60),  # More margin to avoid truncation
                     showlegend=False,
-                    xaxis=dict(title="Portfolio"),
+                    xaxis=dict(
+                        title="Portfolio",
+                        title_font=dict(size=14)
+                    ),
                     yaxis=dict(
                         title="Total Return (%)",
-                        gridcolor='#f3f4f6'
+                        title_font=dict(size=14),
+                        gridcolor='#f3f4f6',
+                        range=[y_range_min, y_range_max],  # Explicit range to prevent truncation
+                        zeroline=True,
+                        zerolinewidth=2,
+                        zerolinecolor='#cbd5e1'
                     ),
                     plot_bgcolor='white',
                     paper_bgcolor='white'
@@ -2136,24 +2262,24 @@ if view_mode == "🏠 Global Dashboard":
         comparison_df = pd.DataFrame(comparison_data)
         comparison_df = comparison_df.sort_values("Value", ascending=False)
         
-        # Calculate totals
-        total_row = {
-            "Profile": "**TOTAL**",
-            "Account": "",
-            "Value_Display": f"**${comparison_df['Value'].sum():,.0f}**",
-            "CAGR_Display": f"**{comparison_df['CAGR'].mean():+.1f}%**",
-            "ROI_Display": f"**{comparison_df['ROI'].mean():+.1f}%**",
-            "Goal": "",
-            "Assets": f"**{comparison_df['Assets'].sum()}**",
-            "Status": ""
-        }
-        
         # Create display dataframe
         display_data = comparison_df[[
             "Profile", "Account", "Value_Display", "CAGR_Display", 
             "ROI_Display", "Goal", "Assets", "Status"
         ]].copy()
         display_data.columns = ["Profile", "Account", "Value", "CAGR ℹ️", "ROI ℹ️", "Goal ℹ️", "Assets", "Status"]
+        
+        # Calculate totals - FIXED: Use renamed column names
+        total_row = {
+            "Profile": "**TOTAL**",
+            "Account": "",
+            "Value": f"**${comparison_df['Value'].sum():,.0f}**",
+            "CAGR ℹ️": f"**{comparison_df['CAGR'].mean():+.1f}%**",
+            "ROI ℹ️": f"**{comparison_df['ROI'].mean():+.1f}%**",
+            "Goal ℹ️": "",
+            "Assets": f"**{comparison_df['Assets'].sum()}**",
+            "Status": ""
+        }
         
         # Append total row
         display_data = pd.concat([display_data, pd.DataFrame([total_row])], ignore_index=True)
@@ -2237,109 +2363,6 @@ if view_mode == "🏠 Global Dashboard":
         st.divider()
         
         # Portfolio Grid
-        st.markdown("### 🔍 Portfolio Strategies")
-        st.caption("Click any profile tile or 'Open' button to view detailed analytics and manage assets")
-        
-        cols = st.columns(2)
-        for i, (name, p_data) in enumerate(profiles.items()):
-            p_assets = p_data.get("assets", {})
-            curr_v = float(sum(p_assets[t]["units"] * prices.get(t, 0) for t in p_assets))
-            
-            has_rebalanced = p_data.get("last_rebalanced") is not None
-            recently_rebalanced = check_recently_rebalanced(p_data.get("last_rebalanced"))
-            needs_rebal, drift_details = calculate_drift_status(p_data, prices)
-            
-            start_val = float(p_data.get('principal', 0))
-            roi_pct = ((curr_v / start_val) - 1) * 100 if start_val > 0 else 0
-            
-            start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d')
-            years_elapsed = max((date.today() - start_date.date()).days / 365.25, 0.01)
-            cagr = ((curr_v / start_val) ** (1 / years_elapsed) - 1) * 100 if start_val > 0 and years_elapsed > 0 else 0
-            
-            p_flag = "🇺🇸" if p_data.get("currency") == "USD" else "🇨🇦"
-            
-            all_deployed = all(
-                asset.get("allocated_pct", 0) >= 100.0 
-                for asset in p_assets.values()
-            ) if p_assets else False
-            
-            if recently_rebalanced:
-                tile_class = "profile-tile-optimized"
-                status_badge = '<span class="success-badge">✅ Balanced</span>'
-            elif needs_rebal:
-                tile_class = "profile-tile-warning"
-                status_badge = '<span class="drift-badge">🚨 REBALANCE REQUIRED</span>'
-            elif has_rebalanced:
-                tile_class = "profile-tile-optimized"
-                status_badge = '<span class="success-badge">✅ Balanced</span>'
-            elif not all_deployed and len(p_assets) > 0:
-                tile_class = "profile-tile"
-                deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
-                status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">🔥 Deploying ({deployed_count}/{len(p_assets)})</span>'
-            elif all_deployed:
-                tile_class = "profile-tile-optimized"
-                status_badge = '<span class="success-badge">✅ Deployed</span>'
-            else:
-                tile_class = "profile-tile"
-                status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
-            
-            with cols[i % 2]:
-                # v5.8.2: Clickable profile tile - entire tile navigates to profile view
-                with st.container():
-                    # Tile content with integrated navigation
-                    st.markdown(f"""
-                        <div class="{tile_class}" style="padding: 24px; margin-top: 0px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;">
-                            <div class="profile-tile-header">
-                                {p_flag} {name}
-                            </div>
-                            <div style="margin-bottom: 16px; text-align: center;">
-                                {status_badge}
-                            </div>
-                            <div style="margin: 20px 0; text-align: center;">
-                                <div class="stat-label">Portfolio Value</div>
-                                <div class="stat-value" style="font-size: 2rem;">${curr_v:,.0f}</div>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; color: #64748b;">
-                                <div>
-                                    <div style="font-size: 0.75rem; opacity: 0.8;">Goal</div>
-                                    <div style="font-weight: 600;">{p_data['yearly_goal_pct']}%/yr</div>
-                                </div>
-                                <div style="text-align: center;">
-                                    <div style="font-size: 0.75rem; opacity: 0.8;">CAGR</div>
-                                    <div style="font-weight: 700; color: {'#10b981' if cagr >= 0 else '#ef4444'};">
-                                        {cagr:+.1f}%
-                                    </div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <div style="font-size: 0.75rem; opacity: 0.8;">ROI</div>
-                                    <div style="font-weight: 700; color: {'#10b981' if roi_pct >= 0 else '#ef4444'};">
-                                        {roi_pct:+.1f}%
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # v5.8.3 FIX: Changed to 'secondary' to avoid red confusion
-                    if st.button(
-                        "📂 Click to Open →",
-                        key=f"open_{name}",
-                        use_container_width=True,
-                        type="secondary",
-                        help=f"Open {name} portfolio manager"
-                    ):
-                        st.session_state.active_profile = name
-                        # v5.9.2 FIX: Set trigger to switch navigation on next rerun
-                        st.session_state.trigger_portfolio_view = True
-                        st.rerun()
-                
-                
-                if needs_rebal and drift_details:
-                    with st.expander("⚠️ View Drift Details", expanded=False):
-                        for t, drift, actual, target in drift_details:
-                            st.caption(f"• {t}: {drift:.1f}% drift")
-                
-                st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
 
 else:  # Portfolio Manager
     if not st.session_state.active_profile:
