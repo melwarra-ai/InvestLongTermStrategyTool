@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.11.3"
+VERSION = "5.11.4"
 VERSION_DATE = "2026-01-10"
-VERSION_NAME = "Progress Bar Enhancement: Gradient colors for Asset Allocation & Deployment"
+VERSION_NAME = "Progress Bar Fix: Custom HTML bar replaces st.progress for reliable colors"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1020,47 +1020,41 @@ with st.sidebar:
             
             if total_assets > 0:
                 deployment_progress = fully_deployed_count / total_assets
+                progress_pct = deployment_progress * 100
                 
-                # Dynamic color based on progress (like Asset Allocation)
+                # Dynamic color based on progress
                 if deployment_progress >= 1.0:
                     bar_color = "#10b981"  # Green - 100%
                     status_emoji = "✅"
-                    status_color = "#10b981"
+                    status_text = "All Deployed"
                 elif deployment_progress >= 0.75:
                     bar_color = "#84cc16"  # Light green - 75-99%
                     status_emoji = "🟢"
-                    status_color = "#84cc16"
+                    status_text = f"In Progress ({fully_deployed_count}/{total_assets})"
                 elif deployment_progress >= 0.50:
                     bar_color = "#fbbf24"  # Yellow - 50-74%
                     status_emoji = "🟡"
-                    status_color = "#fbbf24"
+                    status_text = f"In Progress ({fully_deployed_count}/{total_assets})"
                 elif deployment_progress >= 0.25:
                     bar_color = "#f97316"  # Orange - 25-49%
                     status_emoji = "🟠"
-                    status_color = "#f97316"
+                    status_text = f"In Progress ({fully_deployed_count}/{total_assets})"
                 else:
                     bar_color = "#ef4444"  # Red - 0-24%
                     status_emoji = "🔴"
-                    status_color = "#ef4444"
+                    status_text = f"In Progress ({fully_deployed_count}/{total_assets})"
                 
-                # Apply color to progress bar
+                # Custom HTML progress bar (more reliable than st.progress with CSS)
                 st.markdown(f"""
-                    <style>
-                    div[data-testid="stProgress"] > div > div > div {{
-                        background-color: {bar_color} !important;
-                    }}
-                    </style>
+                    <div style="margin: 20px 0;">
+                        <div style="background: #e5e7eb; border-radius: 12px; height: 12px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+                            <div style="background: {bar_color}; height: 100%; width: {progress_pct}%; transition: all 0.5s ease; border-radius: 12px;"></div>
+                        </div>
+                    </div>
                 """, unsafe_allow_html=True)
                 
-                st.progress(deployment_progress)
-                
                 # Status with colored indicator
-                if deployment_progress >= 1.0:
-                    status_text = "✅ All Deployed"
-                else:
-                    status_text = f"{status_emoji} In Progress ({fully_deployed_count}/{total_assets})"
-                
-                st.markdown(f"<p style='font-size: 1.1rem; font-weight: 600; color: {status_color}; margin-top: 8px;'>{status_text}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-size: 1.1rem; font-weight: 600; color: {bar_color}; margin-top: 8px;'>{status_emoji} {status_text}</p>", unsafe_allow_html=True)
             
             if not deployable_assets:
                 st.success("✅ **All assets 100% deployed!**")
