@@ -8,9 +8,9 @@ import json
 import os
 
 # ===== VERSION INFORMATION =====
-VERSION = "5.11.4"
+VERSION = "5.11.6"
 VERSION_DATE = "2026-01-10"
-VERSION_NAME = "Progress Bar Fix: Custom HTML bar replaces st.progress for reliable colors"
+VERSION_NAME = "Dashboard Order: Action Items at top + Pie chart table under chart"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1377,6 +1377,102 @@ if view_mode == "🏠 Global Dashboard":
         
         st.divider()
         
+        # ===== Collect Action Items Data =====
+        action_items = []
+        
+        for p_name, p_data in profiles.items():
+            p_assets = p_data.get("assets", {})
+            
+            # Check drift status
+            needs_rebal, drift_details = calculate_drift_status(p_data, prices)
+            
+            # Check deployment status
+            all_deployed = all(a.get("allocated_pct", 0) >= 100.0 for a in p_assets.values()) if p_assets else False
+            deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
+            total_assets = len(p_assets)
+            
+            # Collect action items
+            if needs_rebal:
+                drift_count = len(drift_details)
+                max_drift = max([d[1] for d in drift_details]) if drift_details else 0
+                action_items.append({
+                    "priority": 1,
+                    "type": "rebalance",
+                    "profile": p_name,
+                    "message": f"🚨 URGENT - {p_name} needs rebalancing ({drift_count} asset{'s' if drift_count > 1 else ''} drifted, max: {max_drift:.1f}%)",
+                    "detail": f"{drift_count} assets exceed {p_data.get('drift_tolerance', 5.0)}% tolerance",
+                    "action": "Click profile to view details and execute rebalance"
+                })
+            elif not all_deployed and total_assets > 0:
+                remaining_assets = [(t, a.get("allocated_pct", 0)) for t, a in p_assets.items() if a.get("allocated_pct", 0) < 100.0]
+                action_items.append({
+                    "priority": 2,
+                    "type": "deployment",
+                    "profile": p_name,
+                    "message": f"🔥 IN PROGRESS - {p_name} deployment ({deployed_count}/{total_assets} assets fully deployed)",
+                    "detail": ", ".join([f"{t} needs {100-pct:.0f}% more" for t, pct in remaining_assets[:3]]),
+                    "action": "Complete remaining asset deployments"
+                })
+        
+        st.markdown("### ⚡ Action Items Dashboard")
+        
+        # Sort action items by priority
+        action_items.sort(key=lambda x: x["priority"])
+        
+        if action_items:
+            st.caption(f"You have **{len(action_items)} action item(s)** requiring attention")
+            
+            for item in action_items:
+                if item["type"] == "rebalance":
+                    # Urgent rebalance needed
+                    st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); 
+                                    border-left: 4px solid #ef4444; padding: 16px; border-radius: 8px; margin: 12px 0;">
+                            <div style="font-weight: 700; color: #991b1b; font-size: 1.05rem; margin-bottom: 8px;">
+                                {item['message']}
+                            </div>
+                            <div style="color: #7f1d1d; font-size: 0.9rem; margin-bottom: 8px;">
+                                📊 {item['detail']}
+                            </div>
+                            <div style="color: #7f1d1d; font-size: 0.85rem; font-style: italic;">
+                                → {item['action']}
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                elif item["type"] == "deployment":
+                    # Deployment in progress
+                    st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); 
+                                    border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 12px 0;">
+                            <div style="font-weight: 700; color: #92400e; font-size: 1.05rem; margin-bottom: 8px;">
+                                {item['message']}
+                            </div>
+                            <div style="color: #78350f; font-size: 0.9rem; margin-bottom: 8px;">
+                                📋 {item['detail']}
+                            </div>
+                            <div style="color: #78350f; font-size: 0.85rem; font-style: italic;">
+                                → {item['action']}
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+        else:
+            # All clear
+            st.markdown("""
+                <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
+                            border-left: 4px solid #10b981; padding: 16px; border-radius: 8px; margin: 12px 0;">
+                    <div style="font-weight: 700; color: #065f46; font-size: 1.05rem; margin-bottom: 8px;">
+                        ✅ ALL CLEAR - No actions required
+                    </div>
+                    <div style="color: #047857; font-size: 0.9rem;">
+                        All portfolios are properly balanced and fully deployed. Great job! 🎉
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        st.divider()
+        
+        
         # ===== PORTFOLIO STRATEGIES (Moved to top) =====
         st.markdown("### 🔍 Portfolio Strategies")
         st.caption("Click any profile tile or 'Open' button to view detailed analytics and manage assets")
@@ -1460,27 +1556,159 @@ if view_mode == "🏠 Global Dashboard":
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
-                    
-                    # v5.8.3 FIX: Changed to 'secondary' to avoid red confusion
-                    if st.button(
-                        "📂 Click to Open →",
-                        key=f"open_{name}",
-                        use_container_width=True,
-                        type="secondary",
-                        help=f"Open {name} portfolio manager"
-                    ):
-                        st.session_state.active_profile = name
-                        # v5.9.2 FIX: Set trigger to switch navigation on next rerun
-                        st.session_state.trigger_portfolio_view = True
-                        st.rerun()
+        
+        st.markdown("### 🎯 Portfolio Action Items")
+        st.caption("Clear, actionable insights based on your portfolio's current state")
+        
+        # Collect action items across all portfolios
+        urgent_actions = []
+        watch_items = []
+        healthy_items = []
+        
+        # Also prepare data for pie chart
+        allocation_data = []
+        
+        for p_name, p_data in profiles.items():
+            p_assets = p_data.get("assets", {})
+            tolerance = p_data.get('drift_tolerance', 5.0)  # FIXED: Changed from 'rebalance_threshold_pct' to 'drift_tolerance'
+            
+            # Calculate portfolio total
+            p_total = sum(p_assets[t]['units'] * prices.get(t, 0) for t in p_assets)
+            
+            for ticker, asset_data in p_assets.items():
+                current_price = prices.get(ticker, 0)
+                asset_value = asset_data.get('units', 0) * current_price
+                target_alloc = asset_data.get('target', 0)  # FIXED: Changed from 'target_alloc_pct' to 'target'
+                current_alloc = (asset_value / p_total * 100) if p_total > 0 else 0
+                drift_pct = current_alloc - target_alloc
+                abs_drift = abs(drift_pct)
                 
+                # Prepare pie chart data
+                allocation_data.append({
+                    'Asset': ticker,
+                    'Current %': current_alloc,
+                    'Target %': target_alloc,
+                    'Value': asset_value,
+                    'Drift': drift_pct
+                })
                 
-                if needs_rebal and drift_details:
-                    with st.expander("⚠️ View Drift Details", expanded=False):
-                        for t, drift, actual, target in drift_details:
-                            st.caption(f"• {t}: {drift:.1f}% drift")
+                # Calculate recommended trade amount
+                target_value = (target_alloc / 100) * p_total
+                trade_amount = target_value - asset_value
                 
-                st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
+                # Categorize by urgency
+                if abs_drift >= tolerance:
+                    # Urgent - exceeds tolerance
+                    action = "SELL" if drift_pct > 0 else "BUY"
+                    urgent_actions.append({
+                        'Asset': ticker,
+                        'Portfolio': p_name,
+                        'Action': action,
+                        'Amount': abs(trade_amount),
+                        'Current': current_alloc,
+                        'Target': target_alloc,
+                        'Drift': drift_pct,
+                        'Reason': f"{abs_drift:.1f}% drift (tolerance: {tolerance}%)"
+                    })
+                elif abs_drift >= tolerance * 0.5:
+                    # Watch - getting close to tolerance
+                    watch_items.append({
+                        'Asset': ticker,
+                        'Portfolio': p_name,
+                        'Current': current_alloc,
+                        'Target': target_alloc,
+                        'Drift': drift_pct,
+                        'Reason': f"{abs_drift:.1f}% drift (approaching {tolerance}% limit)"
+                    })
+                else:
+                    # Healthy - within acceptable range
+                    healthy_items.append({
+                        'Asset': ticker,
+                        'Portfolio': p_name,
+                        'Current': current_alloc,
+                        'Target': target_alloc,
+                        'Drift': drift_pct
+                    })
+        
+        # Display summary metrics
+        col_a1, col_a2, col_a3, col_a4 = st.columns(4)
+        
+        with col_a1:
+            st.metric(
+                "🔴 Urgent Actions", 
+                len(urgent_actions),
+                delta="Needs rebalancing" if urgent_actions else "All good!"
+            )
+        
+        with col_a2:
+            st.metric(
+                "🟡 Watch List",
+                len(watch_items),
+                delta="Approaching limits"
+            )
+        
+        with col_a3:
+            st.metric(
+                "🟢 Healthy Assets",
+                len(healthy_items),
+                delta=f"{len(healthy_items)/len(allocation_data)*100:.0f}% of portfolio" if allocation_data else "N/A"
+            )
+        
+        with col_a4:
+            total_rebalance_amount = sum(a['Amount'] for a in urgent_actions)
+            st.metric(
+                "💰 Total Rebalancing",
+                f"${total_rebalance_amount:,.0f}",
+                delta="Trade volume needed"
+            )
+        
+        # Display urgent actions
+        if urgent_actions:
+            st.markdown("#### 🔴 Urgent: Rebalancing Required")
+            
+            for action in sorted(urgent_actions, key=lambda x: abs(x['Drift']), reverse=True):
+                color = "#ef4444" if action['Action'] == "SELL" else "#3b82f6"
+                action_icon = "📉" if action['Action'] == "SELL" else "📈"
+                
+                st.markdown(f"""
+                    <div style="background: white; border-left: 4px solid {color}; 
+                                padding: 16px; margin: 8px 0; border-radius: 8px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="font-size: 18px; font-weight: 700; color: {color};">
+                                    {action_icon} {action['Action']} {action['Asset']}
+                                </span>
+                                <div style="color: #64748b; margin-top: 4px;">
+                                    {action['Reason']}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 24px; font-weight: 700; color: {color};">
+                                    ${action['Amount']:,.0f}
+                                </div>
+                                <div style="color: #64748b; font-size: 12px;">
+                                    {action['Current']:.1f}% → {action['Target']:.1f}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.success("✅ **No urgent actions needed!** All assets are within tolerance.")
+        
+        # Display watch items
+        if watch_items:
+            with st.expander(f"🟡 Watch List ({len(watch_items)} assets approaching limits)", expanded=False):
+                for item in sorted(watch_items, key=lambda x: abs(x['Drift']), reverse=True):
+                    st.info(f"**{item['Asset']}** in {item['Portfolio']}: {item['Current']:.1f}% (target: {item['Target']:.1f}%) - {item['Reason']}")
+        
+        # Display healthy assets
+        if healthy_items:
+            with st.expander(f"🟢 Healthy Assets ({len(healthy_items)} on target)", expanded=False):
+                for item in healthy_items:
+                    st.success(f"**{item['Asset']}** in {item['Portfolio']}: {item['Current']:.1f}% (target: {item['Target']:.1f}%) - Within tolerance ✅")
+        
         
         st.divider()
         
@@ -1706,225 +1934,127 @@ if view_mode == "🏠 Global Dashboard":
         st.divider()
         
         # ===== v5.11.0: ACTION ITEMS DASHBOARD (Replaces Asset Health Scores) =====
-        st.markdown("### 🎯 Portfolio Action Items")
-        st.caption("Clear, actionable insights based on your portfolio's current state")
-        
-        # Collect action items across all portfolios
-        urgent_actions = []
-        watch_items = []
-        healthy_items = []
-        
-        # Also prepare data for pie chart
-        allocation_data = []
-        
-        for p_name, p_data in profiles.items():
-            p_assets = p_data.get("assets", {})
-            tolerance = p_data.get('drift_tolerance', 5.0)  # FIXED: Changed from 'rebalance_threshold_pct' to 'drift_tolerance'
-            
-            # Calculate portfolio total
-            p_total = sum(p_assets[t]['units'] * prices.get(t, 0) for t in p_assets)
-            
-            for ticker, asset_data in p_assets.items():
-                current_price = prices.get(ticker, 0)
-                asset_value = asset_data.get('units', 0) * current_price
-                target_alloc = asset_data.get('target', 0)  # FIXED: Changed from 'target_alloc_pct' to 'target'
-                current_alloc = (asset_value / p_total * 100) if p_total > 0 else 0
-                drift_pct = current_alloc - target_alloc
-                abs_drift = abs(drift_pct)
-                
-                # Prepare pie chart data
-                allocation_data.append({
-                    'Asset': ticker,
-                    'Current %': current_alloc,
-                    'Target %': target_alloc,
-                    'Value': asset_value,
-                    'Drift': drift_pct
-                })
-                
-                # Calculate recommended trade amount
-                target_value = (target_alloc / 100) * p_total
-                trade_amount = target_value - asset_value
-                
-                # Categorize by urgency
-                if abs_drift >= tolerance:
-                    # Urgent - exceeds tolerance
-                    action = "SELL" if drift_pct > 0 else "BUY"
-                    urgent_actions.append({
-                        'Asset': ticker,
-                        'Portfolio': p_name,
-                        'Action': action,
-                        'Amount': abs(trade_amount),
-                        'Current': current_alloc,
-                        'Target': target_alloc,
-                        'Drift': drift_pct,
-                        'Reason': f"{abs_drift:.1f}% drift (tolerance: {tolerance}%)"
-                    })
-                elif abs_drift >= tolerance * 0.5:
-                    # Watch - getting close to tolerance
-                    watch_items.append({
-                        'Asset': ticker,
-                        'Portfolio': p_name,
-                        'Current': current_alloc,
-                        'Target': target_alloc,
-                        'Drift': drift_pct,
-                        'Reason': f"{abs_drift:.1f}% drift (approaching {tolerance}% limit)"
-                    })
-                else:
-                    # Healthy - within acceptable range
-                    healthy_items.append({
-                        'Asset': ticker,
-                        'Portfolio': p_name,
-                        'Current': current_alloc,
-                        'Target': target_alloc,
-                        'Drift': drift_pct
-                    })
-        
-        # Display summary metrics
-        col_a1, col_a2, col_a3, col_a4 = st.columns(4)
-        
-        with col_a1:
-            st.metric(
-                "🔴 Urgent Actions", 
-                len(urgent_actions),
-                delta="Needs rebalancing" if urgent_actions else "All good!"
-            )
-        
-        with col_a2:
-            st.metric(
-                "🟡 Watch List",
-                len(watch_items),
-                delta="Approaching limits"
-            )
-        
-        with col_a3:
-            st.metric(
-                "🟢 Healthy Assets",
-                len(healthy_items),
-                delta=f"{len(healthy_items)/len(allocation_data)*100:.0f}% of portfolio" if allocation_data else "N/A"
-            )
-        
-        with col_a4:
-            total_rebalance_amount = sum(a['Amount'] for a in urgent_actions)
-            st.metric(
-                "💰 Total Rebalancing",
-                f"${total_rebalance_amount:,.0f}",
-                delta="Trade volume needed"
-            )
-        
-        # Display urgent actions
-        if urgent_actions:
-            st.markdown("#### 🔴 Urgent: Rebalancing Required")
-            
-            for action in sorted(urgent_actions, key=lambda x: abs(x['Drift']), reverse=True):
-                color = "#ef4444" if action['Action'] == "SELL" else "#3b82f6"
-                action_icon = "📉" if action['Action'] == "SELL" else "📈"
-                
-                st.markdown(f"""
-                    <div style="background: white; border-left: 4px solid {color}; 
-                                padding: 16px; margin: 8px 0; border-radius: 8px;
-                                box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <span style="font-size: 18px; font-weight: 700; color: {color};">
-                                    {action_icon} {action['Action']} {action['Asset']}
-                                </span>
-                                <div style="color: #64748b; margin-top: 4px;">
-                                    {action['Reason']}
-                                </div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="font-size: 24px; font-weight: 700; color: {color};">
-                                    ${action['Amount']:,.0f}
-                                </div>
-                                <div style="color: #64748b; font-size: 12px;">
-                                    {action['Current']:.1f}% → {action['Target']:.1f}%
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.success("✅ **No urgent actions needed!** All assets are within tolerance.")
-        
-        # Display watch items
-        if watch_items:
-            with st.expander(f"🟡 Watch List ({len(watch_items)} assets approaching limits)", expanded=False):
-                for item in sorted(watch_items, key=lambda x: abs(x['Drift']), reverse=True):
-                    st.info(f"**{item['Asset']}** in {item['Portfolio']}: {item['Current']:.1f}% (target: {item['Target']:.1f}%) - {item['Reason']}")
-        
-        # Display healthy assets
-        if healthy_items:
-            with st.expander(f"🟢 Healthy Assets ({len(healthy_items)} on target)", expanded=False):
-                for item in healthy_items:
-                    st.success(f"**{item['Asset']}** in {item['Portfolio']}: {item['Current']:.1f}% (target: {item['Target']:.1f}%) - Within tolerance ✅")
-        
         # NEW: Asset Allocation Pie Chart
         if allocation_data:
             st.markdown("#### 🥧 Asset Allocation Overview")
             
-            col_pie1, col_pie2 = st.columns([2, 1])
+            # Create pie chart (full width)
+            fig_pie = go.Figure()
             
-            with col_pie1:
-                # Create pie chart
-                fig_pie = go.Figure()
-                
-                # Prepare data
-                labels = [item['Asset'] for item in allocation_data]
-                values = [item['Current %'] for item in allocation_data]
-                targets = [item['Target %'] for item in allocation_data]
-                
-                # Color code based on drift
-                colors_pie = []
-                for item in allocation_data:
-                    if abs(item['Drift']) >= tolerance:
-                        colors_pie.append('#ef4444')  # Red - needs rebalancing
-                    elif abs(item['Drift']) >= tolerance * 0.5:
-                        colors_pie.append('#f59e0b')  # Orange - watch
-                    else:
-                        colors_pie.append('#10b981')  # Green - healthy
-                
-                fig_pie.add_trace(go.Pie(
-                    labels=labels,
-                    values=values,
-                    marker=dict(colors=colors_pie, line=dict(color='white', width=2)),
-                    textinfo='label+percent',
-                    textposition='auto',
-                    hovertemplate='<b>%{label}</b><br>' +
-                                  'Current: %{value:.1f}%<br>' +
-                                  '<extra></extra>'
-                ))
-                
-                fig_pie.update_layout(
-                    height=400,
-                    margin=dict(l=20, r=20, t=40, b=20),
-                    title=dict(
-                        text="Current Portfolio Allocation",
-                        x=0.5,
-                        xanchor='center'
-                    ),
-                    showlegend=True,
-                    legend=dict(
-                        orientation="v",
-                        yanchor="middle",
-                        y=0.5,
-                        xanchor="left",
-                        x=1.02
-                    )
+            # Prepare data
+            labels = [item['Asset'] for item in allocation_data]
+            values = [item['Current %'] for item in allocation_data]
+            targets = [item['Target %'] for item in allocation_data]
+            
+            # Color code based on drift
+            colors_pie = []
+            for item in allocation_data:
+                if abs(item['Drift']) >= tolerance:
+                    colors_pie.append('#ef4444')  # Red - needs rebalancing
+                elif abs(item['Drift']) >= tolerance * 0.5:
+                    colors_pie.append('#f59e0b')  # Orange - watch
+                else:
+                    colors_pie.append('#10b981')  # Green - healthy
+            
+            fig_pie.add_trace(go.Pie(
+                labels=labels,
+                values=values,
+                marker=dict(colors=colors_pie, line=dict(color='white', width=2)),
+                textinfo='label+percent',
+                textposition='auto',
+                hovertemplate='<b>%{label}</b><br>' +
+                              'Current: %{value:.1f}%<br>' +
+                              '<extra></extra>'
+            ))
+            
+            fig_pie.update_layout(
+                height=500,
+                margin=dict(l=20, r=20, t=40, b=20),
+                title=dict(
+                    text="Current Portfolio Allocation",
+                    x=0.5,
+                    xanchor='center'
+                ),
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.2,
+                    xanchor="center",
+                    x=0.5
                 )
-                
-                st.plotly_chart(fig_pie, use_container_width=True)
+            )
             
-            with col_pie2:
-                st.markdown("**Color Legend:**")
+            st.plotly_chart(fig_pie, use_container_width=True)
+            
+            # Color Legend
+            col_legend1, col_legend2, col_legend3 = st.columns(3)
+            with col_legend1:
                 st.markdown("🔴 **Red** = Needs rebalancing")
+            with col_legend2:
                 st.markdown("🟠 **Orange** = Watch closely")  
+            with col_legend3:
                 st.markdown("🟢 **Green** = On target")
+            
+            st.markdown("")
+            st.markdown("**Current vs Target Allocations:**")
+            
+            # Group allocation_data by portfolio for table
+            portfolio_groups = {}
+            for item in allocation_data:
+                # Find which portfolio this asset belongs to
+                portfolio_name = None
+                for p_name, p_data in profiles.items():
+                    if item['Asset'] in p_data.get('assets', {}):
+                        portfolio_name = p_name
+                        break
                 
-                st.markdown("")
-                st.markdown("**Current vs Target:**")
-                for item in allocation_data:
-                    drift_icon = "🔴" if abs(item['Drift']) >= tolerance else ("🟠" if abs(item['Drift']) >= tolerance * 0.5 else "🟢")
-                    st.markdown(f"{drift_icon} **{item['Asset']}**: {item['Current %']:.1f}% (target: {item['Target %']:.1f}%)")
+                if portfolio_name:
+                    if portfolio_name not in portfolio_groups:
+                        portfolio_groups[portfolio_name] = []
+                    portfolio_groups[portfolio_name].append(item)
+            
+            # Build table data
+            table_data = []
+            for p_name, items in sorted(portfolio_groups.items()):
+                for item in items:
+                    # Get tolerance for this portfolio
+                    p_tolerance = profiles[p_name].get('drift_tolerance', 5.0)
+                    abs_drift = abs(item['Drift'])
+                    
+                    # Status icon
+                    if abs_drift >= p_tolerance:
+                        status = "🔴 Rebalance"
+                    elif abs_drift >= p_tolerance * 0.5:
+                        status = "🟠 Watch"
+                    else:
+                        status = "🟢 On Target"
+                    
+                    table_data.append({
+                        "Portfolio": p_name,
+                        "Asset": item['Asset'],
+                        "Current %": f"{item['Current %']:.1f}%",
+                        "Target %": f"{item['Target %']:.1f}%",
+                        "Drift": f"{item['Drift']:+.1f}%",
+                        "Status": status
+                    })
+            
+            # Display as table
+            if table_data:
+                df_allocation = pd.DataFrame(table_data)
+                st.dataframe(
+                    df_allocation,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Portfolio": st.column_config.TextColumn("Portfolio", width="medium"),
+                        "Asset": st.column_config.TextColumn("Asset", width="small"),
+                        "Current %": st.column_config.TextColumn("Current %", width="small"),
+                        "Target %": st.column_config.TextColumn("Target %", width="small"),
+                        "Drift": st.column_config.TextColumn("Drift", width="small"),
+                        "Status": st.column_config.TextColumn("Status", width="medium")
+                    }
+                )
         
         st.divider()
         
@@ -2204,7 +2334,6 @@ if view_mode == "🏠 Global Dashboard":
         
         # Collect data for all profiles
         comparison_data = []
-        action_items = []  # For Action Items Dashboard
         
         for p_name, p_data in profiles.items():
             p_assets = p_data.get("assets", {})
@@ -2258,29 +2387,6 @@ if view_mode == "🏠 Global Dashboard":
                 "Status": status,
                 "Status_Priority": status_priority
             })
-            
-            # Collect action items
-            if needs_rebal:
-                drift_count = len(drift_details)
-                max_drift = max([d[1] for d in drift_details]) if drift_details else 0
-                action_items.append({
-                    "priority": 1,
-                    "type": "rebalance",
-                    "profile": p_name,
-                    "message": f"🚨 URGENT - {p_name} needs rebalancing ({drift_count} asset{'s' if drift_count > 1 else ''} drifted, max: {max_drift:.1f}%)",
-                    "detail": f"{drift_count} assets exceed {p_data.get('drift_tolerance', 5.0)}% tolerance",
-                    "action": "Click profile to view details and execute rebalance"
-                })
-            elif not all_deployed and total_assets > 0:
-                remaining_assets = [(t, a.get("allocated_pct", 0)) for t, a in p_assets.items() if a.get("allocated_pct", 0) < 100.0]
-                action_items.append({
-                    "priority": 2,
-                    "type": "deployment",
-                    "profile": p_name,
-                    "message": f"🔥 IN PROGRESS - {p_name} deployment ({deployed_count}/{total_assets} assets fully deployed)",
-                    "detail": ", ".join([f"{t} needs {100-pct:.0f}% more" for t, pct in remaining_assets[:3]]),
-                    "action": "Complete remaining asset deployments"
-                })
         
         # Sort comparison data by Value (descending)
         comparison_df = pd.DataFrame(comparison_data)
@@ -2328,63 +2434,6 @@ if view_mode == "🏠 Global Dashboard":
         st.divider()
         
         # ===== NEW v5.9.0: ACTION ITEMS DASHBOARD =====
-        st.markdown("### ⚡ Action Items Dashboard")
-        
-        # Sort action items by priority
-        action_items.sort(key=lambda x: x["priority"])
-        
-        if action_items:
-            st.caption(f"You have **{len(action_items)} action item(s)** requiring attention")
-            
-            for item in action_items:
-                if item["type"] == "rebalance":
-                    # Urgent rebalance needed
-                    st.markdown(f"""
-                        <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); 
-                                    border-left: 4px solid #ef4444; padding: 16px; border-radius: 8px; margin: 12px 0;">
-                            <div style="font-weight: 700; color: #991b1b; font-size: 1.05rem; margin-bottom: 8px;">
-                                {item['message']}
-                            </div>
-                            <div style="color: #7f1d1d; font-size: 0.9rem; margin-bottom: 8px;">
-                                📊 {item['detail']}
-                            </div>
-                            <div style="color: #7f1d1d; font-size: 0.85rem; font-style: italic;">
-                                → {item['action']}
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                
-                elif item["type"] == "deployment":
-                    # Deployment in progress
-                    st.markdown(f"""
-                        <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); 
-                                    border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 12px 0;">
-                            <div style="font-weight: 700; color: #92400e; font-size: 1.05rem; margin-bottom: 8px;">
-                                {item['message']}
-                            </div>
-                            <div style="color: #78350f; font-size: 0.9rem; margin-bottom: 8px;">
-                                📋 {item['detail']}
-                            </div>
-                            <div style="color: #78350f; font-size: 0.85rem; font-style: italic;">
-                                → {item['action']}
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-        else:
-            # All clear
-            st.markdown("""
-                <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
-                            border-left: 4px solid #10b981; padding: 16px; border-radius: 8px; margin: 12px 0;">
-                    <div style="font-weight: 700; color: #065f46; font-size: 1.05rem; margin-bottom: 8px;">
-                        ✅ ALL CLEAR - No actions required
-                    </div>
-                    <div style="color: #047857; font-size: 0.9rem;">
-                        All portfolios are properly balanced and fully deployed. Great job! 🎉
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-        
-        st.divider()
         
         # Portfolio Grid
 
