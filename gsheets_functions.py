@@ -5,7 +5,7 @@ Maintains exact same interface as load_db() and save_db()
 """
 
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
+from st_gsheets_connection import GSheetsConnection
 import pandas as pd
 import json
 from datetime import datetime
