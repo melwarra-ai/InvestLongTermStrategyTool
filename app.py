@@ -7,13 +7,10 @@ from datetime import datetime, date, timedelta
 import json
 import os
 
-# ===== GOOGLE SHEETS DATABASE =====
-from gsheets_functions import load_db, save_db, get_connection_status, get_app_logs
-
 # ===== VERSION INFORMATION =====
-VERSION = "5.12.0"
-VERSION_DATE = "2026-01-11"
-VERSION_NAME = "Google Sheets Database Integration - Persistent Cloud Storage"
+VERSION = "5.11.7"
+VERSION_DATE = "2026-01-10"
+VERSION_NAME = "Restored 'Click to Open' buttons + All layout fixes"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -297,51 +294,44 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ===== PERSISTENCE LAYER =====
-# OLD LOCAL FILE DATABASE - Commented out, now using Google Sheets
-# The load_db() and save_db() functions are now imported from gsheets_functions.py
-# This maintains the exact same interface but stores data in Google Sheets instead of local JSON
+DB_FILE = "alphastream_wealth.json"
 
-# DB_FILE = "alphastream_wealth.json"
+def load_db():
+    base_schema = {"profiles": {}, "global_logs": []}
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r") as f:
+            try: 
+                data = json.load(f)
+                data.setdefault("profiles", {})
+                data.setdefault("global_logs", [])
+                for p in data["profiles"].values():
+                    p.setdefault("drift_tolerance", 5.0)
+                    p.setdefault("rebalance_stats", [])
+                    p.setdefault("last_rebalanced", None)
+                    p.setdefault("benchmark", None)
+                    
+                    # v5.6 fields
+                    p.setdefault("bank_name", "")
+                    p.setdefault("account_type", "")
+                    
+                    # Workflow field migration
+                    p.setdefault("account_name", "")
+                    p.setdefault("initialization_date", p.get("start_date", ""))
+                    p.setdefault("asset_mix_locked", False)
+                    
+                    # Migrate assets to new schema
+                    for asset_key, asset_data in p.get("assets", {}).items():
+                        asset_data.setdefault("fund_name", asset_key)
+                        asset_data.setdefault("allocated_pct", 0.0)
+                        asset_data.setdefault("purchases", [])
+                return data
+            except: 
+                return base_schema
+    return base_schema
 
-# def load_db():
-#     base_schema = {"profiles": {}, "global_logs": []}
-#     if os.path.exists(DB_FILE):
-#         with open(DB_FILE, "r") as f:
-#             try: 
-#                 data = json.load(f)
-#                 data.setdefault("profiles", {})
-#                 data.setdefault("global_logs", [])
-#                 for p in data["profiles"].values():
-#                     p.setdefault("drift_tolerance", 5.0)
-#                     p.setdefault("rebalance_stats", [])
-#                     p.setdefault("last_rebalanced", None)
-#                     p.setdefault("benchmark", None)
-#                     
-#                     # v5.6 fields
-#                     p.setdefault("bank_name", "")
-#                     p.setdefault("account_type", "")
-#                     
-#                     # Workflow field migration
-#                     p.setdefault("account_name", "")
-#                     p.setdefault("initialization_date", p.get("start_date", ""))
-#                     p.setdefault("asset_mix_locked", False)
-#                     
-#                     # Migrate assets to new schema
-#                     for asset_key, asset_data in p.get("assets", {}).items():
-#                         asset_data.setdefault("fund_name", asset_key)
-#                         asset_data.setdefault("allocated_pct", 0.0)
-#                         asset_data.setdefault("purchases", [])
-#                 return data
-#             except: 
-#                 return base_schema
-#     return base_schema
-
-# def save_db(data):
-#     with open(DB_FILE, "w") as f:
-#         json.dump(data, f, indent=2)
-
-# NOTE: load_db() and save_db() are now provided by gsheets_functions.py
-# They maintain the same interface, so no other code changes are needed!
+def save_db(data):
+    with open(DB_FILE, "w") as f:
+        json.dump(data, f, indent=2)
 
 def log_profile(prof, message):
     prof.setdefault("rebalance_logs", [])
@@ -479,19 +469,6 @@ with st.sidebar:
     st.markdown("### 📊 Portfolio Optimizer")
     st.caption(f"Long Term Strategy Suite v{VERSION}")
     
-    # Database Status Indicator
-    try:
-        status = get_connection_status()
-        if status["connected"]:
-            st.success("☁️ Google Sheets Database")
-            st.caption(f"📊 Connected to cloud storage")
-        else:
-            st.error("❌ Database Offline")
-            st.caption(status["message"])
-    except Exception as e:
-        st.warning("⚠️ Database status unknown")
-        st.caption("Check secrets.toml configuration")
-    
     st.divider()
     
     # Navigation - v5.9.2 FIX: Handle navigation trigger from dashboard profile clicks
@@ -515,28 +492,6 @@ with st.sidebar:
         index=default_nav_index,
         key="nav_radio"
     )
-    
-    st.divider()
-    
-    # Optional: App Logs Viewer (for debugging and monitoring)
-    with st.expander("📋 View App Logs", expanded=False):
-        st.caption("See who's using the app and when")
-        try:
-            if st.button("Refresh Logs", key="refresh_logs_btn"):
-                st.cache_data.clear()
-            logs = get_app_logs(50)
-            if not logs.empty:
-                st.dataframe(
-                    logs[['timestamp', 'event', 'details']],
-                    height=200,
-                    use_container_width=True,
-                    hide_index=True
-                )
-                st.caption(f"Showing last {len(logs)} entries")
-            else:
-                st.info("No logs yet - will appear after first app launch")
-        except Exception as e:
-            st.warning(f"Could not load logs: {e}")
     
     st.divider()
     
