@@ -24,7 +24,31 @@ def get_gsheets_connection():
     Shared across all users
     """
     try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
+        # Read spreadsheet URL from secrets
+        if "connections" not in st.secrets:
+            st.error("❌ Missing [connections.gsheets] section in secrets.toml")
+            st.stop()
+        
+        if "gsheets" not in st.secrets["connections"]:
+            st.error("❌ Missing [connections.gsheets] section in secrets.toml")
+            st.stop()
+        
+        gsheets_config = st.secrets["connections"]["gsheets"]
+        
+        if "spreadsheet" not in gsheets_config:
+            st.error("❌ Missing 'spreadsheet' in secrets.toml")
+            st.info("Add this line to [connections.gsheets]:")
+            st.code('spreadsheet = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit"')
+            st.stop()
+        
+        spreadsheet_url = gsheets_config["spreadsheet"]
+        
+        # Create connection with explicit spreadsheet URL
+        conn = st.connection(
+            "gsheets",
+            type=GSheetsConnection,
+            spreadsheet=spreadsheet_url
+        )
         return conn
     except Exception as e:
         st.error(f"❌ Failed to connect to Google Sheets")
