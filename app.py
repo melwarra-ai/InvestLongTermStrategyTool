@@ -13,8 +13,8 @@ import re
 # ===== VERSION INFORMATION =====
 VERSION = "6.0.0"
 VERSION_DATE = "2026-01-15"
-VERSION_TIME = "15:45:00"
-VERSION_NAME = "Multi-User Authentication System"
+VERSION_TIME = "16:30:00"
+VERSION_NAME = "Multi-User Authentication System + Migration Fix"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -391,7 +391,7 @@ def generate_session_token() -> str:
     return secrets.token_urlsafe(32)
 
 def load_db():
-    """Load multi-user database"""
+    """Load multi-user database with migration support"""
     base_schema = {
         "users": {},
         "global_settings": {
@@ -402,10 +402,81 @@ def load_db():
         "system_logs": []
     }
     
+    # Check for old single-user database file
+    OLD_DB_FILE = "alphastream_wealth.json"
+    
+    # If new DB doesn't exist but old one does, migrate
+    if not os.path.exists(DB_FILE) and os.path.exists(OLD_DB_FILE):
+        try:
+            with open(OLD_DB_FILE, "r") as f:
+                old_data = json.load(f)
+                old_profiles = old_data.get("profiles", {})
+                
+                # Create admin user with migrated profiles
+                admin_hash, admin_salt = hash_password("admin123")
+                migrated_data = {
+                    "users": {
+                        "admin": {
+                            "email": "admin@localhost",
+                            "password_hash": admin_hash,
+                            "password_salt": admin_salt,
+                            "display_name": "Administrator",
+                            "role": "admin",
+                            "is_active": True,
+                            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "last_login": "",
+                            "login_attempts": 0,
+                            "lockout_until": None,
+                            "profiles": old_profiles,
+                            "settings": {}
+                        }
+                    },
+                    "global_settings": base_schema["global_settings"],
+                    "system_logs": [{"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    "type": "migration", "message": f"Migrated {len(old_profiles)} profiles from single-user database", "user_id": "system"}]
+                }
+                save_db(migrated_data)
+                return migrated_data
+        except Exception as e:
+            pass  # Fall through to create new database
+    
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r") as f:
                 data = json.load(f)
+                
+                # Check if this is old single-user format (has "profiles" at root level)
+                if "profiles" in data and "users" not in data:
+                    # Migrate old data to new multi-user format
+                    old_profiles = data.get("profiles", {})
+                    
+                    # Create admin user with migrated profiles
+                    admin_hash, admin_salt = hash_password("admin123")
+                    migrated_data = {
+                        "users": {
+                            "admin": {
+                                "email": "admin@localhost",
+                                "password_hash": admin_hash,
+                                "password_salt": admin_salt,
+                                "display_name": "Administrator",
+                                "role": "admin",
+                                "is_active": True,
+                                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "last_login": "",
+                                "login_attempts": 0,
+                                "lockout_until": None,
+                                "profiles": old_profiles,
+                                "settings": {}
+                            }
+                        },
+                        "global_settings": base_schema["global_settings"],
+                        "system_logs": [{"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                        "type": "migration", "message": "Migrated from single-user to multi-user", "user_id": "system"}]
+                    }
+                    save_db(migrated_data)
+                    return migrated_data
+                
+                # Normal multi-user format - ensure schema integrity
                 data.setdefault("users", {})
                 data.setdefault("global_settings", base_schema["global_settings"])
                 data.setdefault("system_logs", [])
@@ -707,6 +778,34 @@ def is_admin(db, username):
 # ===== SESSION STATE INITIALIZATION =====
 if "db" not in st.session_state:
     st.session_state.db = load_db()
+
+# Ensure db has required structure (safety check)
+if "users" not in st.session_state.db:
+    st.session_state.db["users"] = {}
+if "global_settings" not in st.session_state.db:
+    st.session_state.db["global_settings"] = {"allow_registration": True, "default_drift_tolerance": 5.0}
+if "system_logs" not in st.session_state.db:
+    st.session_state.db["system_logs"] = []
+
+# Create default admin if no users exist
+if not st.session_state.db["users"]:
+    admin_hash, admin_salt = hash_password("admin123")
+    st.session_state.db["users"]["admin"] = {
+        "email": "admin@localhost",
+        "password_hash": admin_hash,
+        "password_salt": admin_salt,
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": True,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "last_login": "",
+        "login_attempts": 0,
+        "lockout_until": None,
+        "profiles": {},
+        "settings": {}
+    }
+    save_db(st.session_state.db)
+
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "current_user" not in st.session_state:
@@ -765,7 +864,7 @@ def show_login_page():
                 st.session_state.auth_page = "register"
                 st.rerun()
         
-        if "admin" in st.session_state.db["users"]:
+        if "admin" in st.session_state.db.get("users", {}):
             with st.expander("ℹ️ First time setup?", expanded=False):
                 st.markdown("""
                     **Default Admin Account:**
@@ -995,7 +1094,7 @@ if not st.session_state.authenticated:
         show_registration_page()
 else:
     current_user = st.session_state.current_user
-    user_data = st.session_state.db["users"].get(current_user, {})
+    user_data = st.session_state.db.get("users", {}).get(current_user, {})
     is_admin_user = user_data.get("role") == "admin"
     
     # ===== SIDEBAR =====
