@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.0.1"
+VERSION = "6.0.2"
 VERSION_DATE = "2026-01-16"
-VERSION_TIME = "09:15:00"
-VERSION_NAME = "Multi-User Auth + UI Improvements"
+VERSION_TIME = "10:00:00"
+VERSION_NAME = "Multi-User Auth + Navigation Fix"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -820,10 +820,10 @@ if "show_rebalance_recommendation" not in st.session_state:
     st.session_state.show_rebalance_recommendation = False
 if "show_execute_form" not in st.session_state:
     st.session_state.show_execute_form = False
-if "trigger_portfolio_view" not in st.session_state:
-    st.session_state.trigger_portfolio_view = False
 if "auth_page" not in st.session_state:
     st.session_state.auth_page = "login"
+if "nav_radio" not in st.session_state:
+    st.session_state.nav_radio = "🏠 Global Dashboard"
 
 # ===== AUTHENTICATION UI =====
 def show_login_page():
@@ -1109,17 +1109,15 @@ else:
         st.caption(f"Long Term Strategy Suite v{VERSION}")
         st.divider()
         
-        if st.session_state.get("trigger_portfolio_view", False):
-            st.session_state.trigger_portfolio_view = False
-            if "nav_radio" in st.session_state:
-                del st.session_state["nav_radio"]
-        
         nav_options = ["🏠 Global Dashboard", "📊 Portfolio Manager"]
         if is_admin_user:
             nav_options.append("👑 Admin Dashboard")
         
-        default_nav_index = 1 if st.session_state.get("active_profile") else 0
-        view_mode = st.radio("Navigation", nav_options, index=default_nav_index, key="nav_radio")
+        # Ensure nav_radio has a valid value
+        if st.session_state.get("nav_radio") not in nav_options:
+            st.session_state.nav_radio = "🏠 Global Dashboard"
+        
+        view_mode = st.radio("Navigation", nav_options, key="nav_radio")
         
         st.divider()
         
@@ -1844,7 +1842,7 @@ else:
                     
                     if st.button(f"📊 Open {name}", key=f"open_{name}", use_container_width=True):
                         st.session_state.active_profile = name
-                        st.session_state.trigger_portfolio_view = True
+                        st.session_state.nav_radio = "📊 Portfolio Manager"  # Force navigation to Portfolio Manager
                         st.rerun()
                     st.markdown("")
             
