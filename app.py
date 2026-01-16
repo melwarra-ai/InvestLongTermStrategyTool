@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.0.0"
-VERSION_DATE = "2026-01-15"
-VERSION_TIME = "16:30:00"
-VERSION_NAME = "Multi-User Authentication System + Migration Fix"
+VERSION = "6.0.1"
+VERSION_DATE = "2026-01-16"
+VERSION_TIME = "09:15:00"
+VERSION_NAME = "Multi-User Auth + UI Improvements"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1403,31 +1403,29 @@ else:
             if valid_ticker:
                 st.markdown("---")
                 default_target = prof.get("assets", {}).get(a_sym, {}).get("target", 0.0)
-                default_units = prof.get("assets", {}).get(a_sym, {}).get("units", 0.0)
                 
                 a_w = st.number_input("Target Allocation %", min_value=0.0, max_value=max_available,
-                                     value=min(float(default_target), max_available), step=0.5, key="target_weight")
-                
-                if a_w > 0:
-                    target_value = (a_w / 100) * prof['principal']
-                    suggested_units = target_value / last_price
-                    st.markdown(f'<div class="buying-guide">💡 <strong>Buy Guide:</strong> To reach {a_w}% → Buy <span class="buying-guide-highlight">{suggested_units:.4f} units</span> (${target_value:,.0f})</div>', unsafe_allow_html=True)
-                
-                a_u = st.number_input("Units Currently Owned", min_value=0.0, value=float(default_units),
-                                     step=0.0001, format="%.4f", key="units_owned")
+                                     value=min(float(default_target), max_available), step=0.5, 
+                                     help=f"Set the target % for {a_sym}. Max available: {max_available:.1f}%",
+                                     key="target_weight")
                 
                 st.markdown("---")
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
                     save_disabled = (a_w <= 0) or (a_w > max_available)
                     if st.button("💾 Save Asset", use_container_width=True, type="primary", key="save_asset", disabled=save_disabled):
+                        # Preserve existing units and purchases if updating
+                        existing_units = prof.get("assets", {}).get(a_sym, {}).get("units", 0.0)
+                        existing_allocated = prof.get("assets", {}).get(a_sym, {}).get("allocated_pct", 0.0)
+                        existing_purchases = prof.get("assets", {}).get(a_sym, {}).get("purchases", [])
+                        
                         prof.setdefault("assets", {})[a_sym] = {
-                            "fund_name": ticker_name, "units": a_u, "target": a_w,
-                            "allocated_pct": prof.get("assets", {}).get(a_sym, {}).get("allocated_pct", 0.0),
-                            "purchases": prof.get("assets", {}).get(a_sym, {}).get("purchases", [])
+                            "fund_name": ticker_name, "units": existing_units, "target": a_w,
+                            "allocated_pct": existing_allocated,
+                            "purchases": existing_purchases
                         }
                         action = "Updated" if is_existing else "Added"
-                        log_profile(prof, f"{action} {a_sym}: {a_w}% target, {a_u:.4f} units")
+                        log_profile(prof, f"{action} {a_sym}: {a_w}% target")
                         save_db(st.session_state.db)
                         st.success(f"✅ {action} {a_sym}!")
                         st.rerun()
@@ -1445,7 +1443,12 @@ else:
                 st.divider()
                 st.markdown("### 📋 Current Assets")
                 for ticker, data in prof["assets"].items():
-                    st.caption(f"**{ticker}**: {data['target']}% ({data['units']:.4f} units)")
+                    units = data.get('units', 0)
+                    allocated_pct = data.get('allocated_pct', 0)
+                    if units > 0:
+                        st.caption(f"**{ticker}**: {data['target']}% target • {allocated_pct:.0f}% deployed ({units:.4f} units)")
+                    else:
+                        st.caption(f"**{ticker}**: {data['target']}% target • Not deployed")
             
             # Asset Mix Locking
             st.divider()
@@ -1541,46 +1544,71 @@ else:
                             
                             portfolio_pct = (deploy_pct / 100) * target_pct
                             deploy_amount = (portfolio_pct / 100) * prof['principal']
-                            st.info(f"**Deploying:** {deploy_pct:.1f}% of {selected_ticker}'s {target_pct}% = ${deploy_amount:,.2f}")
+                            
+                            # Fetch and display price preview for the selected date
+                            preview_price = None
+                            preview_price_date = None
+                            try:
+                                t_obj = yf.Ticker(selected_ticker)
+                                if deploy_date == date.today():
+                                    hist = t_obj.history(period="1d")
+                                else:
+                                    start_d = pd.to_datetime(deploy_date) - timedelta(days=7)
+                                    end_d = pd.to_datetime(deploy_date) + timedelta(days=1)
+                                    hist = t_obj.history(start=start_d, end=end_d)
+                                
+                                if not hist.empty:
+                                    hist.index = pd.to_datetime(hist.index).date
+                                    if deploy_date in hist.index:
+                                        preview_price = float(hist.loc[deploy_date]['Close'])
+                                        preview_price_date = deploy_date
+                                    else:
+                                        available_dates = [d for d in hist.index if d <= deploy_date]
+                                        if available_dates:
+                                            preview_price_date = max(available_dates)
+                                            preview_price = float(hist.loc[preview_price_date]['Close'])
+                            except:
+                                pass
+                            
+                            # Display deployment preview with price info
+                            if preview_price:
+                                estimated_units = deploy_amount / preview_price
+                                p_flag = "🇺🇸" if prof.get("currency") == "USD" else "🇨🇦"
+                                
+                                st.markdown(f'''
+                                    <div class="buying-guide">
+                                        <div style="margin-bottom: 8px;"><strong>📊 Deployment Preview:</strong></div>
+                                        <div>• <strong>Price on {preview_price_date}:</strong> {p_flag} ${preview_price:,.2f}</div>
+                                        <div>• <strong>Investment Amount:</strong> ${deploy_amount:,.2f} ({deploy_pct:.1f}% of {target_pct}% target)</div>
+                                        <div>• <strong>Estimated Units:</strong> <span class="buying-guide-highlight">{estimated_units:.4f} units</span></div>
+                                    </div>
+                                ''', unsafe_allow_html=True)
+                                
+                                if preview_price_date != deploy_date:
+                                    st.caption(f"ℹ️ Using {preview_price_date} price (closest trading day)")
+                            else:
+                                st.warning(f"⚠️ Could not fetch price for {deploy_date}. Price will be fetched when recording.")
+                                st.info(f"**Deploying:** {deploy_pct:.1f}% of {selected_ticker}'s {target_pct}% = ${deploy_amount:,.2f}")
                             
                             if st.button("📥 Record Deployment", type="primary", use_container_width=True, key="record_deploy_btn"):
                                 try:
-                                    with st.spinner(f"Fetching price for {selected_ticker}..."):
-                                        t_obj = yf.Ticker(selected_ticker)
-                                        if deploy_date == date.today():
-                                            hist = t_obj.history(period="1d")
-                                        else:
-                                            start_d = pd.to_datetime(deploy_date) - timedelta(days=7)
-                                            end_d = pd.to_datetime(deploy_date) + timedelta(days=1)
-                                            hist = t_obj.history(start=start_d, end=end_d)
-                                        
-                                        if hist.empty:
-                                            st.error(f"❌ No price data for {selected_ticker}")
-                                        else:
-                                            hist.index = pd.to_datetime(hist.index).date
-                                            if deploy_date in hist.index:
-                                                price = float(hist.loc[deploy_date]['Close'])
-                                            else:
-                                                available_dates = [d for d in hist.index if d <= deploy_date]
-                                                if available_dates:
-                                                    price_date = max(available_dates)
-                                                    price = float(hist.loc[price_date]['Close'])
-                                                else:
-                                                    price = None
-                                            
-                                            if price is not None:
-                                                quantity = deploy_amount / price
-                                                purchase = {"date": str(deploy_date), "deploy_pct": deploy_pct,
-                                                           "amount": deploy_amount, "price": price, "quantity": quantity}
-                                                asset_data.setdefault("purchases", []).append(purchase)
-                                                asset_data["units"] = asset_data.get("units", 0) + quantity
-                                                asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)
-                                                log_profile(prof, f"Deployed {deploy_pct:.1f}% of {selected_ticker} (${deploy_amount:,.2f} @ ${price:.2f})")
-                                                save_db(st.session_state.db)
-                                                st.success(f"✅ Deployed {deploy_pct:.1f}% of {selected_ticker}")
-                                                if asset_data['allocated_pct'] >= 100.0:
-                                                    st.balloons()
-                                                st.rerun()
+                                    if preview_price:
+                                        # Use the already fetched price
+                                        price = preview_price
+                                        quantity = deploy_amount / price
+                                        purchase = {"date": str(deploy_date), "deploy_pct": deploy_pct,
+                                                   "amount": deploy_amount, "price": price, "quantity": quantity}
+                                        asset_data.setdefault("purchases", []).append(purchase)
+                                        asset_data["units"] = asset_data.get("units", 0) + quantity
+                                        asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)
+                                        log_profile(prof, f"Deployed {deploy_pct:.1f}% of {selected_ticker} (${deploy_amount:,.2f} @ ${price:.2f} = {quantity:.4f} units)")
+                                        save_db(st.session_state.db)
+                                        st.success(f"✅ Deployed {deploy_pct:.1f}% of {selected_ticker} - {quantity:.4f} units @ ${price:.2f}")
+                                        if asset_data['allocated_pct'] >= 100.0:
+                                            st.balloons()
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Could not fetch price. Please try a different date.")
                                 except Exception as e:
                                     st.error(f"❌ Error: {str(e)}")
             
@@ -2105,11 +2133,18 @@ else:
             st.info("👈 **Add your first asset using the sidebar**")
             st.markdown("### 📚 Quick Start Guide")
             st.markdown("""
-            1. **Add Assets** (④): Enter ticker symbols and target percentages
-            2. **Lock Mix** (⑤): Lock when allocations total 100%
-            3. **Deploy Capital** (⑥): Record your purchases at actual prices
-            4. **Monitor Drift**: System alerts when rebalancing is needed
-            5. **Rebalance**: Execute trades to restore target allocations
+            **Follow the sidebar steps in order:**
+            
+            1. **① Strategy Setup**: Create your investment profile (✅ Done!)
+            2. **② Drift Strategy**: Set your rebalancing tolerance threshold
+            3. **③ Benchmark**: Choose a market benchmark for comparison
+            4. **④ Asset Allocation**: Add ticker symbols and set target percentages
+            5. **⑤ Lock Asset Mix**: Lock your allocation when it totals 100%
+            6. **⑥ Asset Deployment**: Record your purchases at actual prices
+            
+            **After deployment:**
+            - **Monitor Drift**: System alerts when rebalancing is needed
+            - **Rebalance**: Execute trades to restore target allocations
             """)
             st.stop()
         
