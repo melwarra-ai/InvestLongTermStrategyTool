@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.0.3"
+VERSION = "6.0.4"
 VERSION_DATE = "2026-01-16"
-VERSION_TIME = "10:30:00"
-VERSION_NAME = "Multi-User Auth + Navigation Fix v2"
+VERSION_TIME = "11:00:00"
+VERSION_NAME = "Multi-User Auth + Navigation Fix v3"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -822,8 +822,8 @@ if "show_execute_form" not in st.session_state:
     st.session_state.show_execute_form = False
 if "auth_page" not in st.session_state:
     st.session_state.auth_page = "login"
-if "desired_page" not in st.session_state:
-    st.session_state.desired_page = "🏠 Global Dashboard"
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "🏠 Global Dashboard"
 
 # ===== AUTHENTICATION UI =====
 def show_login_page():
@@ -1113,24 +1113,18 @@ else:
         if is_admin_user:
             nav_options.append("👑 Admin Dashboard")
         
-        # Handle forced navigation (e.g., from "Open" button on dashboard)
-        if st.session_state.get("_force_nav", False):
-            st.session_state._force_nav = False
-            # Delete the widget state to allow index to take effect
-            if "nav_radio" in st.session_state:
-                del st.session_state["nav_radio"]
-        
-        # Determine the index based on desired_page
-        desired = st.session_state.get("desired_page", "🏠 Global Dashboard")
-        if desired in nav_options:
-            default_idx = nav_options.index(desired)
+        # Get current page from session state (not widget state)
+        current_page = st.session_state.get("current_page", "🏠 Global Dashboard")
+        if current_page in nav_options:
+            default_idx = nav_options.index(current_page)
         else:
             default_idx = 0
         
-        view_mode = st.radio("Navigation", nav_options, index=default_idx, key="nav_radio")
+        # Radio WITHOUT key - uses index parameter on each rerun
+        view_mode = st.radio("Navigation", nav_options, index=default_idx)
         
-        # Sync desired_page with actual selection (for when user clicks radio manually)
-        st.session_state.desired_page = view_mode
+        # Update session state with user's selection
+        st.session_state.current_page = view_mode
         
         st.divider()
         
@@ -1855,8 +1849,7 @@ else:
                     
                     if st.button(f"📊 Open {name}", key=f"open_{name}", use_container_width=True):
                         st.session_state.active_profile = name
-                        st.session_state.desired_page = "📊 Portfolio Manager"
-                        st.session_state._force_nav = True  # Force radio to update
+                        st.session_state.current_page = "📊 Portfolio Manager"
                         st.rerun()
                     st.markdown("")
             
