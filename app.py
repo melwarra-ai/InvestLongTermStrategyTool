@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.0.4"
-VERSION_DATE = "2026-01-16"
-VERSION_TIME = "11:00:00"
-VERSION_NAME = "Multi-User Auth + Navigation Fix v3"
+VERSION = "6.0.5"
+VERSION_DATE = "2026-01-18"
+VERSION_TIME = "12:00:00"
+VERSION_NAME = "Multi-User Auth + Button Navigation"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -823,7 +823,7 @@ if "show_execute_form" not in st.session_state:
 if "auth_page" not in st.session_state:
     st.session_state.auth_page = "login"
 if "current_page" not in st.session_state:
-    st.session_state.current_page = "🏠 Global Dashboard"
+    st.session_state.current_page = "Global Dashboard"
 
 # ===== AUTHENTICATION UI =====
 def show_login_page():
@@ -1109,22 +1109,33 @@ else:
         st.caption(f"Long Term Strategy Suite v{VERSION}")
         st.divider()
         
-        nav_options = ["🏠 Global Dashboard", "📊 Portfolio Manager"]
+        # Navigation using buttons (no state management issues)
+        st.markdown("**Navigation**")
+        
+        # Get current page
+        if "current_page" not in st.session_state:
+            st.session_state.current_page = "Global Dashboard"
+        
+        # Style for selected button
+        nav_col1, nav_col2 = st.columns(2)
+        with nav_col1:
+            dash_type = "primary" if st.session_state.current_page == "Global Dashboard" else "secondary"
+            if st.button("🏠 Global Dashboard", use_container_width=True, type=dash_type, key="nav_global"):
+                st.session_state.current_page = "Global Dashboard"
+                st.rerun()
+        with nav_col2:
+            port_type = "primary" if st.session_state.current_page == "Portfolio Manager" else "secondary"
+            if st.button("📊 Portfolio Manager", use_container_width=True, type=port_type, key="nav_portfolio"):
+                st.session_state.current_page = "Portfolio Manager"
+                st.rerun()
+        
         if is_admin_user:
-            nav_options.append("👑 Admin Dashboard")
+            admin_type = "primary" if st.session_state.current_page == "Admin Dashboard" else "secondary"
+            if st.button("👑 Admin Dashboard", use_container_width=True, type=admin_type, key="nav_admin"):
+                st.session_state.current_page = "Admin Dashboard"
+                st.rerun()
         
-        # Get current page from session state (not widget state)
-        current_page = st.session_state.get("current_page", "🏠 Global Dashboard")
-        if current_page in nav_options:
-            default_idx = nav_options.index(current_page)
-        else:
-            default_idx = 0
-        
-        # Radio WITHOUT key - uses index parameter on each rerun
-        view_mode = st.radio("Navigation", nav_options, index=default_idx)
-        
-        # Update session state with user's selection
-        st.session_state.current_page = view_mode
+        view_mode = st.session_state.current_page
         
         st.divider()
         
@@ -1171,7 +1182,7 @@ else:
         # Profile-specific sidebar
         user_profiles = get_user_profiles(st.session_state.db, current_user)
         
-        if view_mode == "📊 Portfolio Manager" and user_profiles:
+        if view_mode == "Portfolio Manager" and user_profiles:
             st.divider()
             st.markdown("### 🎯 Active Profile")
             
@@ -1657,10 +1668,10 @@ else:
             st.rerun()
 
     # ===== MAIN CONTENT AREA =====
-    if view_mode == "👑 Admin Dashboard" and is_admin_user:
+    if view_mode == "Admin Dashboard" and is_admin_user:
         show_admin_dashboard()
     
-    elif view_mode == "🏠 Global Dashboard":
+    elif view_mode == "Global Dashboard":
         st.title("🏠 Global Portfolio Dashboard")
         
         description_box(
@@ -1849,7 +1860,7 @@ else:
                     
                     if st.button(f"📊 Open {name}", key=f"open_{name}", use_container_width=True):
                         st.session_state.active_profile = name
-                        st.session_state.current_page = "📊 Portfolio Manager"
+                        st.session_state.current_page = "Portfolio Manager"
                         st.rerun()
                     st.markdown("")
             
@@ -2065,7 +2076,7 @@ else:
             df_comparison = pd.DataFrame(comparison_data)
             st.dataframe(df_comparison, use_container_width=True, hide_index=True)
 
-    elif view_mode == "📊 Portfolio Manager":
+    elif view_mode == "Portfolio Manager":
         if not st.session_state.active_profile:
             user_profiles = get_user_profiles(st.session_state.db, current_user)
             if user_profiles:
