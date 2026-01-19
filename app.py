@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.0.6"
+VERSION = "6.0.7"
 VERSION_DATE = "2026-01-18"
-VERSION_TIME = "12:30:00"
-VERSION_NAME = "Multi-User Auth + Deploy by Units"
+VERSION_TIME = "13:00:00"
+VERSION_NAME = "Multi-User Auth + Past Deployment Dates"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1555,8 +1555,7 @@ else:
                             deploy_method = st.radio("Deployment Method", ["By Percentage", "By Units"], 
                                                     horizontal=True, key="deploy_method_radio")
                             
-                            inception_date = datetime.strptime(prof.get('start_date'), '%Y-%m-%d').date()
-                            deploy_date = st.date_input("Deployment Date", value=date.today(), min_value=inception_date,
+                            deploy_date = st.date_input("Deployment Date", value=date.today(),
                                                        max_value=date.today(), key="deploy_date_input")
                             
                             # Fetch price for preview
