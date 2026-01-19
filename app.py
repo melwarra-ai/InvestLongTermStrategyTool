@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.1.1"
+VERSION = "6.1.2"
 VERSION_DATE = "2026-01-18"
-VERSION_TIME = "16:00:00"
-VERSION_NAME = "Multi-User Auth + Enhanced Dashboard"
+VERSION_TIME = "17:00:00"
+VERSION_NAME = "Multi-User Auth + Deployment Limits"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -701,9 +701,6 @@ def check_recently_rebalanced(last_rebalanced_str):
 
 def calculate_average_cost(asset_data):
     """Calculate weighted average cost for an asset."""
-    allocated_pct = asset_data.get("allocated_pct", 0)
-    if allocated_pct < 100.0:
-        return None
     purchases = asset_data.get("purchases", [])
     if not purchases:
         return None
@@ -1549,121 +1546,148 @@ else:
                             remaining_pct = max(0, 100.0 - current_allocated)
                             target_pct = asset_data.get("target", 0)
                             
-                            # Calculate dollar amounts for clarity
+                            # Calculate dollar amounts - use ACTUAL spend from purchases
                             target_budget = (target_pct / 100) * prof['principal']
-                            deployed_amount = (current_allocated / 100) * target_budget
-                            remaining_budget = target_budget - deployed_amount
+                            purchases = asset_data.get("purchases", [])
+                            actual_spent = sum(p.get("amount", 0) for p in purchases)
+                            remaining_budget = max(0, target_budget - actual_spent)
                             
                             st.markdown(f"**{selected_ticker}:** Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
-                            st.caption(f"Deployed: ${deployed_amount:,.0f} ({current_allocated:.1f}%) • Remaining: ${max(0, remaining_budget):,.0f} ({remaining_pct:.1f}%)")
+                            st.caption(f"Deployed: ${actual_spent:,.0f} ({current_allocated:.1f}%) • Remaining: ${remaining_budget:,.0f} ({remaining_pct:.1f}%)")
                             
-                            # Deployment method selection
-                            deploy_method = st.radio("Deployment Method", ["By Percentage", "By Units"], 
-                                                    horizontal=True, key="deploy_method_radio")
-                            
-                            deploy_date = st.date_input("Deployment Date", value=date.today(),
-                                                       max_value=date.today(), key="deploy_date_input")
-                            
-                            # Fetch price for preview
-                            preview_price = None
-                            preview_price_date = None
-                            try:
-                                t_obj = yf.Ticker(selected_ticker)
-                                if deploy_date == date.today():
-                                    hist = t_obj.history(period="1d")
-                                else:
-                                    start_d = pd.to_datetime(deploy_date) - timedelta(days=7)
-                                    end_d = pd.to_datetime(deploy_date) + timedelta(days=1)
-                                    hist = t_obj.history(start=start_d, end=end_d)
-                                
-                                if not hist.empty:
-                                    hist.index = pd.to_datetime(hist.index).date
-                                    if deploy_date in hist.index:
-                                        preview_price = float(hist.loc[deploy_date]['Close'])
-                                        preview_price_date = deploy_date
-                                    else:
-                                        available_dates = [d for d in hist.index if d <= deploy_date]
-                                        if available_dates:
-                                            preview_price_date = max(available_dates)
-                                            preview_price = float(hist.loc[preview_price_date]['Close'])
-                            except:
-                                pass
-                            
-                            # Show price info
-                            if preview_price:
-                                p_flag = "🇺🇸" if prof.get("currency") == "USD" else "🇨🇦"
-                                st.info(f"📈 **Price on {preview_price_date}:** {p_flag} ${preview_price:,.2f}")
-                                if preview_price_date != deploy_date:
-                                    st.caption(f"ℹ️ Using {preview_price_date} price (closest trading day)")
-                            
-                            if deploy_method == "By Percentage":
-                                # Ensure default_pct is always >= min_value (0.1)
-                                default_pct = max(10.0, min(25.0, remaining_pct)) if remaining_pct > 0.1 else 10.0
-                                
-                                deploy_pct = st.number_input("Deploy % (of asset's target)", min_value=0.1, max_value=200.0,
-                                                            value=default_pct, step=0.1, key="deploy_pct_input")
-                                portfolio_pct = (deploy_pct / 100) * target_pct
-                                deploy_amount = (portfolio_pct / 100) * prof['principal']
-                                if preview_price:
-                                    estimated_units = deploy_amount / preview_price
+                            # Check if already fully deployed
+                            if remaining_pct < 0.1:
+                                st.success(f"✅ {selected_ticker} is fully deployed ({current_allocated:.1f}%)")
+                                if remaining_pct > 0:
+                                    st.caption(f"Remaining {remaining_pct:.2f}% is below minimum deployment threshold.")
+                                st.info("Select another asset to continue deploying.")
                             else:
-                                # By Units
-                                deploy_units = st.number_input("Number of Units", min_value=0.0001, value=1.0, 
-                                                              step=0.1, format="%.4f", key="deploy_units_input")
-                                if preview_price:
-                                    deploy_amount = deploy_units * preview_price
-                                    estimated_units = deploy_units
-                                    # Calculate equivalent deploy_pct
-                                    portfolio_pct = (deploy_amount / prof['principal']) * 100
-                                    deploy_pct = (portfolio_pct / target_pct) * 100 if target_pct > 0 else 0
-                                else:
-                                    deploy_amount = 0
-                                    estimated_units = deploy_units
-                                    deploy_pct = 0
-                            
-                            # Display deployment preview
-                            if preview_price:
-                                target_amount = (target_pct / 100) * prof['principal']
-                                already_deployed_amount = (current_allocated / 100) * target_amount
-                                new_total_pct = current_allocated + deploy_pct
+                                # Deployment method selection
+                                deploy_method = st.radio("Deployment Method", ["By Percentage", "By Units"], 
+                                                        horizontal=True, key="deploy_method_radio")
                                 
-                                st.markdown(f'''
-                                    <div class="buying-guide">
-                                        <div style="margin-bottom: 8px;"><strong>📊 Deployment Preview:</strong></div>
-                                        <div>• <strong>Units:</strong> <span class="buying-guide-highlight">{estimated_units:.4f} units</span></div>
-                                        <div>• <strong>Investment Amount:</strong> ${deploy_amount:,.2f}</div>
-                                        <div>• <strong>Asset Target Budget:</strong> ${target_amount:,.2f} ({target_pct}% of ${prof['principal']:,.0f})</div>
-                                        <div>• <strong>Already Deployed:</strong> ${already_deployed_amount:,.2f} ({current_allocated:.1f}%)</div>
-                                        <div>• <strong>After This Deploy:</strong> {new_total_pct:.1f}% of target</div>
-                                    </div>
-                                ''', unsafe_allow_html=True)
-                            else:
-                                st.warning(f"⚠️ Could not fetch price for {deploy_date}.")
-                            
-                            can_deploy = preview_price is not None and (
-                                (deploy_method == "By Percentage" and deploy_pct > 0) or
-                                (deploy_method == "By Units" and estimated_units > 0)
-                            )
-                            
-                            if st.button("📥 Record Deployment", type="primary", use_container_width=True, 
-                                        key="record_deploy_btn", disabled=not can_deploy):
+                                deploy_date = st.date_input("Deployment Date", value=date.today(),
+                                                           max_value=date.today(), key="deploy_date_input")
+                                
+                                # Fetch price for preview
+                                preview_price = None
+                                preview_price_date = None
                                 try:
-                                    price = preview_price
-                                    quantity = estimated_units
+                                    t_obj = yf.Ticker(selected_ticker)
+                                    if deploy_date == date.today():
+                                        hist = t_obj.history(period="1d")
+                                    else:
+                                        start_d = pd.to_datetime(deploy_date) - timedelta(days=7)
+                                        end_d = pd.to_datetime(deploy_date) + timedelta(days=1)
+                                        hist = t_obj.history(start=start_d, end=end_d)
                                     
-                                    purchase = {"date": str(deploy_date), "deploy_pct": deploy_pct,
-                                               "amount": deploy_amount, "price": price, "quantity": quantity}
-                                    asset_data.setdefault("purchases", []).append(purchase)
-                                    asset_data["units"] = asset_data.get("units", 0) + quantity
-                                    asset_data["allocated_pct"] = current_allocated + deploy_pct  # Track actual deployment
-                                    log_profile(prof, f"Deployed {quantity:.4f} units of {selected_ticker} (${deploy_amount:,.2f} @ ${price:.2f})")
-                                    save_db(st.session_state.db)
-                                    st.success(f"✅ Deployed {quantity:.4f} units of {selected_ticker} @ ${price:.2f}")
-                                    if asset_data['allocated_pct'] >= 100.0:
-                                        st.balloons()
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"❌ Error: {str(e)}")
+                                    if not hist.empty:
+                                        hist.index = pd.to_datetime(hist.index).date
+                                        if deploy_date in hist.index:
+                                            preview_price = float(hist.loc[deploy_date]['Close'])
+                                            preview_price_date = deploy_date
+                                        else:
+                                            available_dates = [d for d in hist.index if d <= deploy_date]
+                                            if available_dates:
+                                                preview_price_date = max(available_dates)
+                                                preview_price = float(hist.loc[preview_price_date]['Close'])
+                                except:
+                                    pass
+                                
+                                # Show price info
+                                if preview_price:
+                                    p_flag = "🇺🇸" if prof.get("currency") == "USD" else "🇨🇦"
+                                    st.info(f"📈 **Price on {preview_price_date}:** {p_flag} ${preview_price:,.2f}")
+                                    if preview_price_date != deploy_date:
+                                        st.caption(f"ℹ️ Using {preview_price_date} price (closest trading day)")
+                                
+                                # Initialize variables
+                                deploy_pct = 0
+                                deploy_amount = 0
+                                estimated_units = 0
+                                exceeds_limit = False
+                                
+                                if deploy_method == "By Percentage":
+                                    # Cap max at remaining_pct (guaranteed >= 0.1 due to check above)
+                                    default_pct = min(25.0, remaining_pct)
+                                    
+                                    deploy_pct = st.number_input("Deploy % (of asset's target)", min_value=0.1, max_value=max(0.1, remaining_pct),
+                                                                value=max(0.1, default_pct), step=0.1, key="deploy_pct_input")
+                                    portfolio_pct = (deploy_pct / 100) * target_pct
+                                    deploy_amount = (portfolio_pct / 100) * prof['principal']
+                                    if preview_price:
+                                        estimated_units = deploy_amount / preview_price
+                                else:
+                                    # By Units - calculate max units allowed
+                                    if preview_price:
+                                        max_units = remaining_budget / preview_price
+                                        st.caption(f"💡 Max units for remaining budget: {max_units:,.4f}")
+                                        
+                                        # Default to 1 unit or max_units, whichever is smaller
+                                        default_units = min(1.0, max(0.0001, max_units))
+                                        deploy_units = st.number_input("Number of Units", min_value=0.0001, value=default_units, 
+                                                                      step=0.1, format="%.4f", key="deploy_units_input")
+                                        
+                                        deploy_amount = deploy_units * preview_price
+                                        estimated_units = deploy_units
+                                        # Calculate equivalent deploy_pct
+                                        portfolio_pct = (deploy_amount / prof['principal']) * 100
+                                        deploy_pct = (portfolio_pct / target_pct) * 100 if target_pct > 0 else 0
+                                        
+                                        # Check if exceeds remaining
+                                        if deploy_pct > remaining_pct + 0.01:  # Small tolerance for rounding
+                                            exceeds_limit = True
+                                    else:
+                                        deploy_units = st.number_input("Number of Units", min_value=0.0001, value=1.0, 
+                                                                      step=0.1, format="%.4f", key="deploy_units_input")
+                                        deploy_amount = 0
+                                        estimated_units = deploy_units
+                                        deploy_pct = 0
+                                
+                                # Display deployment preview
+                                if preview_price:
+                                    new_total_pct = min(current_allocated + deploy_pct, 100.0)
+                                    new_total_spent = actual_spent + deploy_amount
+                                    
+                                    st.markdown(f'''
+                                        <div class="buying-guide">
+                                            <div style="margin-bottom: 8px;"><strong>📊 Deployment Preview:</strong></div>
+                                            <div>• <strong>Units:</strong> <span class="buying-guide-highlight">{estimated_units:.4f} units</span></div>
+                                            <div>• <strong>Investment Amount:</strong> ${deploy_amount:,.2f}</div>
+                                            <div>• <strong>Asset Target Budget:</strong> ${target_budget:,.2f} ({target_pct}% of ${prof['principal']:,.0f})</div>
+                                            <div>• <strong>Already Spent:</strong> ${actual_spent:,.2f} ({current_allocated:.1f}%)</div>
+                                            <div>• <strong>After This Deploy:</strong> ${new_total_spent:,.2f} ({new_total_pct:.1f}% of target)</div>
+                                        </div>
+                                    ''', unsafe_allow_html=True)
+                                    
+                                    # Warning if exceeds limit
+                                    if exceeds_limit:
+                                        over_amount = deploy_amount - remaining_budget
+                                        st.error(f"⚠️ This exceeds remaining budget by ${over_amount:,.2f}. Reduce units to max {remaining_budget/preview_price:,.4f}.")
+                                else:
+                                    st.warning(f"⚠️ Could not fetch price for {deploy_date}.")
+                                
+                                can_deploy = preview_price is not None and deploy_pct > 0 and not exceeds_limit
+                                
+                                if st.button("📥 Record Deployment", type="primary", use_container_width=True, 
+                                            key="record_deploy_btn", disabled=not can_deploy):
+                                    try:
+                                        price = preview_price
+                                        quantity = estimated_units
+                                        
+                                        purchase = {"date": str(deploy_date), "deploy_pct": deploy_pct,
+                                                   "amount": deploy_amount, "price": price, "quantity": quantity}
+                                        asset_data.setdefault("purchases", []).append(purchase)
+                                        asset_data["units"] = asset_data.get("units", 0) + quantity
+                                        asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)  # Cap at 100%
+                                        log_profile(prof, f"Deployed {quantity:.4f} units of {selected_ticker} (${deploy_amount:,.2f} @ ${price:.2f})")
+                                        save_db(st.session_state.db)
+                                        st.success(f"✅ Deployed {quantity:.4f} units of {selected_ticker} @ ${price:.2f}")
+                                        if asset_data['allocated_pct'] >= 100.0:
+                                            st.balloons()
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"❌ Error: {str(e)}")
             
             # Activity Log
             st.divider()
