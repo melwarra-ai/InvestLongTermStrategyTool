@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.1.5"
+VERSION = "6.1.6"
 VERSION_DATE = "2026-01-19"
-VERSION_TIME = "12:00:00"
-VERSION_NAME = "Multi-User Auth + Rebalance UX Improvements"
+VERSION_TIME = "13:00:00"
+VERSION_NAME = "Multi-User Auth + Exact & Rounded Shares Display"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2645,14 +2645,17 @@ else:
                             old_units = float(asset_dict[t]["units"])
                             new_units = float((asset_dict[t]["target"] / 100 * curr_v) / data[t].iloc[-1])
                             change_units = new_units - old_units
-                            # Round to whole units (can't buy/sell fractional shares at most brokers)
+                            # Store both exact and rounded (can't buy/sell fractional shares at most brokers)
                             change_units_rounded = round(change_units)
                             if abs(change_units_rounded) >= 1:
-                                action = "BUY" if change_units_rounded > 0 else "SELL"
+                                action = "BUY" if change_units > 0 else "SELL"
                                 current_price = float(data[t].iloc[-1])
                                 recommendations.append({
-                                    "ticker": t, "action": action, "shares": abs(change_units_rounded),
-                                    "estimated_price": current_price, "estimated_value": abs(change_units_rounded) * current_price
+                                    "ticker": t, "action": action, 
+                                    "exact_shares": abs(change_units),  # Precise calculation
+                                    "shares": abs(change_units_rounded),  # Rounded for execution
+                                    "estimated_price": current_price, 
+                                    "estimated_value": abs(change_units_rounded) * current_price
                                 })
                         store_rebalance_recommendation(prof, recommendations)
                         save_db(st.session_state.db)
@@ -2686,13 +2689,16 @@ else:
                         st.markdown("**Recommended Trades:**")
                         for rec in recommendations:
                             color = "🟢" if rec['action'] == "BUY" else "🔴"
-                            shares = int(rec['shares'])
-                            st.markdown(f"{color} **{rec['action']} {rec['ticker']}**: {shares:,} shares @ ~${rec['estimated_price']:.2f} (${rec['estimated_value']:.2f})")
+                            exact_shares = rec.get('exact_shares', rec['shares'])
+                            rounded_shares = int(rec['shares'])
+                            st.markdown(f"{color} **{rec['action']} {rec['ticker']}**: {exact_shares:.4f} shares → **Execute {rounded_shares:,} shares** @ ~${rec['estimated_price']:.2f} (${rec['estimated_value']:.2f})")
+                        
+                        st.info("💡 **Note:** Exact calculations shown with recommended whole units to execute at your broker.")
                         
                         st.markdown("""
                         **Next Steps:**
                         1. Go to your broker (Fidelity, IBKR, etc.)
-                        2. Execute the trades listed above
+                        2. Execute the **rounded** trades listed above
                         3. Note the **actual prices** you received
                         4. Return here and click **"✅ Execute Rebalance Now"**
                         """)
@@ -2720,9 +2726,11 @@ else:
                         actual_prices = {}
                         
                         for rec in recommendations:
-                            shares = int(rec['shares'])
-                            st.markdown(f"**{rec['action']} {rec['ticker']}** ({shares:,} shares)")
-                            st.caption(f"Estimated: ${rec['estimated_price']:.2f}")
+                            exact_shares = rec.get('exact_shares', rec['shares'])
+                            rounded_shares = int(rec['shares'])
+                            st.markdown(f"**{rec['action']} {rec['ticker']}**")
+                            st.caption(f"Calculated: {exact_shares:.4f} shares → **Execute: {rounded_shares:,} shares**")
+                            st.caption(f"Estimated price: ${rec['estimated_price']:.2f}")
                             actual_price = st.number_input(f"Actual price for {rec['ticker']}",
                                 min_value=0.01, value=float(rec['estimated_price']), step=0.01,
                                 format="%.2f", key=f"actual_price_{rec['ticker']}")
