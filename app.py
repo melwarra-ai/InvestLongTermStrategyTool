@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.1.0"
+VERSION = "6.1.1"
 VERSION_DATE = "2026-01-18"
-VERSION_TIME = "15:00:00"
-VERSION_NAME = "Multi-User Auth + Fixed Deploy Default"
+VERSION_TIME = "16:00:00"
+VERSION_NAME = "Multi-User Auth + Enhanced Dashboard"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2332,9 +2332,10 @@ else:
                 # Performance Chart
                 st.markdown("### 📈 Performance vs Goal Path")
                 benchmark_caption = f" & 100% {prof.get('benchmark', '')}" if prof.get('benchmark') else ""
-                st.caption(f"Track your portfolio's performance against target growth{benchmark_caption}")
+                st.caption(f"Track your portfolio's actual performance against your target growth trajectory{benchmark_caption}")
                 
                 fig = go.Figure()
+                benchmark_comparison_msg = None
                 
                 # Benchmark comparison
                 benchmark_ticker = prof.get('benchmark')
@@ -2348,19 +2349,38 @@ else:
                             benchmark_data = benchmark_data.dropna()
                             if len(benchmark_data) > 0:
                                 first_price = float(benchmark_data.iloc[0])
+                                last_price = float(benchmark_data.iloc[-1])
                                 benchmark_normalized = (benchmark_data / first_price) * start_val
-                                bench_return = ((float(benchmark_data.iloc[-1]) / first_price) - 1) * 100
+                                bench_return = ((last_price / first_price) - 1) * 100
+                                bench_final_value = float(benchmark_normalized.iloc[-1])
+                                
                                 fig.add_trace(go.Scatter(
                                     x=benchmark_data.index, y=benchmark_normalized,
                                     name=f'100% {benchmark_ticker} ({bench_return:+.1f}%)',
-                                    line=dict(color='#ef4444', width=3, dash='dot')
+                                    line=dict(color='#ef4444', width=3, dash='dot'),
+                                    hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
+                                                 '<b>Benchmark Value:</b> $%{y:,.0f}<br>' +
+                                                 f'<b>Ticker:</b> {benchmark_ticker}<br>' +
+                                                 f'<b>Return:</b> {bench_return:+.1f}%<br>' +
+                                                 '<extra></extra>'
                                 ))
+                                
+                                portfolio_vs_bench = curr_v - bench_final_value
+                                if portfolio_vs_bench > 0:
+                                    benchmark_comparison_msg = ("success", f"📊 Your portfolio outperformed {benchmark_ticker} by ${portfolio_vs_bench:,.0f} ({((curr_v/bench_final_value - 1)*100):+.1f}%)" if bench_final_value > 0 else f"📊 Your portfolio: ${curr_v:,.0f}")
+                                else:
+                                    benchmark_comparison_msg = ("info", f"📊 {benchmark_ticker} outperformed your portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)" if curr_v > 0 else f"📊 Benchmark: ${bench_final_value:,.0f}")
                     except:
                         pass
                 
                 # Actual portfolio
                 fig.add_trace(go.Scatter(x=data.index, y=daily_val, name='Actual Portfolio',
-                    line=dict(color='#3b82f6', width=3)))
+                    line=dict(color='#3b82f6', width=3),
+                    hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
+                                 '<b>Portfolio Value:</b> $%{y:,.2f}<br>' +
+                                 '<b>Performance:</b> Actual<br>' +
+                                 '<extra></extra>'
+                ))
                 
                 # Goal path
                 days = np.arange(len(data.index))
@@ -2368,36 +2388,103 @@ else:
                 target_path = start_val * (1 + daily_rate) ** days
                 fig.add_trace(go.Scatter(x=data.index, y=target_path,
                     name=f'Goal Path ({prof["yearly_goal_pct"]}%/yr)',
-                    line=dict(color='#10b981', width=2, dash='dash')))
+                    line=dict(color='#10b981', width=2, dash='dash'),
+                    hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
+                                 '<b>Target Value:</b> $%{y:,.2f}<br>' +
+                                 f'<b>Goal Rate:</b> {prof["yearly_goal_pct"]}% annually<br>' +
+                                 '<extra></extra>'
+                ))
                 
                 fig.update_layout(
                     hovermode='x unified', plot_bgcolor='white', height=550, showlegend=True,
-                    xaxis=dict(showgrid=True, gridcolor='#f1f5f9', title='Date'),
-                    yaxis=dict(showgrid=True, gridcolor='#f1f5f9', title='Portfolio Value ($)', tickformat='$,.0f'),
-                    legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5)
+                    hoverlabel=dict(bgcolor="white", font_size=14, font_family="Inter, sans-serif", bordercolor="#e2e8f0"),
+                    xaxis=dict(showgrid=True, gridcolor='#f1f5f9', title='Date', title_font=dict(size=14, color='#64748b'), tickfont=dict(size=11)),
+                    yaxis=dict(showgrid=True, gridcolor='#f1f5f9', title='Portfolio Value ($)', title_font=dict(size=14, color='#64748b'), tickfont=dict(size=11), tickformat='$,.0f'),
+                    legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5, font=dict(size=12), bgcolor='rgba(255,255,255,0.9)', bordercolor='#e2e8f0', borderwidth=1),
+                    margin=dict(l=70, r=40, t=20, b=80)
                 )
                 st.plotly_chart(fig, use_container_width=True)
+                
+                with st.expander("📊 Understanding This Chart", expanded=False):
+                    st.markdown("""
+                    **What the lines represent:**
+                    
+                    🔴 **Benchmark (Red dotted line)** *(if selected)*  
+                    Shows what would happen if you invested 100% in the market index at profile start.
+                    
+                    🔵 **Actual Portfolio (Blue solid line)**  
+                    Your portfolio's real performance based on actual asset prices and your holdings.
+                    
+                    🟢 **Goal Path (Green dashed line)**  
+                    Your target growth trajectory based on your yearly goal percentage.
+                    
+                    **Tips:**
+                    - Click any legend item to show/hide that line
+                    - Hover over the chart to see exact values at any date
+                    - Use the toolbar to zoom, pan, or save the chart
+                    """)
+                
+                if benchmark_comparison_msg:
+                    msg_type, msg_text = benchmark_comparison_msg
+                    if msg_type == "success":
+                        st.success(msg_text)
+                    else:
+                        st.info(msg_text)
                 
                 st.divider()
                 
                 # Holdings Table
-                st.markdown("### 📋 Current Holdings & Rebalancing Analysis")
+                st.markdown("### ⚖️ Rebalance Analysis")
+                st.caption("Review asset allocation drift and required trades to restore target percentages")
+                
+                with st.expander("ℹ️ Understanding the rebalance table", expanded=False):
+                    st.markdown("""
+                    **This table shows what trades are needed** to restore your target allocation.
+                    
+                    **Column Explanations:**
+                    - **Target %**: Your desired allocation for this asset (e.g., 25% means you want this asset to be 25% of your total portfolio)
+                    - **Deployed**: Deployment progress from 0-100% showing how much of YOUR PLANNED CAPITAL for this specific asset has been invested
+                        - 0% = haven't started buying this asset yet
+                        - 50% = halfway through planned purchases
+                        - 100% = finished all planned purchases for this asset
+                        - ⚠️ **NOTE:** This is NOT portfolio allocation percentage!
+                    - **Actual %**: Current portfolio percentage based on market values (changes with price movements)
+                    - **Drift**: Difference between Actual % and Target %
+                        - 🔴 Red = exceeds tolerance (action needed)
+                        - 🟡 Yellow = warning (close to tolerance)
+                        - 🟢 Green = within tolerance (good)
+                        - ⚠️ Gray = during deployment (drift tracking informational)
+                    - **Status**: Current state (Deploying = adding capital, Deployed = monitoring drift)
+                    
+                    **Example to clarify Deployed vs Actual %:**
+                    - You set Target % = 25% for SPXL (you want it to be 25% of your $100k portfolio = $25k)
+                    - You've bought $5k worth so far
+                    - Deployed = 20% (because $5k is 20% of your planned $25k target)
+                    - Actual % might be 4.7% (because $5k is 4.7% of your $100k portfolio right now)
+                    - As you buy more, Deployed increases toward 100%
+                    - When Deployed reaches 100%, you've invested the full $25k
+                    - Then Actual % will be near 25% (depending on whether other assets are also deployed)
+                    
+                    💡 **Key Insight:** "Deployed" tracks YOUR deployment progress (0-100%), while "Actual %" shows current market-based portfolio allocation
+                    
+                    💡 Use the two-step workflow below to rebalance with real broker prices
+                    """)
                 
                 column_config = {
-                    "Fund Name": st.column_config.TextColumn("Fund Name", width="large"),
-                    "Ticker": st.column_config.TextColumn("Ticker", width="small"),
-                    "Target %": st.column_config.TextColumn("Target %", width="small"),
-                    "Deployed": st.column_config.TextColumn("Deployed", width="small"),
-                    "Actual %": st.column_config.TextColumn("Actual %", width="small"),
-                    "Drift": st.column_config.TextColumn("Drift", width="small"),
-                    "Status": st.column_config.TextColumn("Status", width="medium"),
-                    "Avg Cost": st.column_config.TextColumn("Avg Cost", width="small"),
-                    "Units": st.column_config.TextColumn("Units", width="small"),
-                    "Current Price": st.column_config.TextColumn("Price", width="small"),
-                    "%Daily Change": st.column_config.TextColumn("%Change", width="small"),
-                    "Amount": st.column_config.TextColumn("Value", width="medium"),
-                    "Buy/Sell Amt": st.column_config.TextColumn("Trade Amt", width="medium"),
-                    "Buy/Sell Shares": st.column_config.TextColumn("Trade Shares", width="small")
+                    "Fund Name": st.column_config.TextColumn("Fund Name ℹ️", help="Full name of the investment fund or security", width="large"),
+                    "Ticker": st.column_config.TextColumn("Ticker ℹ️", help="Stock ticker symbol", width="small"),
+                    "Target %": st.column_config.TextColumn("Target % ℹ️", help="Your desired allocation percentage for this asset in the portfolio", width="small"),
+                    "Deployed": st.column_config.TextColumn("Deployed ℹ️", help="Deployment progress: 0-100% shows how much of your planned capital for THIS ASSET has been deployed (NOT portfolio allocation). 100% = fully deployed.", width="small"),
+                    "Actual %": st.column_config.TextColumn("Actual % ℹ️", help="Current portfolio percentage based on market values (this will differ from Target % due to price movements)", width="small"),
+                    "Drift": st.column_config.TextColumn("Drift ℹ️", help="Difference between Actual % and Target % (🔴 = exceeds tolerance and needs rebalancing, ⚠️ = still deploying)", width="small"),
+                    "Status": st.column_config.TextColumn("Status ℹ️", help="Current state: Deploying = still adding capital, Deployed = fully funded and monitoring drift", width="medium"),
+                    "Avg Cost": st.column_config.TextColumn("Avg Cost ℹ️", help="Weighted average cost per unit (calculated when 100% deployed)", width="small"),
+                    "Units": st.column_config.TextColumn("Units ℹ️", help="Total shares/units owned", width="small"),
+                    "Current Price": st.column_config.TextColumn("Price ℹ️", help="Latest market price per unit", width="small"),
+                    "%Daily Change": st.column_config.TextColumn("%Change ℹ️", help="Price change from previous trading day", width="small"),
+                    "Amount": st.column_config.TextColumn("Value ℹ️", help="Current market value (Units × Current Price)", width="medium"),
+                    "Buy/Sell Amt": st.column_config.TextColumn("Trade Amt ℹ️", help="Dollar amount to trade for rebalancing", width="medium"),
+                    "Buy/Sell Shares": st.column_config.TextColumn("Trade Shares ℹ️", help="Number of shares to buy (+) or sell (-)", width="small")
                 }
                 
                 rows = []
