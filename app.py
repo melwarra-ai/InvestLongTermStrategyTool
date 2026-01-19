@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.1.6"
+VERSION = "6.1.7"
 VERSION_DATE = "2026-01-19"
-VERSION_TIME = "13:00:00"
-VERSION_NAME = "Multi-User Auth + Exact & Rounded Shares Display"
+VERSION_TIME = "14:00:00"
+VERSION_NAME = "Multi-User Auth + Enhanced Performance Chart"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2021,18 +2021,69 @@ else:
                 if len(performance_data) > 1:
                     st.markdown("#### 📈 Portfolio Performance Comparison")
                     perf_sorted = sorted(performance_data, key=lambda x: x['total_return_pct'], reverse=True)
-                    colors = ['#10b981' if p['total_return_pct'] >= 0 else '#ef4444' for p in perf_sorted]
+                    
+                    # Enhanced color scheme - gradient based on performance
+                    def get_color(val, max_val, min_val):
+                        if val >= 0:
+                            # Green gradient for positive
+                            intensity = min(val / max(max_val, 1) * 0.7 + 0.3, 1.0)
+                            return f'rgba(16, 185, 129, {intensity})'
+                        else:
+                            # Red gradient for negative
+                            intensity = min(abs(val) / max(abs(min_val), 1) * 0.7 + 0.3, 1.0)
+                            return f'rgba(239, 68, 68, {intensity})'
+                    
+                    max_ret = max(p['total_return_pct'] for p in perf_sorted)
+                    min_ret = min(p['total_return_pct'] for p in perf_sorted)
+                    colors = [get_color(p['total_return_pct'], max_ret, min_ret) for p in perf_sorted]
                     
                     fig_perf = go.Figure()
                     fig_perf.add_trace(go.Bar(
                         x=[p['name'] for p in perf_sorted],
                         y=[p['total_return_pct'] for p in perf_sorted],
-                        marker_color=colors,
-                        text=[f"{p['total_return_pct']:+.1f}%" for p in perf_sorted],
-                        textposition='outside', width=0.4
+                        marker=dict(
+                            color=colors,
+                            line=dict(color='rgba(0,0,0,0.1)', width=1)
+                        ),
+                        text=[f"<b>{p['total_return_pct']:+.1f}%</b><br>${p['curr_val']:,.0f}" for p in perf_sorted],
+                        textposition='outside',
+                        textfont=dict(size=12),
+                        width=0.5,
+                        customdata=[[p['start_val'], p['curr_val'], p['total_return'], p['days_elapsed']] for p in perf_sorted],
+                        hovertemplate='<b>%{x}</b><br>' +
+                                     'Return: %{y:+.2f}%<br>' +
+                                     'Invested: $%{customdata[0]:,.0f}<br>' +
+                                     'Current: $%{customdata[1]:,.0f}<br>' +
+                                     'Gain/Loss: $%{customdata[2]:,.0f}<br>' +
+                                     'Days: %{customdata[3]}<br>' +
+                                     '<extra></extra>'
                     ))
-                    fig_perf.update_layout(height=400, showlegend=False, plot_bgcolor='white',
-                        xaxis=dict(title="Portfolio"), yaxis=dict(title="Total Return (%)", gridcolor='#f3f4f6'))
+                    
+                    # Add a zero line for reference
+                    fig_perf.add_hline(y=0, line_dash="dash", line_color="#94a3b8", line_width=1)
+                    
+                    fig_perf.update_layout(
+                        height=420,
+                        showlegend=False,
+                        plot_bgcolor='white',
+                        paper_bgcolor='white',
+                        margin=dict(t=40, b=60, l=60, r=40),
+                        xaxis=dict(
+                            title="Portfolio",
+                            title_font=dict(size=13, color='#64748b'),
+                            tickfont=dict(size=11, color='#334155'),
+                            showgrid=False
+                        ),
+                        yaxis=dict(
+                            title="Total Return (%)",
+                            title_font=dict(size=13, color='#64748b'),
+                            tickfont=dict(size=11),
+                            gridcolor='#f1f5f9',
+                            zerolinecolor='#94a3b8',
+                            tickformat='+.0f'
+                        ),
+                        hoverlabel=dict(bgcolor="white", font_size=13, bordercolor="#e2e8f0")
+                    )
                     st.plotly_chart(fig_perf, use_container_width=True)
             
             st.divider()
