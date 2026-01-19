@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.1.9"
+VERSION = "6.2.0"
 VERSION_DATE = "2026-01-19"
-VERSION_TIME = "15:00:00"
-VERSION_NAME = "Multi-User Auth + Fixed Hover Formatting"
+VERSION_TIME = "16:00:00"
+VERSION_NAME = "Multi-User Auth + Normalized Chart Comparison"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2475,11 +2475,19 @@ else:
                     except:
                         pass
                 
-                # Actual portfolio
-                fig.add_trace(go.Scatter(x=data.index, y=daily_val, name='Actual Portfolio',
+                # Actual portfolio - normalize to start at principal for fair comparison
+                first_portfolio_val = float(daily_val.iloc[0])
+                if first_portfolio_val > 0:
+                    portfolio_normalized = (daily_val / first_portfolio_val) * start_val
+                else:
+                    portfolio_normalized = daily_val
+                
+                portfolio_return = ((float(portfolio_normalized.iloc[-1]) / start_val) - 1) * 100
+                fig.add_trace(go.Scatter(x=data.index, y=portfolio_normalized, 
+                    name=f'Actual Portfolio ({portfolio_return:+.1f}%)',
                     line=dict(color='#3b82f6', width=3),
                     hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
-                                 '<b>Portfolio Value:</b> $%{y:,.2f}<br>' +
+                                 '<b>Portfolio Value:</b> $%{y:,.0f}<br>' +
                                  '<b>Performance:</b> Actual<br>' +
                                  '<extra></extra>'
                 ))
@@ -2508,17 +2516,20 @@ else:
                 st.plotly_chart(fig, use_container_width=True)
                 
                 with st.expander("📊 Understanding This Chart", expanded=False):
-                    st.markdown("""
+                    st.markdown(f"""
                     **What the lines represent:**
                     
+                    All lines start at your principal (${start_val:,.0f}) for a fair "apples-to-apples" comparison.
+                    
                     🔴 **Benchmark (Red dotted line)** *(if selected)*  
-                    Shows what would happen if you invested 100% in the market index at profile start.
+                    Shows growth if you invested 100% in the benchmark index from day one.
                     
                     🔵 **Actual Portfolio (Blue solid line)**  
-                    Your portfolio's real performance based on actual asset prices and your holdings.
+                    Your portfolio's relative performance - normalized to show how your asset mix 
+                    would have grown from the principal value.
                     
                     🟢 **Goal Path (Green dashed line)**  
-                    Your target growth trajectory based on your yearly goal percentage.
+                    Your target growth trajectory based on your yearly goal of {prof['yearly_goal_pct']}%.
                     
                     **Tips:**
                     - Click any legend item to show/hide that line
