@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.1.7"
+VERSION = "6.1.8"
 VERSION_DATE = "2026-01-19"
-VERSION_TIME = "14:00:00"
-VERSION_NAME = "Multi-User Auth + Enhanced Performance Chart"
+VERSION_TIME = "14:30:00"
+VERSION_NAME = "Multi-User Auth + Rounded Hover Values"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2051,11 +2051,11 @@ else:
                         width=0.5,
                         customdata=[[p['start_val'], p['curr_val'], p['total_return'], p['days_elapsed']] for p in perf_sorted],
                         hovertemplate='<b>%{x}</b><br>' +
-                                     'Return: %{y:+.2f}%<br>' +
+                                     'Return: %{y:+.1f}%<br>' +
                                      'Invested: $%{customdata[0]:,.0f}<br>' +
                                      'Current: $%{customdata[1]:,.0f}<br>' +
-                                     'Gain/Loss: $%{customdata[2]:,.0f}<br>' +
-                                     'Days: %{customdata[3]}<br>' +
+                                     'Gain/Loss: $%{customdata[2]:+,.0f}<br>' +
+                                     'Days: %{customdata[3]:,.0f}<br>' +
                                      '<extra></extra>'
                     ))
                     
