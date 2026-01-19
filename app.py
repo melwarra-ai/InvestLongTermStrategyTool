@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.1.3"
+VERSION = "6.1.4"
 VERSION_DATE = "2026-01-19"
-VERSION_TIME = "10:00:00"
-VERSION_NAME = "Multi-User Auth + Whole Units & Status Fixes"
+VERSION_TIME = "11:00:00"
+VERSION_NAME = "Multi-User Auth + Consistent Deploy Threshold"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1507,8 +1507,9 @@ else:
                 st.info("🔒 **Lock your asset mix first**")
             else:
                 assets = prof.get("assets", {})
-                deployable_assets = {t: d for t, d in assets.items() if d.get("allocated_pct", 0) < 100.0}
-                fully_deployed_count = sum(1 for a in assets.values() if a.get("allocated_pct", 0) >= 100.0)
+                # Use 99.5% threshold consistently (same as table "Deployed" status)
+                deployable_assets = {t: d for t, d in assets.items() if d.get("allocated_pct", 0) < 99.5}
+                fully_deployed_count = sum(1 for a in assets.values() if a.get("allocated_pct", 0) >= 99.5)
                 total_assets = len(assets)
                 
                 st.markdown(f"**Progress:** {fully_deployed_count}/{total_assets} assets fully deployed")
@@ -1825,8 +1826,8 @@ else:
             for p_name, p_data in profiles.items():
                 p_assets = p_data.get("assets", {})
                 needs_rebal, drift_details = calculate_drift_status(p_data, prices)
-                all_deployed = all(a.get("allocated_pct", 0) >= 100.0 for a in p_assets.values()) if p_assets else False
-                deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
+                all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in p_assets.values()) if p_assets else False
+                deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 99.5)
                 total_assets = len(p_assets)
                 
                 if needs_rebal:
@@ -1839,7 +1840,7 @@ else:
                         "action": "Click profile to view details and execute rebalance"
                     })
                 elif not all_deployed and total_assets > 0:
-                    remaining = [(t, a.get("allocated_pct", 0)) for t, a in p_assets.items() if a.get("allocated_pct", 0) < 100.0]
+                    remaining = [(t, a.get("allocated_pct", 0)) for t, a in p_assets.items() if a.get("allocated_pct", 0) < 99.5]
                     action_items.append({
                         "priority": 2, "type": "deployment", "profile": p_name,
                         "message": f"📥 IN PROGRESS - {p_name} deployment ({deployed_count}/{total_assets} assets)",
@@ -1903,7 +1904,7 @@ else:
                 cagr = ((curr_v / start_val) ** (1 / years_elapsed) - 1) * 100 if start_val > 0 else 0
                 
                 p_flag = "🇺🇸" if p_data.get("currency") == "USD" else "🇨🇦"
-                all_deployed = all(a.get("allocated_pct", 0) >= 100.0 for a in p_assets.values()) if p_assets else False
+                all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in p_assets.values()) if p_assets else False
                 
                 if recently_rebalanced or (has_rebalanced and not needs_rebal):
                     tile_class = "profile-tile-optimized"
@@ -1913,7 +1914,7 @@ else:
                     status_badge = '<span class="drift-badge">🚨 REBALANCE</span>'
                 elif not all_deployed and len(p_assets) > 0:
                     tile_class = "profile-tile"
-                    deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
+                    deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 99.5)
                     status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem;">📥 Deploying ({deployed_count}/{len(p_assets)})</span>'
                 elif all_deployed:
                     tile_class = "profile-tile-optimized"
@@ -2130,8 +2131,8 @@ else:
                 cagr = ((curr_val / start_val) ** (1 / years) - 1) * 100 if start_val > 0 else 0
                 
                 needs_rebal, _ = calculate_drift_status(p_data, prices)
-                all_deployed = all(a.get("allocated_pct", 0) >= 100.0 for a in p_assets.values()) if p_assets else False
-                deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 100.0)
+                all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in p_assets.values()) if p_assets else False
+                deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 99.5)
                 total_assets = len(p_assets)
                 
                 if needs_rebal:
@@ -2186,9 +2187,9 @@ else:
             st.warning("⚠️ **Asset mix not locked** - Define and lock assets first")
         else:
             assets = prof.get("assets", {})
-            all_deployed = all(a.get("allocated_pct", 0) >= 100.0 for a in assets.values())
+            all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in assets.values())
             if assets and not all_deployed:
-                partial = [(t, a.get("allocated_pct", 0)) for t, a in assets.items() if a.get("allocated_pct", 0) < 100.0]
+                partial = [(t, a.get("allocated_pct", 0)) for t, a in assets.items() if a.get("allocated_pct", 0) < 99.5]
                 st.info(f"📊 **Deployment in progress** - {len(partial)} asset(s) not fully deployed")
             elif assets and all_deployed:
                 st.success("✅ **All assets deployed** - Portfolio drift monitoring active")
@@ -2212,7 +2213,7 @@ else:
             else:
                 assets = prof.get("assets", {})
                 if assets:
-                    deployed_count = sum(1 for a in assets.values() if a.get("allocated_pct", 0) >= 100.0)
+                    deployed_count = sum(1 for a in assets.values() if a.get("allocated_pct", 0) >= 99.5)
                     total_count = len(assets)
                     if deployed_count < total_count:
                         st.metric("Deployment", f"{deployed_count}/{total_count}", delta="In Progress", delta_color="off")
