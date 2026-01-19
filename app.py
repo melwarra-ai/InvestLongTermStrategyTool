@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.1.8"
+VERSION = "6.1.9"
 VERSION_DATE = "2026-01-19"
-VERSION_TIME = "14:30:00"
-VERSION_NAME = "Multi-User Auth + Rounded Hover Values"
+VERSION_TIME = "15:00:00"
+VERSION_NAME = "Multi-User Auth + Fixed Hover Formatting"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2049,13 +2049,19 @@ else:
                         textposition='outside',
                         textfont=dict(size=12),
                         width=0.5,
-                        customdata=[[p['start_val'], p['curr_val'], p['total_return'], p['days_elapsed']] for p in perf_sorted],
+                        customdata=[[
+                            f"{p['total_return_pct']:+.1f}%",
+                            f"${p['start_val']:,.0f}",
+                            f"${p['curr_val']:,.0f}",
+                            f"${p['total_return']:+,.0f}",
+                            f"{p['days_elapsed']:.0f}"
+                        ] for p in perf_sorted],
                         hovertemplate='<b>%{x}</b><br>' +
-                                     'Return: %{y:+.1f}%<br>' +
-                                     'Invested: $%{customdata[0]:,.0f}<br>' +
-                                     'Current: $%{customdata[1]:,.0f}<br>' +
-                                     'Gain/Loss: $%{customdata[2]:+,.0f}<br>' +
-                                     'Days: %{customdata[3]:,.0f}<br>' +
+                                     'Return: %{customdata[0]}<br>' +
+                                     'Invested: %{customdata[1]}<br>' +
+                                     'Current: %{customdata[2]}<br>' +
+                                     'Gain/Loss: %{customdata[3]}<br>' +
+                                     'Days: %{customdata[4]}<br>' +
                                      '<extra></extra>'
                     ))
                     
