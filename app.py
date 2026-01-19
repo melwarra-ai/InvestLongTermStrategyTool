@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.1.2"
-VERSION_DATE = "2026-01-18"
-VERSION_TIME = "17:00:00"
-VERSION_NAME = "Multi-User Auth + Deployment Limits"
+VERSION = "6.1.3"
+VERSION_DATE = "2026-01-19"
+VERSION_TIME = "10:00:00"
+VERSION_NAME = "Multi-User Auth + Whole Units & Status Fixes"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1552,13 +1552,17 @@ else:
                             actual_spent = sum(p.get("amount", 0) for p in purchases)
                             remaining_budget = max(0, target_budget - actual_spent)
                             
-                            st.markdown(f"**{selected_ticker}:** Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
-                            st.caption(f"Deployed: ${actual_spent:,.0f} ({current_allocated:.1f}%) • Remaining: ${remaining_budget:,.0f} ({remaining_pct:.1f}%)")
+                            # Display with consistent rounding
+                            display_allocated = min(round(current_allocated), 100)
+                            display_remaining = max(round(remaining_pct), 0)
                             
-                            # Check if already fully deployed
-                            if remaining_pct < 0.1:
-                                st.success(f"✅ {selected_ticker} is fully deployed ({current_allocated:.1f}%)")
-                                if remaining_pct > 0:
+                            st.markdown(f"**{selected_ticker}:** Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
+                            st.caption(f"Deployed: ${actual_spent:,.0f} ({display_allocated}%) • Remaining: ${remaining_budget:,.0f} ({display_remaining}%)")
+                            
+                            # Check if already fully deployed (use 99.5% as threshold, matching table)
+                            if current_allocated >= 99.5 or remaining_pct < 0.5:
+                                st.success(f"✅ {selected_ticker} is fully deployed ({min(current_allocated, 100):.0f}%)")
+                                if remaining_pct > 0 and remaining_pct < 0.5:
                                     st.caption(f"Remaining {remaining_pct:.2f}% is below minimum deployment threshold.")
                                 st.info("Select another asset to continue deploying.")
                             else:
@@ -1616,30 +1620,45 @@ else:
                                     portfolio_pct = (deploy_pct / 100) * target_pct
                                     deploy_amount = (portfolio_pct / 100) * prof['principal']
                                     if preview_price:
-                                        estimated_units = deploy_amount / preview_price
+                                        # Round to whole units (can't buy fractional shares)
+                                        estimated_units = round(deploy_amount / preview_price)
+                                        if estimated_units < 1:
+                                            st.warning(f"⚠️ This percentage results in less than 1 unit. Increase the percentage or use 'By Units' with 1 unit.")
+                                            estimated_units = 0
+                                            deploy_amount = 0
+                                        else:
+                                            # Recalculate actual amount based on whole units
+                                            deploy_amount = estimated_units * preview_price
                                 else:
-                                    # By Units - calculate max units allowed
+                                    # By Units - calculate max units allowed (whole units only)
                                     if preview_price:
-                                        max_units = remaining_budget / preview_price
-                                        st.caption(f"💡 Max units for remaining budget: {max_units:,.4f}")
+                                        max_units = int(remaining_budget / preview_price)
                                         
-                                        # Default to 1 unit or max_units, whichever is smaller
-                                        default_units = min(1.0, max(0.0001, max_units))
-                                        deploy_units = st.number_input("Number of Units", min_value=0.0001, value=default_units, 
-                                                                      step=0.1, format="%.4f", key="deploy_units_input")
-                                        
-                                        deploy_amount = deploy_units * preview_price
-                                        estimated_units = deploy_units
-                                        # Calculate equivalent deploy_pct
-                                        portfolio_pct = (deploy_amount / prof['principal']) * 100
-                                        deploy_pct = (portfolio_pct / target_pct) * 100 if target_pct > 0 else 0
-                                        
-                                        # Check if exceeds remaining
-                                        if deploy_pct > remaining_pct + 0.01:  # Small tolerance for rounding
-                                            exceeds_limit = True
+                                        if max_units < 1:
+                                            st.warning(f"⚠️ Remaining budget (${remaining_budget:,.2f}) is less than 1 unit (${preview_price:,.2f}). Use 'By Percentage' or select another asset.")
+                                            estimated_units = 0
+                                            deploy_amount = 0
+                                            deploy_pct = 0
+                                        else:
+                                            st.caption(f"💡 Max whole units for remaining budget: {max_units:,}")
+                                            
+                                            # Default to 1 unit or max_units, whichever is smaller
+                                            default_units = min(1, max_units)
+                                            deploy_units = st.number_input("Number of Units", min_value=1, max_value=max_units,
+                                                                          value=default_units, step=1, key="deploy_units_input")
+                                            
+                                            deploy_amount = deploy_units * preview_price
+                                            estimated_units = deploy_units
+                                            # Calculate equivalent deploy_pct
+                                            portfolio_pct = (deploy_amount / prof['principal']) * 100
+                                            deploy_pct = (portfolio_pct / target_pct) * 100 if target_pct > 0 else 0
+                                            
+                                            # Check if exceeds remaining (shouldn't happen with max_value set)
+                                            if deploy_pct > remaining_pct + 0.01:
+                                                exceeds_limit = True
                                     else:
-                                        deploy_units = st.number_input("Number of Units", min_value=0.0001, value=1.0, 
-                                                                      step=0.1, format="%.4f", key="deploy_units_input")
+                                        deploy_units = st.number_input("Number of Units", min_value=1, value=1, 
+                                                                      step=1, key="deploy_units_input")
                                         deploy_amount = 0
                                         estimated_units = deploy_units
                                         deploy_pct = 0
@@ -1652,7 +1671,7 @@ else:
                                     st.markdown(f'''
                                         <div class="buying-guide">
                                             <div style="margin-bottom: 8px;"><strong>📊 Deployment Preview:</strong></div>
-                                            <div>• <strong>Units:</strong> <span class="buying-guide-highlight">{estimated_units:.4f} units</span></div>
+                                            <div>• <strong>Units:</strong> <span class="buying-guide-highlight">{int(estimated_units):,} units</span></div>
                                             <div>• <strong>Investment Amount:</strong> ${deploy_amount:,.2f}</div>
                                             <div>• <strong>Asset Target Budget:</strong> ${target_budget:,.2f} ({target_pct}% of ${prof['principal']:,.0f})</div>
                                             <div>• <strong>Already Spent:</strong> ${actual_spent:,.2f} ({current_allocated:.1f}%)</div>
@@ -1663,26 +1682,27 @@ else:
                                     # Warning if exceeds limit
                                     if exceeds_limit:
                                         over_amount = deploy_amount - remaining_budget
-                                        st.error(f"⚠️ This exceeds remaining budget by ${over_amount:,.2f}. Reduce units to max {remaining_budget/preview_price:,.4f}.")
+                                        max_whole_units = int(remaining_budget / preview_price)
+                                        st.error(f"⚠️ This exceeds remaining budget by ${over_amount:,.2f}. Max units: {max_whole_units:,}.")
                                 else:
                                     st.warning(f"⚠️ Could not fetch price for {deploy_date}.")
                                 
-                                can_deploy = preview_price is not None and deploy_pct > 0 and not exceeds_limit
+                                can_deploy = preview_price is not None and deploy_pct > 0 and not exceeds_limit and estimated_units >= 1
                                 
                                 if st.button("📥 Record Deployment", type="primary", use_container_width=True, 
                                             key="record_deploy_btn", disabled=not can_deploy):
                                     try:
                                         price = preview_price
-                                        quantity = estimated_units
+                                        quantity = int(estimated_units)  # Ensure whole units
                                         
                                         purchase = {"date": str(deploy_date), "deploy_pct": deploy_pct,
                                                    "amount": deploy_amount, "price": price, "quantity": quantity}
                                         asset_data.setdefault("purchases", []).append(purchase)
                                         asset_data["units"] = asset_data.get("units", 0) + quantity
                                         asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)  # Cap at 100%
-                                        log_profile(prof, f"Deployed {quantity:.4f} units of {selected_ticker} (${deploy_amount:,.2f} @ ${price:.2f})")
+                                        log_profile(prof, f"Deployed {quantity:,} units of {selected_ticker} (${deploy_amount:,.2f} @ ${price:.2f})")
                                         save_db(st.session_state.db)
-                                        st.success(f"✅ Deployed {quantity:.4f} units of {selected_ticker} @ ${price:.2f}")
+                                        st.success(f"✅ Deployed {quantity:,} units of {selected_ticker} @ ${price:.2f}")
                                         if asset_data['allocated_pct'] >= 100.0:
                                             st.balloons()
                                         st.rerun()
@@ -2549,25 +2569,28 @@ else:
                     total_turnover += abs(val_diff)
                     total_current_val += act_val
                     
-                    if allocated_pct < 100.0:
-                        drift_display = f"⚠️ {drift:+.2f}%"
-                        status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
+                    # Drift color - always apply based on drift magnitude
+                    drift_tolerance = prof.get("drift_tolerance", 5.0)
+                    if abs(drift) >= drift_tolerance:
+                        drift_display = f"🔴 {drift:+.2f}%"
+                    elif abs(drift) >= drift_tolerance * 0.6:  # Warning at 60% of tolerance
+                        drift_display = f"🟡 {drift:+.2f}%"
                     else:
-                        if abs(drift) >= prof.get("drift_tolerance", 5.0):
-                            drift_display = f"🔴 {drift:+.2f}%"
-                        elif abs(drift) > 0.5:
-                            drift_display = f"🟡 {drift:+.2f}%"
-                        else:
-                            drift_display = f"🟢 {drift:+.2f}%"
+                        drift_display = f"🟢 {drift:+.2f}%"
+                    
+                    # Status - use 99.5 threshold for "fully deployed"
+                    if allocated_pct >= 99.5:
                         status_display = "✅ Deployed"
+                    else:
+                        status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
                     
                     rows.append({
                         "Fund Name": fund_name, "Ticker": t, "Target %": f"{tar_w:.2f}%",
-                        "Deployed": f"{allocated_pct:.0f}%", "Actual %": f"{act_w:.2f}%",
+                        "Deployed": f"{min(allocated_pct, 100):.0f}%", "Actual %": f"{act_w:.2f}%",
                         "Drift": drift_display, "Status": status_display, "Avg Cost": avg_cost_display,
                         "Units": f"{cur_u:.0f}", "Current Price": f"${current_price:.2f}",
                         "%Daily Change": f"{daily_change_pct:+.2f}%", "Amount": f"${act_val:,.0f}",
-                        "Buy/Sell Amt": f"${abs(val_diff):,.0f}", "Buy/Sell Shares": f"{unit_diff:+.0f}"
+                        "Buy/Sell Amt": f"${abs(val_diff):,.0f}", "Buy/Sell Shares": f"{round(unit_diff):+.0f}"
                     })
                 
                 rows.append({
