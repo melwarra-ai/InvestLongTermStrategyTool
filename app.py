@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.2.2"
+VERSION = "6.3.0"
 VERSION_DATE = "2026-01-19"
-VERSION_TIME = "18:00:00"
-VERSION_NAME = "Multi-User Auth + Fixed Benchmark Comparison"
+VERSION_TIME = "19:00:00"
+VERSION_NAME = "Multi-User Auth + Risk Metrics & Goal Tracker"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2028,9 +2028,240 @@ else:
                 
                 st.markdown("")
                 
+                # === NEW FEATURE 1: Risk Metrics ===
+                st.markdown("#### 📉 Risk Metrics")
+                st.caption("Key risk indicators across all portfolios (based on historical data)")
+                
+                # Fetch historical data for risk calculations
+                try:
+                    earliest_date = min(p['start_date'] for p in performance_data)
+                    all_portfolio_tickers = set()
+                    for p_data in profiles.values():
+                        all_portfolio_tickers.update(p_data.get("assets", {}).keys())
+                    
+                    if all_portfolio_tickers:
+                        hist_data = yf.download(list(all_portfolio_tickers), start=str(earliest_date), auto_adjust=True, progress=False)['Close']
+                        if isinstance(hist_data, pd.Series):
+                            hist_data = hist_data.to_frame(name=list(all_portfolio_tickers)[0])
+                        
+                        # Calculate combined portfolio daily values
+                        combined_daily = pd.Series(0.0, index=hist_data.index)
+                        for p_name, p_data in profiles.items():
+                            p_assets = p_data.get("assets", {})
+                            for ticker, asset in p_assets.items():
+                                if ticker in hist_data.columns:
+                                    units = float(asset.get("units", 0))
+                                    combined_daily += hist_data[ticker].ffill() * units
+                        
+                        combined_daily = combined_daily[combined_daily > 0]
+                        
+                        if len(combined_daily) > 20:
+                            # Calculate daily returns
+                            daily_returns = combined_daily.pct_change().dropna()
+                            
+                            # Volatility (annualized)
+                            volatility = daily_returns.std() * np.sqrt(252) * 100
+                            
+                            # Max Drawdown
+                            cumulative = (1 + daily_returns).cumprod()
+                            rolling_max = cumulative.expanding().max()
+                            drawdowns = (cumulative - rolling_max) / rolling_max
+                            max_drawdown = drawdowns.min() * 100
+                            
+                            # Sharpe Ratio (assuming 5% risk-free rate)
+                            risk_free_rate = 0.05
+                            excess_returns = daily_returns.mean() * 252 - risk_free_rate
+                            sharpe_ratio = excess_returns / (daily_returns.std() * np.sqrt(252)) if daily_returns.std() > 0 else 0
+                            
+                            # Best/Worst Day
+                            best_day = daily_returns.max() * 100
+                            worst_day = daily_returns.min() * 100
+                            
+                            col_r1, col_r2, col_r3, col_r4, col_r5 = st.columns(5)
+                            with col_r1:
+                                vol_color = "#10b981" if volatility < 15 else "#f59e0b" if volatility < 25 else "#ef4444"
+                                st.markdown(f'''
+                                    <div style="background: white; border: 2px solid {vol_color}; padding: 16px; border-radius: 10px; text-align: center;">
+                                        <div style="font-size: 12px; color: #64748b;">📊 Volatility</div>
+                                        <div style="font-size: 24px; font-weight: 700; color: {vol_color};">{volatility:.1f}%</div>
+                                        <div style="font-size: 10px; color: #94a3b8;">Annualized</div>
+                                    </div>
+                                ''', unsafe_allow_html=True)
+                            with col_r2:
+                                dd_color = "#10b981" if max_drawdown > -10 else "#f59e0b" if max_drawdown > -20 else "#ef4444"
+                                st.markdown(f'''
+                                    <div style="background: white; border: 2px solid {dd_color}; padding: 16px; border-radius: 10px; text-align: center;">
+                                        <div style="font-size: 12px; color: #64748b;">📉 Max Drawdown</div>
+                                        <div style="font-size: 24px; font-weight: 700; color: {dd_color};">{max_drawdown:.1f}%</div>
+                                        <div style="font-size: 10px; color: #94a3b8;">Peak to trough</div>
+                                    </div>
+                                ''', unsafe_allow_html=True)
+                            with col_r3:
+                                sr_color = "#10b981" if sharpe_ratio > 1 else "#f59e0b" if sharpe_ratio > 0.5 else "#ef4444"
+                                st.markdown(f'''
+                                    <div style="background: white; border: 2px solid {sr_color}; padding: 16px; border-radius: 10px; text-align: center;">
+                                        <div style="font-size: 12px; color: #64748b;">⚖️ Sharpe Ratio</div>
+                                        <div style="font-size: 24px; font-weight: 700; color: {sr_color};">{sharpe_ratio:.2f}</div>
+                                        <div style="font-size: 10px; color: #94a3b8;">Risk-adjusted</div>
+                                    </div>
+                                ''', unsafe_allow_html=True)
+                            with col_r4:
+                                st.markdown(f'''
+                                    <div style="background: white; border: 2px solid #10b981; padding: 16px; border-radius: 10px; text-align: center;">
+                                        <div style="font-size: 12px; color: #64748b;">🚀 Best Day</div>
+                                        <div style="font-size: 24px; font-weight: 700; color: #10b981;">{best_day:+.1f}%</div>
+                                        <div style="font-size: 10px; color: #94a3b8;">Single day</div>
+                                    </div>
+                                ''', unsafe_allow_html=True)
+                            with col_r5:
+                                st.markdown(f'''
+                                    <div style="background: white; border: 2px solid #ef4444; padding: 16px; border-radius: 10px; text-align: center;">
+                                        <div style="font-size: 12px; color: #64748b;">💥 Worst Day</div>
+                                        <div style="font-size: 24px; font-weight: 700; color: #ef4444;">{worst_day:+.1f}%</div>
+                                        <div style="font-size: 10px; color: #94a3b8;">Single day</div>
+                                    </div>
+                                ''', unsafe_allow_html=True)
+                            
+                            with st.expander("ℹ️ Understanding Risk Metrics"):
+                                st.markdown("""
+                                - **Volatility**: How much your portfolio value fluctuates. Lower is more stable. <15% is low, >25% is high.
+                                - **Max Drawdown**: Largest peak-to-trough decline. Shows worst-case loss experienced.
+                                - **Sharpe Ratio**: Return per unit of risk. >1 is good, >2 is excellent, <0.5 is poor.
+                                - **Best/Worst Day**: Single-day extremes show tail risk exposure.
+                                """)
+                            
+                            st.markdown("")
+                            
+                            # === NEW FEATURE 2: Combined Portfolio Timeline ===
+                            st.markdown("#### 📈 Combined Wealth Timeline")
+                            st.caption("Total portfolio value over time across all strategies")
+                            
+                            fig_combined = go.Figure()
+                            
+                            # Normalize to start at total principal
+                            first_val = float(combined_daily.iloc[0])
+                            combined_normalized = (combined_daily / first_val) * total_invested
+                            combined_return = ((float(combined_normalized.iloc[-1]) / total_invested) - 1) * 100
+                            
+                            # Combined portfolio line
+                            fig_combined.add_trace(go.Scatter(
+                                x=combined_daily.index, y=combined_normalized,
+                                name=f'Total Portfolio ({combined_return:+.1f}%)',
+                                line=dict(color='#3b82f6', width=3),
+                                fill='tozeroy',
+                                fillcolor='rgba(59, 130, 246, 0.1)',
+                                hovertemplate='<b>%{x|%Y-%m-%d}</b><br>Value: $%{y:,.0f}<extra></extra>'
+                            ))
+                            
+                            # Add individual portfolio lines (thinner, for reference)
+                            portfolio_colors = ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+                            for idx, (p_name, p_data) in enumerate(profiles.items()):
+                                p_assets = p_data.get("assets", {})
+                                p_daily = pd.Series(0.0, index=hist_data.index)
+                                for ticker, asset in p_assets.items():
+                                    if ticker in hist_data.columns:
+                                        units = float(asset.get("units", 0))
+                                        p_daily += hist_data[ticker].ffill() * units
+                                p_daily = p_daily[p_daily > 0]
+                                if len(p_daily) > 0:
+                                    p_first = float(p_daily.iloc[0])
+                                    p_principal = float(p_data.get('principal', p_first))
+                                    p_normalized = (p_daily / p_first) * p_principal
+                                    p_return = ((float(p_normalized.iloc[-1]) / p_principal) - 1) * 100
+                                    color = portfolio_colors[idx % len(portfolio_colors)]
+                                    fig_combined.add_trace(go.Scatter(
+                                        x=p_daily.index, y=p_normalized,
+                                        name=f'{p_name} ({p_return:+.1f}%)',
+                                        line=dict(color=color, width=1.5, dash='dot'),
+                                        hovertemplate=f'<b>{p_name}</b><br>' + '%{x|%Y-%m-%d}<br>Value: $%{y:,.0f}<extra></extra>'
+                                    ))
+                            
+                            fig_combined.update_layout(
+                                height=400, plot_bgcolor='white', hovermode='x unified',
+                                xaxis=dict(title='Date', showgrid=True, gridcolor='#f1f5f9'),
+                                yaxis=dict(title='Portfolio Value ($)', showgrid=True, gridcolor='#f1f5f9', tickformat='$,.0f'),
+                                legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
+                                margin=dict(l=60, r=40, t=20, b=60)
+                            )
+                            st.plotly_chart(fig_combined, use_container_width=True)
+                except Exception as e:
+                    st.caption(f"📊 Risk metrics require more historical data")
+                
+                st.markdown("")
+                
+                # === NEW FEATURE 3: Goal Progress Tracker ===
+                st.markdown("#### 🎯 Goal Progress Tracker")
+                st.caption("Track progress toward your investment goals")
+                
+                for p_name, p_data in profiles.items():
+                    p_assets = p_data.get("assets", {})
+                    curr_val = float(sum(p_assets[t]["units"] * prices.get(t, 0) for t in p_assets))
+                    start_val = float(p_data.get('principal', 0))
+                    goal_pct = float(p_data.get('yearly_goal_pct', 10))
+                    
+                    start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d').date()
+                    years_elapsed = max((date.today() - start_date).days / 365.25, 0.01)
+                    
+                    # Calculate target value based on goal rate
+                    target_now = start_val * ((1 + goal_pct/100) ** years_elapsed)
+                    
+                    # Project when they'll hit 2x their principal at goal rate
+                    goal_target = start_val * 2  # 2x goal
+                    if curr_val > start_val and start_val > 0:
+                        actual_cagr = ((curr_val / start_val) ** (1 / years_elapsed) - 1)
+                        if actual_cagr > 0:
+                            years_to_2x = np.log(2) / np.log(1 + actual_cagr)
+                            projected_date = start_date + timedelta(days=int(years_to_2x * 365.25))
+                        else:
+                            projected_date = None
+                            years_to_2x = None
+                    else:
+                        projected_date = None
+                        years_to_2x = None
+                    
+                    # Progress percentage (how much of the WAY to target_now)
+                    progress_pct = min(((curr_val - start_val) / (target_now - start_val)) * 100, 150) if target_now > start_val else 100
+                    
+                    # Status
+                    if curr_val >= target_now:
+                        status_color = "#10b981"
+                        status_text = "🎯 On Track"
+                        bar_color = "#10b981"
+                    elif curr_val >= start_val:
+                        status_color = "#f59e0b"
+                        status_text = "📈 Behind Goal"
+                        bar_color = "#f59e0b"
+                    else:
+                        status_color = "#ef4444"
+                        status_text = "📉 Below Start"
+                        bar_color = "#ef4444"
+                    
+                    st.markdown(f'''
+                        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-weight: 600; font-size: 1rem;">{p_name}</span>
+                                <span style="background: {status_color}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;">{status_text}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">
+                                <span>Current: <strong>${curr_val:,.0f}</strong></span>
+                                <span>Target: <strong>${target_now:,.0f}</strong> ({goal_pct}%/yr)</span>
+                            </div>
+                            <div style="background: #e2e8f0; border-radius: 10px; height: 12px; overflow: hidden;">
+                                <div style="background: {bar_color}; height: 100%; width: {min(progress_pct, 100)}%; border-radius: 10px;"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; margin-top: 6px;">
+                                <span>Started: {start_date.strftime('%b %Y')}</span>
+                                <span>{progress_pct:.0f}% of goal path</span>
+                                <span>{"📅 2x by " + projected_date.strftime('%b %Y') if projected_date and projected_date > date.today() else "—"}</span>
+                            </div>
+                        </div>
+                    ''', unsafe_allow_html=True)
+                
+                st.markdown("")
+                
                 # Performance comparison chart
                 if len(performance_data) > 1:
-                    st.markdown("#### 📈 Portfolio Performance Comparison")
+                    st.markdown("#### 📊 Portfolio Performance Comparison")
                     perf_sorted = sorted(performance_data, key=lambda x: x['total_return_pct'], reverse=True)
                     
                     # Enhanced color scheme - gradient based on performance
