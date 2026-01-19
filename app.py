@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.2.1"
+VERSION = "6.2.2"
 VERSION_DATE = "2026-01-19"
-VERSION_TIME = "17:00:00"
-VERSION_NAME = "Multi-User Auth + Multi-Benchmark & Enhanced Tooltips"
+VERSION_TIME = "18:00:00"
+VERSION_NAME = "Multi-User Auth + Fixed Benchmark Comparison"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2497,11 +2497,12 @@ else:
                                                  '<extra></extra>'
                                 ))
                                 
-                                portfolio_vs_bench = curr_v - bench_final_value
-                                if portfolio_vs_bench > 0:
-                                    benchmark_comparison_msgs.append(("success", f"📊 Portfolio beat {benchmark_ticker} by ${portfolio_vs_bench:,.0f} ({((curr_v/bench_final_value - 1)*100):+.1f}%)"))
-                                else:
-                                    benchmark_comparison_msgs.append(("info", f"📊 {benchmark_ticker} beat portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)"))
+                                # Store for comparison after portfolio normalization
+                                benchmark_comparison_msgs.append({
+                                    "ticker": benchmark_ticker,
+                                    "return": bench_return,
+                                    "final_value": bench_final_value
+                                })
                     except:
                         pass
                 
@@ -2512,7 +2513,22 @@ else:
                 else:
                     portfolio_normalized = daily_val
                 
-                portfolio_return = ((float(portfolio_normalized.iloc[-1]) / start_val) - 1) * 100
+                portfolio_normalized_final = float(portfolio_normalized.iloc[-1])
+                portfolio_return = ((portfolio_normalized_final / start_val) - 1) * 100
+                
+                # Now calculate benchmark comparisons using normalized portfolio value
+                benchmark_display_msgs = []
+                for bench_data in benchmark_comparison_msgs:
+                    ticker = bench_data["ticker"]
+                    bench_final = bench_data["final_value"]
+                    portfolio_vs_bench = portfolio_normalized_final - bench_final
+                    
+                    if portfolio_vs_bench > 0:
+                        pct_diff = ((portfolio_normalized_final / bench_final) - 1) * 100
+                        benchmark_display_msgs.append(("success", f"📊 Portfolio beat {ticker} by ${portfolio_vs_bench:,.0f} ({pct_diff:+.1f}%)"))
+                    else:
+                        pct_diff = ((bench_final / portfolio_normalized_final) - 1) * 100
+                        benchmark_display_msgs.append(("info", f"📊 {ticker} beat portfolio by ${abs(portfolio_vs_bench):,.0f} ({pct_diff:+.1f}%)"))
                 
                 # Calculate daily returns for portfolio tooltip
                 portfolio_daily_returns = ((portfolio_normalized / start_val) - 1) * 100
@@ -2597,8 +2613,8 @@ else:
                     - Use the toolbar to zoom, pan, or save the chart
                     """)
                 
-                if benchmark_comparison_msgs:
-                    for msg_type, msg_text in benchmark_comparison_msgs:
+                if benchmark_display_msgs:
+                    for msg_type, msg_text in benchmark_display_msgs:
                         if msg_type == "success":
                             st.success(msg_text)
                         else:
