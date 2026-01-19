@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.2.0"
+VERSION = "6.2.1"
 VERSION_DATE = "2026-01-19"
-VERSION_TIME = "16:00:00"
-VERSION_NAME = "Multi-User Auth + Normalized Chart Comparison"
+VERSION_TIME = "17:00:00"
+VERSION_NAME = "Multi-User Auth + Multi-Benchmark & Enhanced Tooltips"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -496,6 +496,7 @@ def load_db():
                         p_data.setdefault("rebalance_stats", [])
                         p_data.setdefault("last_rebalanced", None)
                         p_data.setdefault("benchmark", None)
+                        p_data.setdefault("benchmarks", [])
                         p_data.setdefault("bank_name", "")
                         p_data.setdefault("account_type", "")
                         p_data.setdefault("account_name", "")
@@ -1168,7 +1169,8 @@ else:
                             "start_date": str(n_start), "bank_name": n_bank, "account_type": n_account_type,
                             "account_name": f"{n_bank} {n_account_type}", "initialization_date": str(n_start),
                             "asset_mix_locked": False, "assets": {}, "rebalance_logs": [],
-                            "drift_tolerance": 5.0, "rebalance_stats": [], "last_rebalanced": None, "benchmark": None
+                            "drift_tolerance": 5.0, "rebalance_stats": [], "last_rebalanced": None, 
+                            "benchmark": None, "benchmarks": []
                         }
                         save_db(st.session_state.db)
                         prof = st.session_state.db["users"][current_user]["profiles"][n_name]
@@ -1315,31 +1317,40 @@ else:
             with st.expander("ℹ️ Why use a benchmark?", expanded=False):
                 st.markdown("""
                 **Benchmarks** help evaluate performance.
-                - Chart shows 100% investment in the benchmark
+                - Chart shows 100% investment in each benchmark
                 - **Outperforming** = your strategy adds value
+                - Select multiple to compare different indices
                 """)
             
             benchmark_options = {
-                "None": None, "S&P 500 (SPY)": "SPY", "NASDAQ-100 (QQQ)": "QQQ",
-                "Total Market (VTI)": "VTI", "Russell 2000 (IWM)": "IWM", "Dow Jones (DIA)": "DIA"
+                "S&P 500 (SPY)": "SPY", "NASDAQ-100 (QQQ)": "QQQ",
+                "Total Market (VTI)": "VTI", "Russell 2000 (IWM)": "IWM", 
+                "Dow Jones (DIA)": "DIA", "Bonds (BND)": "BND"
             }
-            current_benchmark = prof.get('benchmark')
-            benchmark_index = 0
-            for idx, (key, value) in enumerate(benchmark_options.items()):
-                if value == current_benchmark:
-                    benchmark_index = idx
-                    break
+            current_benchmarks = prof.get('benchmarks', [])
+            # Migration: convert old single benchmark to list
+            if not current_benchmarks and prof.get('benchmark'):
+                current_benchmarks = [prof.get('benchmark')]
             
-            selected_benchmark = st.selectbox("Select Benchmark", options=list(benchmark_options.keys()),
-                                             index=benchmark_index, key="benchmark_select")
-            if st.button("💾 Save Benchmark", use_container_width=True, key="save_benchmark"):
-                prof['benchmark'] = benchmark_options[selected_benchmark]
+            # Get display names for current benchmarks
+            current_display = [k for k, v in benchmark_options.items() if v in current_benchmarks]
+            
+            selected_benchmarks = st.multiselect("Select Benchmarks", 
+                options=list(benchmark_options.keys()),
+                default=current_display,
+                key="benchmark_multiselect",
+                help="Select one or more benchmarks to compare"
+            )
+            
+            if st.button("💾 Save Benchmarks", use_container_width=True, key="save_benchmark"):
+                prof['benchmarks'] = [benchmark_options[b] for b in selected_benchmarks]
+                prof['benchmark'] = prof['benchmarks'][0] if prof['benchmarks'] else None  # Keep for backward compat
                 save_db(st.session_state.db)
                 st.success("✅ Saved!")
                 st.rerun()
             
-            if prof.get('benchmark'):
-                st.caption(f"📊 Active: {prof['benchmark']}")
+            if prof.get('benchmarks'):
+                st.caption(f"📊 Active: {', '.join(prof['benchmarks'])}")
             
             st.divider()
             
@@ -2433,15 +2444,22 @@ else:
                 
                 # Performance Chart
                 st.markdown("### 📈 Performance vs Goal Path")
-                benchmark_caption = f" & 100% {prof.get('benchmark', '')}" if prof.get('benchmark') else ""
+                benchmarks_list = prof.get('benchmarks', [])
+                if not benchmarks_list and prof.get('benchmark'):
+                    benchmarks_list = [prof.get('benchmark')]
+                benchmark_caption = f" & {', '.join(benchmarks_list)}" if benchmarks_list else ""
                 st.caption(f"Track your portfolio's actual performance against your target growth trajectory{benchmark_caption}")
                 
                 fig = go.Figure()
-                benchmark_comparison_msg = None
+                benchmark_comparison_msgs = []
                 
-                # Benchmark comparison
-                benchmark_ticker = prof.get('benchmark')
-                if benchmark_ticker:
+                # Benchmark colors for multiple benchmarks
+                benchmark_colors = ['#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1']
+                
+                # Multiple benchmark comparison
+                for idx, benchmark_ticker in enumerate(benchmarks_list):
+                    if not benchmark_ticker:
+                        continue
                     try:
                         benchmark_raw = yf.download(benchmark_ticker, start=prof["start_date"], auto_adjust=True, progress=False)
                         if not benchmark_raw.empty:
@@ -2456,22 +2474,34 @@ else:
                                 bench_return = ((last_price / first_price) - 1) * 100
                                 bench_final_value = float(benchmark_normalized.iloc[-1])
                                 
+                                # Calculate daily returns for tooltip
+                                bench_daily_returns = ((benchmark_normalized / start_val) - 1) * 100
+                                
+                                # Create customdata with pre-formatted values
+                                customdata = [[
+                                    f"${val:,.0f}",
+                                    f"{ret:+.1f}%",
+                                    benchmark_ticker
+                                ] for val, ret in zip(benchmark_normalized, bench_daily_returns)]
+                                
+                                color = benchmark_colors[idx % len(benchmark_colors)]
                                 fig.add_trace(go.Scatter(
                                     x=benchmark_data.index, y=benchmark_normalized,
-                                    name=f'100% {benchmark_ticker} ({bench_return:+.1f}%)',
-                                    line=dict(color='#ef4444', width=3, dash='dot'),
-                                    hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
-                                                 '<b>Benchmark Value:</b> $%{y:,.0f}<br>' +
-                                                 f'<b>Ticker:</b> {benchmark_ticker}<br>' +
-                                                 f'<b>Return:</b> {bench_return:+.1f}%<br>' +
+                                    name=f'{benchmark_ticker} ({bench_return:+.1f}%)',
+                                    line=dict(color=color, width=2, dash='dot'),
+                                    customdata=customdata,
+                                    hovertemplate='<b>%{x|%Y-%m-%d}</b><br>' +
+                                                 'Value: %{customdata[0]}<br>' +
+                                                 'Return: %{customdata[1]}<br>' +
+                                                 'Ticker: %{customdata[2]}<br>' +
                                                  '<extra></extra>'
                                 ))
                                 
                                 portfolio_vs_bench = curr_v - bench_final_value
                                 if portfolio_vs_bench > 0:
-                                    benchmark_comparison_msg = ("success", f"📊 Your portfolio outperformed {benchmark_ticker} by ${portfolio_vs_bench:,.0f} ({((curr_v/bench_final_value - 1)*100):+.1f}%)" if bench_final_value > 0 else f"📊 Your portfolio: ${curr_v:,.0f}")
+                                    benchmark_comparison_msgs.append(("success", f"📊 Portfolio beat {benchmark_ticker} by ${portfolio_vs_bench:,.0f} ({((curr_v/bench_final_value - 1)*100):+.1f}%)"))
                                 else:
-                                    benchmark_comparison_msg = ("info", f"📊 {benchmark_ticker} outperformed your portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)" if curr_v > 0 else f"📊 Benchmark: ${bench_final_value:,.0f}")
+                                    benchmark_comparison_msgs.append(("info", f"📊 {benchmark_ticker} beat portfolio by ${abs(portfolio_vs_bench):,.0f} ({((bench_final_value/curr_v - 1)*100):+.1f}%)"))
                     except:
                         pass
                 
@@ -2483,12 +2513,25 @@ else:
                     portfolio_normalized = daily_val
                 
                 portfolio_return = ((float(portfolio_normalized.iloc[-1]) / start_val) - 1) * 100
+                
+                # Calculate daily returns for portfolio tooltip
+                portfolio_daily_returns = ((portfolio_normalized / start_val) - 1) * 100
+                
+                # Create customdata for portfolio with pre-formatted values
+                portfolio_customdata = [[
+                    f"${val:,.0f}",
+                    f"{ret:+.1f}%",
+                    f"${val - start_val:+,.0f}"
+                ] for val, ret in zip(portfolio_normalized, portfolio_daily_returns)]
+                
                 fig.add_trace(go.Scatter(x=data.index, y=portfolio_normalized, 
                     name=f'Actual Portfolio ({portfolio_return:+.1f}%)',
                     line=dict(color='#3b82f6', width=3),
-                    hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
-                                 '<b>Portfolio Value:</b> $%{y:,.0f}<br>' +
-                                 '<b>Performance:</b> Actual<br>' +
+                    customdata=portfolio_customdata,
+                    hovertemplate='<b>%{x|%Y-%m-%d}</b><br>' +
+                                 'Value: %{customdata[0]}<br>' +
+                                 'Return: %{customdata[1]}<br>' +
+                                 'Gain/Loss: %{customdata[2]}<br>' +
                                  '<extra></extra>'
                 ))
                 
@@ -2496,12 +2539,23 @@ else:
                 days = np.arange(len(data.index))
                 daily_rate = (float(prof['yearly_goal_pct']) / 100) / 365.25
                 target_path = start_val * (1 + daily_rate) ** days
+                
+                # Calculate goal path returns for tooltip
+                goal_returns = ((target_path / start_val) - 1) * 100
+                goal_customdata = [[
+                    f"${val:,.0f}",
+                    f"{ret:+.1f}%",
+                    f"${val - start_val:+,.0f}"
+                ] for val, ret in zip(target_path, goal_returns)]
+                
                 fig.add_trace(go.Scatter(x=data.index, y=target_path,
                     name=f'Goal Path ({prof["yearly_goal_pct"]}%/yr)',
                     line=dict(color='#10b981', width=2, dash='dash'),
-                    hovertemplate='<b>Date:</b> %{x|%Y-%m-%d}<br>' +
-                                 '<b>Target Value:</b> $%{y:,.2f}<br>' +
-                                 f'<b>Goal Rate:</b> {prof["yearly_goal_pct"]}% annually<br>' +
+                    customdata=goal_customdata,
+                    hovertemplate='<b>%{x|%Y-%m-%d}</b><br>' +
+                                 'Target: %{customdata[0]}<br>' +
+                                 'Return: %{customdata[1]}<br>' +
+                                 'Growth: %{customdata[2]}<br>' +
                                  '<extra></extra>'
                 ))
                 
@@ -2521,8 +2575,9 @@ else:
                     
                     All lines start at your principal (${start_val:,.0f}) for a fair "apples-to-apples" comparison.
                     
-                    🔴 **Benchmark (Red dotted line)** *(if selected)*  
-                    Shows growth if you invested 100% in the benchmark index from day one.
+                    📊 **Benchmarks (Dotted lines)** *(if selected)*  
+                    Each shows what $100K invested in that index would be worth today.
+                    Colors: 🔴 Red, 🟠 Orange, 🟣 Purple, 💗 Pink, 🩵 Teal, 💙 Indigo
                     
                     🔵 **Actual Portfolio (Blue solid line)**  
                     Your portfolio's relative performance - normalized to show how your asset mix 
@@ -2531,18 +2586,23 @@ else:
                     🟢 **Goal Path (Green dashed line)**  
                     Your target growth trajectory based on your yearly goal of {prof['yearly_goal_pct']}%.
                     
+                    **Tooltip Info:**
+                    - **Value**: Current value at that date
+                    - **Return**: Percentage change from start
+                    - **Gain/Loss**: Dollar change from start
+                    
                     **Tips:**
                     - Click any legend item to show/hide that line
                     - Hover over the chart to see exact values at any date
                     - Use the toolbar to zoom, pan, or save the chart
                     """)
                 
-                if benchmark_comparison_msg:
-                    msg_type, msg_text = benchmark_comparison_msg
-                    if msg_type == "success":
-                        st.success(msg_text)
-                    else:
-                        st.info(msg_text)
+                if benchmark_comparison_msgs:
+                    for msg_type, msg_text in benchmark_comparison_msgs:
+                        if msg_type == "success":
+                            st.success(msg_text)
+                        else:
+                            st.info(msg_text)
                 
                 st.divider()
                 
