@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.1.4"
+VERSION = "6.1.5"
 VERSION_DATE = "2026-01-19"
-VERSION_TIME = "11:00:00"
-VERSION_NAME = "Multi-User Auth + Consistent Deploy Threshold"
+VERSION_TIME = "12:00:00"
+VERSION_NAME = "Multi-User Auth + Rebalance UX Improvements"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2645,12 +2645,14 @@ else:
                             old_units = float(asset_dict[t]["units"])
                             new_units = float((asset_dict[t]["target"] / 100 * curr_v) / data[t].iloc[-1])
                             change_units = new_units - old_units
-                            if abs(change_units) > 0.0001:
-                                action = "BUY" if change_units > 0 else "SELL"
+                            # Round to whole units (can't buy/sell fractional shares at most brokers)
+                            change_units_rounded = round(change_units)
+                            if abs(change_units_rounded) >= 1:
+                                action = "BUY" if change_units_rounded > 0 else "SELL"
                                 current_price = float(data[t].iloc[-1])
                                 recommendations.append({
-                                    "ticker": t, "action": action, "shares": abs(change_units),
-                                    "estimated_price": current_price, "estimated_value": abs(change_units) * current_price
+                                    "ticker": t, "action": action, "shares": abs(change_units_rounded),
+                                    "estimated_price": current_price, "estimated_value": abs(change_units_rounded) * current_price
                                 })
                         store_rebalance_recommendation(prof, recommendations)
                         save_db(st.session_state.db)
@@ -2670,6 +2672,8 @@ else:
                         st.rerun()
                     if not has_recommendation:
                         st.info("📋 Get recommendation first")
+                    elif st.session_state.get("show_execute_form", False):
+                        st.success("👇 **Scroll down** to enter your actual broker prices")
                 
                 # Show recommendation details
                 if st.session_state.get("show_rebalance_recommendation", False) and "pending_rebalance" in prof:
@@ -2682,7 +2686,8 @@ else:
                         st.markdown("**Recommended Trades:**")
                         for rec in recommendations:
                             color = "🟢" if rec['action'] == "BUY" else "🔴"
-                            st.markdown(f"{color} **{rec['action']} {rec['ticker']}**: {rec['shares']:.4f} shares @ ~${rec['estimated_price']:.2f} (${rec['estimated_value']:.2f})")
+                            shares = int(rec['shares'])
+                            st.markdown(f"{color} **{rec['action']} {rec['ticker']}**: {shares:,} shares @ ~${rec['estimated_price']:.2f} (${rec['estimated_value']:.2f})")
                         
                         st.markdown("""
                         **Next Steps:**
@@ -2700,8 +2705,13 @@ else:
                 # Actual price entry form
                 if st.session_state.get("show_execute_form", False) and "pending_rebalance" in prof:
                     st.markdown("---")
-                    st.markdown("### 💰 Enter Actual Broker Prices")
-                    st.caption("Enter the exact prices you received")
+                    st.markdown('''
+                        <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
+                                    border-left: 4px solid #10b981; padding: 16px; border-radius: 8px; margin: 12px 0;">
+                            <h3 style="margin: 0 0 8px 0; color: #065f46;">💰 ACTION REQUIRED: Enter Actual Broker Prices</h3>
+                            <p style="margin: 0; color: #047857;">Enter the exact prices you received when executing trades at your broker.</p>
+                        </div>
+                    ''', unsafe_allow_html=True)
                     
                     recommendations = prof["pending_rebalance"]["recommendations"]
                     
@@ -2710,7 +2720,8 @@ else:
                         actual_prices = {}
                         
                         for rec in recommendations:
-                            st.markdown(f"**{rec['action']} {rec['ticker']}** ({rec['shares']:.4f} shares)")
+                            shares = int(rec['shares'])
+                            st.markdown(f"**{rec['action']} {rec['ticker']}** ({shares:,} shares)")
                             st.caption(f"Estimated: ${rec['estimated_price']:.2f}")
                             actual_price = st.number_input(f"Actual price for {rec['ticker']}",
                                 min_value=0.01, value=float(rec['estimated_price']), step=0.01,
@@ -2733,12 +2744,13 @@ else:
                             for rec in recommendations:
                                 ticker = rec['ticker']
                                 actual_price = actual_prices[ticker]
+                                shares = int(rec['shares'])  # Ensure whole units
                                 if rec['action'] == "BUY":
-                                    asset_dict[ticker]["units"] = float(asset_dict[ticker]["units"]) + rec['shares']
-                                    changes.append(f"🟢 {ticker} BUY {rec['shares']:.4f} @ ${actual_price:.2f}")
+                                    asset_dict[ticker]["units"] = int(asset_dict[ticker]["units"]) + shares
+                                    changes.append(f"🟢 {ticker} BUY {shares:,} @ ${actual_price:.2f}")
                                 else:
-                                    asset_dict[ticker]["units"] = float(asset_dict[ticker]["units"]) - rec['shares']
-                                    changes.append(f"🔴 {ticker} SELL {rec['shares']:.4f} @ ${actual_price:.2f}")
+                                    asset_dict[ticker]["units"] = int(asset_dict[ticker]["units"]) - shares
+                                    changes.append(f"🔴 {ticker} SELL {shares:,} @ ${actual_price:.2f}")
                             
                             detail_log += ", ".join(changes) if changes else "No changes"
                             prof.setdefault("rebalance_stats", []).insert(0, detail_log)
