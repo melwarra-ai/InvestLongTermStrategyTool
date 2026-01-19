@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.0.9"
+VERSION = "6.1.0"
 VERSION_DATE = "2026-01-18"
-VERSION_TIME = "14:30:00"
-VERSION_NAME = "Multi-User Auth + Robust Deployment"
+VERSION_TIME = "15:00:00"
+VERSION_NAME = "Multi-User Auth + Fixed Deploy Default"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1597,13 +1597,8 @@ else:
                                     st.caption(f"ℹ️ Using {preview_price_date} price (closest trading day)")
                             
                             if deploy_method == "By Percentage":
-                                # Handle edge case where remaining_pct might be 0 or negative
-                                if remaining_pct >= 25.0:
-                                    default_pct = 25.0
-                                elif remaining_pct > 0:
-                                    default_pct = remaining_pct
-                                else:
-                                    default_pct = 10.0  # Default when already over 100% deployed
+                                # Ensure default_pct is always >= min_value (0.1)
+                                default_pct = max(10.0, min(25.0, remaining_pct)) if remaining_pct > 0.1 else 10.0
                                 
                                 deploy_pct = st.number_input("Deploy % (of asset's target)", min_value=0.1, max_value=200.0,
                                                             value=default_pct, step=0.1, key="deploy_pct_input")
