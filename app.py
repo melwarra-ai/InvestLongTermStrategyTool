@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.0.7"
+VERSION = "6.0.9"
 VERSION_DATE = "2026-01-18"
-VERSION_TIME = "13:00:00"
-VERSION_NAME = "Multi-User Auth + Past Deployment Dates"
+VERSION_TIME = "14:30:00"
+VERSION_NAME = "Multi-User Auth + Robust Deployment"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1546,10 +1546,16 @@ else:
                         if selected_ticker:
                             asset_data = deployable_assets[selected_ticker]
                             current_allocated = asset_data.get("allocated_pct", 0)
-                            remaining_pct = 100.0 - current_allocated
+                            remaining_pct = max(0, 100.0 - current_allocated)
                             target_pct = asset_data.get("target", 0)
                             
-                            st.markdown(f"**{selected_ticker}:** {target_pct}% target, {current_allocated:.1f}% deployed, {remaining_pct:.1f}% remaining")
+                            # Calculate dollar amounts for clarity
+                            target_budget = (target_pct / 100) * prof['principal']
+                            deployed_amount = (current_allocated / 100) * target_budget
+                            remaining_budget = target_budget - deployed_amount
+                            
+                            st.markdown(f"**{selected_ticker}:** Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
+                            st.caption(f"Deployed: ${deployed_amount:,.0f} ({current_allocated:.1f}%) • Remaining: ${max(0, remaining_budget):,.0f} ({remaining_pct:.1f}%)")
                             
                             # Deployment method selection
                             deploy_method = st.radio("Deployment Method", ["By Percentage", "By Units"], 
@@ -1591,8 +1597,16 @@ else:
                                     st.caption(f"ℹ️ Using {preview_price_date} price (closest trading day)")
                             
                             if deploy_method == "By Percentage":
-                                deploy_pct = st.number_input("Deploy % (of asset's target)", min_value=0.1, max_value=remaining_pct,
-                                                            value=min(25.0, remaining_pct), step=0.1, key="deploy_pct_input")
+                                # Handle edge case where remaining_pct might be 0 or negative
+                                if remaining_pct >= 25.0:
+                                    default_pct = 25.0
+                                elif remaining_pct > 0:
+                                    default_pct = remaining_pct
+                                else:
+                                    default_pct = 10.0  # Default when already over 100% deployed
+                                
+                                deploy_pct = st.number_input("Deploy % (of asset's target)", min_value=0.1, max_value=200.0,
+                                                            value=default_pct, step=0.1, key="deploy_pct_input")
                                 portfolio_pct = (deploy_pct / 100) * target_pct
                                 deploy_amount = (portfolio_pct / 100) * prof['principal']
                                 if preview_price:
@@ -1614,18 +1628,20 @@ else:
                             
                             # Display deployment preview
                             if preview_price:
+                                target_amount = (target_pct / 100) * prof['principal']
+                                already_deployed_amount = (current_allocated / 100) * target_amount
+                                new_total_pct = current_allocated + deploy_pct
+                                
                                 st.markdown(f'''
                                     <div class="buying-guide">
                                         <div style="margin-bottom: 8px;"><strong>📊 Deployment Preview:</strong></div>
                                         <div>• <strong>Units:</strong> <span class="buying-guide-highlight">{estimated_units:.4f} units</span></div>
                                         <div>• <strong>Investment Amount:</strong> ${deploy_amount:,.2f}</div>
-                                        <div>• <strong>Deployment %:</strong> {deploy_pct:.1f}% of {target_pct}% target</div>
+                                        <div>• <strong>Asset Target Budget:</strong> ${target_amount:,.2f} ({target_pct}% of ${prof['principal']:,.0f})</div>
+                                        <div>• <strong>Already Deployed:</strong> ${already_deployed_amount:,.2f} ({current_allocated:.1f}%)</div>
+                                        <div>• <strong>After This Deploy:</strong> {new_total_pct:.1f}% of target</div>
                                     </div>
                                 ''', unsafe_allow_html=True)
-                                
-                                # Warning if deploying more than remaining
-                                if deploy_pct > remaining_pct:
-                                    st.warning(f"⚠️ This exceeds remaining {remaining_pct:.1f}%. Will cap at 100% deployed.")
                             else:
                                 st.warning(f"⚠️ Could not fetch price for {deploy_date}.")
                             
@@ -1639,13 +1655,12 @@ else:
                                 try:
                                     price = preview_price
                                     quantity = estimated_units
-                                    actual_deploy_pct = min(deploy_pct, remaining_pct)  # Cap at remaining
                                     
-                                    purchase = {"date": str(deploy_date), "deploy_pct": actual_deploy_pct,
+                                    purchase = {"date": str(deploy_date), "deploy_pct": deploy_pct,
                                                "amount": deploy_amount, "price": price, "quantity": quantity}
                                     asset_data.setdefault("purchases", []).append(purchase)
                                     asset_data["units"] = asset_data.get("units", 0) + quantity
-                                    asset_data["allocated_pct"] = min(100.0, current_allocated + actual_deploy_pct)
+                                    asset_data["allocated_pct"] = current_allocated + deploy_pct  # Track actual deployment
                                     log_profile(prof, f"Deployed {quantity:.4f} units of {selected_ticker} (${deploy_amount:,.2f} @ ${price:.2f})")
                                     save_db(st.session_state.db)
                                     st.success(f"✅ Deployed {quantity:.4f} units of {selected_ticker} @ ${price:.2f}")
