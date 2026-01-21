@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.3.5"
-VERSION_DATE = "2026-01-20"
-VERSION_TIME = "20:18:00"
-VERSION_NAME = "Multi-User Auth + Original Design with Pulse Animation"
+VERSION = "6.3.6"
+VERSION_DATE = "2026-01-21"
+VERSION_TIME = "11:54:00"
+VERSION_NAME = "Multi-User Auth + Fixed CAGR for Partial Deployments"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1950,11 +1950,29 @@ else:
                 needs_rebal, drift_details = calculate_drift_status(p_data, prices)
                 
                 start_val = float(p_data.get('principal', 0))
-                roi_pct = ((curr_v / start_val) - 1) * 100 if start_val > 0 else 0
+                
+                # Calculate deployed capital
+                p_deployed = 0
+                for t, asset in p_assets.items():
+                    purchases = asset.get("purchases", [])
+                    p_deployed += sum(p.get("amount", 0) for p in purchases)
+                
+                p_deployment_pct = (p_deployed / start_val * 100) if start_val > 0 else 0
+                p_is_fully_deployed = p_deployment_pct >= 99.5
+                
+                # Calculate ROI and CAGR based on deployed capital for partially deployed
+                if p_is_fully_deployed:
+                    roi_pct = ((curr_v / start_val) - 1) * 100 if start_val > 0 else 0
+                else:
+                    roi_pct = ((curr_v / p_deployed) - 1) * 100 if p_deployed > 0 else 0
                 
                 start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d')
                 years_elapsed = max((date.today() - start_date.date()).days / 365.25, 0.01)
-                cagr = ((curr_v / start_val) ** (1 / years_elapsed) - 1) * 100 if start_val > 0 else 0
+                
+                if p_is_fully_deployed:
+                    cagr = ((curr_v / start_val) ** (1 / years_elapsed) - 1) * 100 if start_val > 0 else 0
+                else:
+                    cagr = ((curr_v / p_deployed) ** (1 / years_elapsed) - 1) * 100 if p_deployed > 0 else 0
                 
                 p_flag = "🇺🇸" if p_data.get("currency") == "USD" else "🇨🇦"
                 all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in p_assets.values()) if p_assets else False
@@ -2551,10 +2569,29 @@ else:
                 p_assets = p_data.get("assets", {})
                 curr_val = float(sum(p_assets[t]["units"] * prices.get(t, 0) for t in p_assets))
                 start_val = float(p_data.get('principal', 0))
-                roi = ((curr_val / start_val) - 1) * 100 if start_val > 0 else 0
+                
+                # Calculate deployed capital
+                ct_deployed = 0
+                for t, asset in p_assets.items():
+                    purchases = asset.get("purchases", [])
+                    ct_deployed += sum(p.get("amount", 0) for p in purchases)
+                
+                ct_deployment_pct = (ct_deployed / start_val * 100) if start_val > 0 else 0
+                ct_is_fully_deployed = ct_deployment_pct >= 99.5
+                
+                # Calculate ROI and CAGR based on deployed capital
+                if ct_is_fully_deployed:
+                    roi = ((curr_val / start_val) - 1) * 100 if start_val > 0 else 0
+                else:
+                    roi = ((curr_val / ct_deployed) - 1) * 100 if ct_deployed > 0 else 0
+                
                 start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d')
                 years = max((date.today() - start_date.date()).days / 365.25, 0.01)
-                cagr = ((curr_val / start_val) ** (1 / years) - 1) * 100 if start_val > 0 else 0
+                
+                if ct_is_fully_deployed:
+                    cagr = ((curr_val / start_val) ** (1 / years) - 1) * 100 if start_val > 0 else 0
+                else:
+                    cagr = ((curr_val / ct_deployed) ** (1 / years) - 1) * 100 if ct_deployed > 0 else 0
                 
                 needs_rebal, _ = calculate_drift_status(p_data, prices)
                 all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in p_assets.values()) if p_assets else False
@@ -2570,12 +2607,16 @@ else:
                 else:
                     status = "⚪ New"
                 
+                # Add deployment indicator to CAGR/ROI labels if partial
+                cagr_display = f"{cagr:+.1f}%" if ct_is_fully_deployed else f"{cagr:+.1f}%*"
+                roi_display = f"{roi:+.1f}%" if ct_is_fully_deployed else f"{roi:+.1f}%*"
+                
                 comparison_data.append({
                     "Profile": p_name,
                     "Account": f"{p_data.get('bank_name', 'N/A')} {p_data.get('account_type', '')}",
                     "Value": f"${curr_val:,.0f}",
-                    "CAGR": f"{cagr:+.1f}%",
-                    "ROI": f"{roi:+.1f}%",
+                    "CAGR": cagr_display,
+                    "ROI": roi_display,
                     "Goal": f"{p_data.get('yearly_goal_pct', 0):.1f}%/yr",
                     "Assets": total_assets,
                     "Status": status
@@ -2583,6 +2624,10 @@ else:
             
             df_comparison = pd.DataFrame(comparison_data)
             st.dataframe(df_comparison, use_container_width=True, hide_index=True)
+            
+            # Note about asterisk for partially deployed
+            if any('*' in str(row.get('CAGR', '')) or '*' in str(row.get('ROI', '')) for row in comparison_data):
+                st.caption("*CAGR/ROI calculated on deployed capital only (portfolio still deploying)")
 
     elif view_mode == "Portfolio Manager":
         if not st.session_state.active_profile:
@@ -2711,6 +2756,16 @@ else:
                 curr_v = float(daily_val.iloc[-1])
                 start_val = float(prof['principal'])
                 
+                # Calculate total deployed capital (actual money invested)
+                total_deployed = 0
+                for t in v_t:
+                    purchases = asset_dict[t].get("purchases", [])
+                    total_deployed += sum(p.get("amount", 0) for p in purchases)
+                
+                # Deployment percentage
+                deployment_pct = (total_deployed / start_val * 100) if start_val > 0 else 0
+                is_fully_deployed = deployment_pct >= 99.5
+                
                 if curr_v <= 0:
                     st.warning("⚠️ **Portfolio value is zero**")
                     st.info("Complete asset deployments to see portfolio metrics.")
@@ -2720,11 +2775,20 @@ else:
                 target_val = start_val * (1 + (float(prof['yearly_goal_pct'])/100))**years
                 
                 perc_diff = ((curr_v / target_val) - 1) * 100 if target_val > 0 else 0
-                roi_pct = ((curr_v / start_val) - 1) * 100 if start_val > 0 else 0
+                
+                # Calculate ROI and CAGR based on deployed capital for partially deployed portfolios
+                if is_fully_deployed:
+                    roi_pct = ((curr_v / start_val) - 1) * 100 if start_val > 0 else 0
+                else:
+                    roi_pct = ((curr_v / total_deployed) - 1) * 100 if total_deployed > 0 else 0
                 
                 prof_start_date = datetime.strptime(prof.get('start_date', str(date.today())), '%Y-%m-%d')
                 prof_years = max((date.today() - prof_start_date.date()).days / 365.25, 0.01)
-                profile_cagr = ((curr_v / start_val) ** (1 / prof_years) - 1) * 100 if start_val > 0 else 0
+                
+                if is_fully_deployed:
+                    profile_cagr = ((curr_v / start_val) ** (1 / prof_years) - 1) * 100 if start_val > 0 else 0
+                else:
+                    profile_cagr = ((curr_v / total_deployed) ** (1 / prof_years) - 1) * 100 if total_deployed > 0 else 0
                 
                 # Drift detection
                 recently_rebalanced = check_recently_rebalanced(prof.get("last_rebalanced"))
@@ -2797,14 +2861,24 @@ else:
                 with col_s1:
                     st.markdown(f'<div class="stat-item"><div class="stat-label">Current Value</div><div class="stat-value">${curr_v:,.0f}</div></div>', unsafe_allow_html=True)
                 with col_s2:
-                    st.markdown(f'<div class="stat-item"><div class="stat-label">Total ROI</div><div class="stat-value" style="color: {"#10b981" if roi_pct >= 0 else "#ef4444"};">{roi_pct:+.2f}%</div></div>', unsafe_allow_html=True)
+                    roi_label = "Total ROI" if is_fully_deployed else "ROI (Deployed)"
+                    st.markdown(f'<div class="stat-item"><div class="stat-label">{roi_label}</div><div class="stat-value" style="color: {"#10b981" if roi_pct >= 0 else "#ef4444"};">{roi_pct:+.2f}%</div></div>', unsafe_allow_html=True)
                 with col_s3:
-                    st.markdown(f'<div class="stat-item"><div class="stat-label">CAGR</div><div class="stat-value" style="color: {"#10b981" if profile_cagr >= 0 else "#ef4444"};">{profile_cagr:+.2f}%</div></div>', unsafe_allow_html=True)
+                    cagr_label = "CAGR" if is_fully_deployed else "CAGR (Deployed)"
+                    st.markdown(f'<div class="stat-item"><div class="stat-label">{cagr_label}</div><div class="stat-value" style="color: {"#10b981" if profile_cagr >= 0 else "#ef4444"};">{profile_cagr:+.2f}%</div></div>', unsafe_allow_html=True)
                 with col_s4:
                     st.markdown(f'<div class="stat-item"><div class="stat-label">vs Target Path</div><div class="stat-value" style="color: {"#10b981" if perc_diff >= 0 else "#ef4444"};">{perc_diff:+.2f}%</div></div>', unsafe_allow_html=True)
                 with col_s5:
-                    annualized = ((curr_v / start_val) ** (1/years) - 1) * 100
-                    st.markdown(f'<div class="stat-item"><div class="stat-label">Annualized</div><div class="stat-value" style="color: {"#10b981" if annualized >= 0 else "#ef4444"};">{annualized:.2f}%</div></div>', unsafe_allow_html=True)
+                    if is_fully_deployed:
+                        annualized = ((curr_v / start_val) ** (1/years) - 1) * 100
+                    else:
+                        annualized = ((curr_v / total_deployed) ** (1/years) - 1) * 100 if total_deployed > 0 else 0
+                    ann_label = "Annualized" if is_fully_deployed else "Ann. (Deployed)"
+                    st.markdown(f'<div class="stat-item"><div class="stat-label">{ann_label}</div><div class="stat-value" style="color: {"#10b981" if annualized >= 0 else "#ef4444"};">{annualized:.2f}%</div></div>', unsafe_allow_html=True)
+                
+                # Note for partially deployed portfolios
+                if not is_fully_deployed:
+                    st.caption(f"ℹ️ *Metrics calculated on deployed capital (${total_deployed:,.0f} of ${start_val:,.0f} = {deployment_pct:.1f}% deployed)*")
                 
                 st.divider()
                 
@@ -3106,7 +3180,8 @@ else:
                 
                 rows.append({
                     "Fund Name": "**TOTAL**", "Ticker": "", "Target %": "**100.00%**",
-                    "Deployed": "", "Actual %": "**100.00%**", "Drift": "—", "Status": "",
+                    "Deployed": f"**{deployment_pct:.0f}%**" if not is_fully_deployed else "**100%**", 
+                    "Actual %": "**100.00%**", "Drift": "—", "Status": "✅" if is_fully_deployed else f"📥 {deployment_pct:.0f}%",
                     "Avg Cost": "", "Units": "", "Current Price": "", "%Daily Change": "",
                     "Amount": f"**${total_current_val:,.0f}**",
                     "Buy/Sell Amt": f"**${total_turnover:,.0f}**", "Buy/Sell Shares": "—"
