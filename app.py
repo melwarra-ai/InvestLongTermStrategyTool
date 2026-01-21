@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.3.3"
+VERSION = "6.3.4"
 VERSION_DATE = "2026-01-20"
-VERSION_TIME = "20:09:00"
-VERSION_NAME = "Multi-User Auth + Compact Portfolio Cards"
+VERSION_TIME = "20:11:00"
+VERSION_NAME = "Multi-User Auth + Fixed Portfolio Cards"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2006,20 +2006,15 @@ else:
                 with cols[i % 2]:
                     st.markdown(f'''
                         <div style="background: white; border: 2px solid {border_color}; border-radius: 12px; 
-                                    padding: 16px; margin-bottom: 8px; transition: all 0.2s ease;">
-                            <!-- Header Row -->
+                                    padding: 16px; margin-bottom: 8px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                                 <div style="font-weight: 700; font-size: 1.1rem; color: #1e293b;">{p_flag} {name}</div>
                                 <span style="background: {status_bg}; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600;">{status_text}</span>
                             </div>
-                            
-                            <!-- Value Row -->
                             <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
                                 <div style="font-size: 1.8rem; font-weight: 700; color: #0f172a;">${curr_v:,.0f}</div>
                                 <div style="font-size: 1.1rem; font-weight: 600; color: {roi_color};">{trend_arrow} {roi_pct:+.1f}%</div>
                             </div>
-                            
-                            <!-- Goal Progress Bar -->
                             <div style="margin-bottom: 10px;">
                                 <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #64748b; margin-bottom: 3px;">
                                     <span>Goal Progress</span>
@@ -2029,8 +2024,6 @@ else:
                                     <div style="background: {progress_color}; height: 100%; width: {min(goal_progress, 100)}%; border-radius: 4px;"></div>
                                 </div>
                             </div>
-                            
-                            <!-- Metrics Row -->
                             <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b; padding-top: 10px; border-top: 1px solid #f1f5f9;">
                                 <div><span style="opacity: 0.7;">Goal:</span> <strong>{goal_pct:.0f}%/yr</strong></div>
                                 <div><span style="opacity: 0.7;">CAGR:</span> <strong style="color: {cagr_color};">{cagr:+.1f}%</strong></div>
