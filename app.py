@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.3.7"
+VERSION = "6.4.0"
 VERSION_DATE = "2026-01-21"
-VERSION_TIME = "16:28:00"
-VERSION_NAME = "Multi-User Auth + Enhanced Comparison Table"
+VERSION_TIME = "16:34:00"
+VERSION_NAME = "Multi-User Auth + AI Assistant"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -397,7 +397,9 @@ def load_db():
         "global_settings": {
             "allow_registration": True,
             "require_email_verification": False,
-            "default_drift_tolerance": 5.0
+            "default_drift_tolerance": 5.0,
+            "ai_assistant_enabled": True,
+            "ai_assistant_api_key": ""
         },
         "system_logs": []
     }
@@ -773,6 +775,77 @@ def is_admin(db, username):
         return False
     return db["users"][username].get("role") == "admin"
 
+# ===== AI ASSISTANT =====
+AI_SYSTEM_PROMPT = """You are a helpful AI assistant for the AlphaStream Portfolio Optimizer application. Your role is to help users understand and use the application effectively.
+
+## About the Application
+AlphaStream is a long-term investment portfolio management tool that helps users:
+- Create and manage multiple investment portfolios/strategies
+- Track asset allocation and monitor drift from targets
+- Rebalance portfolios when allocations drift beyond tolerance
+- Compare performance against benchmarks and goals
+
+## Key Features to Explain
+
+### 1. Portfolio Setup (Sidebar Steps)
+- **Strategy Setup (①)**: Create a profile with name, principal amount, goal %, currency, bank/account info
+- **Drift Strategy (②)**: Set tolerance % (how much drift is acceptable before rebalancing)
+- **Benchmark (③)**: Select benchmarks to compare against (SPY, QQQ, VTI, etc.)
+- **Asset Allocation (④)**: Add tickers and set target percentages (must total 100%)
+- **Lock Asset Mix (⑤)**: Lock allocation when ready to deploy capital
+- **Asset Deployment (⑥)**: Record actual purchases at real broker prices
+
+### 2. Key Metrics Explained
+- **CAGR**: Compound Annual Growth Rate - annualized return
+- **ROI**: Total Return on Investment since inception
+- **Drift**: Difference between actual % and target % allocation
+- **Deployed %**: How much of planned capital has been invested
+
+### 3. Rebalancing
+- When an asset drifts beyond tolerance, rebalancing is needed
+- The app shows exactly how many shares to buy/sell
+- Use Two-Step Workflow: get recommendations, execute at broker, record actual prices
+
+### 4. Global Dashboard
+- Overview of all portfolios
+- Risk metrics (volatility, Sharpe ratio, max drawdown)
+- Combined wealth timeline
+- Attribution analysis (top contributors/detractors)
+
+## Guidelines
+- Be concise and helpful
+- Use bullet points for lists
+- Reference specific features by name
+- If unsure about a feature, say so
+- Suggest using the ℹ️ help expanders throughout the app for detailed explanations
+- Keep responses focused on the app's functionality"""
+
+def get_ai_response(user_message, chat_history, api_key):
+    """Get response from Anthropic API"""
+    try:
+        import anthropic
+        
+        client = anthropic.Anthropic(api_key=api_key)
+        
+        # Build messages from chat history
+        messages = []
+        for msg in chat_history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": user_message})
+        
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1024,
+            system=AI_SYSTEM_PROMPT,
+            messages=messages
+        )
+        
+        return response.content[0].text
+    except ImportError:
+        return "❌ The `anthropic` package is not installed. Please run: `pip install anthropic`"
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
 # ===== SESSION STATE INITIALIZATION =====
 if "db" not in st.session_state:
     st.session_state.db = load_db()
@@ -781,7 +854,16 @@ if "db" not in st.session_state:
 if "users" not in st.session_state.db:
     st.session_state.db["users"] = {}
 if "global_settings" not in st.session_state.db:
-    st.session_state.db["global_settings"] = {"allow_registration": True, "default_drift_tolerance": 5.0}
+    st.session_state.db["global_settings"] = {
+        "allow_registration": True, 
+        "default_drift_tolerance": 5.0,
+        "ai_assistant_enabled": True,
+        "ai_assistant_api_key": ""
+    }
+# Ensure AI settings exist in existing databases
+if "ai_assistant_enabled" not in st.session_state.db.get("global_settings", {}):
+    st.session_state.db["global_settings"]["ai_assistant_enabled"] = True
+    st.session_state.db["global_settings"]["ai_assistant_api_key"] = ""
 if "system_logs" not in st.session_state.db:
     st.session_state.db["system_logs"] = []
 
@@ -1077,12 +1159,29 @@ def show_admin_dashboard():
         with st.form("global_settings_form"):
             allow_reg = st.checkbox("Allow New Registrations", value=settings.get("allow_registration", True))
             default_tolerance = st.number_input("Default Drift Tolerance (%)", value=float(settings.get("default_drift_tolerance", 5.0)), min_value=0.5, max_value=20.0, step=0.5)
+            
+            st.divider()
+            st.markdown("**🤖 AI Assistant Settings**")
+            ai_enabled = st.checkbox("Enable AI Assistant", value=settings.get("ai_assistant_enabled", True), 
+                                    help="Allow users to access the AI-powered help assistant")
+            ai_api_key = st.text_input("Anthropic API Key", value=settings.get("ai_assistant_api_key", ""), 
+                                       type="password", help="Enter your Anthropic API key for the AI assistant")
+            
             if st.form_submit_button("💾 Save Settings", type="primary"):
                 st.session_state.db["global_settings"]["allow_registration"] = allow_reg
                 st.session_state.db["global_settings"]["default_drift_tolerance"] = default_tolerance
+                st.session_state.db["global_settings"]["ai_assistant_enabled"] = ai_enabled
+                st.session_state.db["global_settings"]["ai_assistant_api_key"] = ai_api_key
                 save_db(st.session_state.db)
                 st.success("✅ Settings saved!")
                 st.rerun()
+        
+        # AI Assistant status
+        if settings.get("ai_assistant_enabled", False):
+            if settings.get("ai_assistant_api_key"):
+                st.success("✅ AI Assistant is **enabled** and configured")
+            else:
+                st.warning("⚠️ AI Assistant is enabled but **no API key** configured")
 
 # ===== MAIN APPLICATION FLOW =====
 if not st.session_state.authenticated:
@@ -1792,6 +1891,69 @@ else:
                             st.success(msg)
                         else:
                             st.error(msg)
+        
+        # ===== AI ASSISTANT CHAT =====
+        ai_settings = st.session_state.db.get("global_settings", {})
+        ai_enabled = ai_settings.get("ai_assistant_enabled", False)
+        ai_api_key = ai_settings.get("ai_assistant_api_key", "")
+        
+        if ai_enabled and ai_api_key:
+            st.divider()
+            st.markdown("### 🤖 AI Assistant")
+            
+            # Initialize chat history
+            if "ai_chat_history" not in st.session_state:
+                st.session_state.ai_chat_history = []
+            
+            with st.expander("💬 Ask me anything about the app", expanded=False):
+                # Display chat history
+                chat_container = st.container()
+                with chat_container:
+                    if not st.session_state.ai_chat_history:
+                        st.caption("👋 Hi! I can help you understand how to use this portfolio app. Ask me anything!")
+                    
+                    for msg in st.session_state.ai_chat_history[-6:]:  # Show last 6 messages
+                        if msg["role"] == "user":
+                            st.markdown(f"**You:** {msg['content']}")
+                        else:
+                            st.markdown(f"**🤖 Assistant:** {msg['content']}")
+                
+                # Input for new message
+                user_input = st.text_input("Type your question...", key="ai_user_input", 
+                                          placeholder="e.g., How do I rebalance?")
+                
+                col_send, col_clear = st.columns([3, 1])
+                with col_send:
+                    if st.button("📤 Send", use_container_width=True, key="ai_send_btn"):
+                        if user_input.strip():
+                            # Add user message to history
+                            st.session_state.ai_chat_history.append({
+                                "role": "user", 
+                                "content": user_input
+                            })
+                            
+                            # Get AI response
+                            with st.spinner("Thinking..."):
+                                response = get_ai_response(
+                                    user_input, 
+                                    st.session_state.ai_chat_history[:-1],  # Exclude current message
+                                    ai_api_key
+                                )
+                            
+                            # Add assistant response to history
+                            st.session_state.ai_chat_history.append({
+                                "role": "assistant",
+                                "content": response
+                            })
+                            
+                            st.rerun()
+                
+                with col_clear:
+                    if st.button("🗑️", use_container_width=True, key="ai_clear_btn", help="Clear chat"):
+                        st.session_state.ai_chat_history = []
+                        st.rerun()
+        
+        st.divider()
         
         if st.button("🚪 Logout", use_container_width=True, key="logout_btn"):
             log_system_event(st.session_state.db, "logout", f"User logged out: {current_user}", current_user)
