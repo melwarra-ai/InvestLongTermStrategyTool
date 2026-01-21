@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.3.0"
-VERSION_DATE = "2026-01-19"
-VERSION_TIME = "19:00:00"
-VERSION_NAME = "Multi-User Auth + Risk Metrics & Goal Tracker"
+VERSION = "6.3.1"
+VERSION_DATE = "2026-01-20"
+VERSION_TIME = "10:00:00"
+VERSION_NAME = "Multi-User Auth + Actual Price Entry"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1363,6 +1363,10 @@ else:
                 - **Target %**: Your desired allocation
                 - **Total must equal 100%** to lock
                 - **Rebalancing**: When prices change, your % drifts
+                
+                💡 **Backtest first!** Use tools like [Testfol.io](https://testfol.io/) or 
+                [Portfolio Visualizer](https://www.portfoliovisualizer.com/) to validate your 
+                allocation strategy with historical data before committing capital.
                 """)
             
             current_alloc = sum(a.get('target', 0) for a in prof.get("assets", {}).values())
@@ -1684,10 +1688,45 @@ else:
                                         <div class="buying-guide">
                                             <div style="margin-bottom: 8px;"><strong>📊 Deployment Preview:</strong></div>
                                             <div>• <strong>Units:</strong> <span class="buying-guide-highlight">{int(estimated_units):,} units</span></div>
-                                            <div>• <strong>Investment Amount:</strong> ${deploy_amount:,.2f}</div>
+                                            <div>• <strong>Estimated Cost:</strong> ${deploy_amount:,.2f} (based on ${preview_price:,.2f}/unit)</div>
                                             <div>• <strong>Asset Target Budget:</strong> ${target_budget:,.2f} ({target_pct}% of ${prof['principal']:,.0f})</div>
                                             <div>• <strong>Already Spent:</strong> ${actual_spent:,.2f} ({current_allocated:.1f}%)</div>
-                                            <div>• <strong>After This Deploy:</strong> ${new_total_spent:,.2f} ({new_total_pct:.1f}% of target)</div>
+                                        </div>
+                                    ''', unsafe_allow_html=True)
+                                    
+                                    # Actual price input - user enters what they actually paid
+                                    st.markdown("---")
+                                    st.markdown("**💰 Enter Actual Purchase Details:**")
+                                    st.caption("After buying at your broker, enter the actual price you paid")
+                                    
+                                    actual_price = st.number_input(
+                                        f"Actual Price Paid (per unit)",
+                                        min_value=0.01,
+                                        value=float(preview_price),
+                                        step=0.01,
+                                        format="%.2f",
+                                        key="actual_deploy_price",
+                                        help="Enter the exact price you paid at your broker"
+                                    )
+                                    
+                                    # Recalculate with actual price
+                                    actual_deploy_amount = int(estimated_units) * actual_price
+                                    new_total_spent_actual = actual_spent + actual_deploy_amount
+                                    
+                                    # Show price difference if any
+                                    price_diff = actual_price - preview_price
+                                    price_diff_pct = (price_diff / preview_price) * 100 if preview_price > 0 else 0
+                                    
+                                    if abs(price_diff) > 0.01:
+                                        diff_color = "#ef4444" if price_diff > 0 else "#10b981"
+                                        diff_icon = "📈" if price_diff > 0 else "📉"
+                                        st.caption(f"{diff_icon} Price difference: ${price_diff:+.2f} ({price_diff_pct:+.1f}%) vs estimated")
+                                    
+                                    st.markdown(f'''
+                                        <div style="background: #f0fdf4; border: 1px solid #10b981; border-radius: 8px; padding: 12px; margin-top: 8px;">
+                                            <div style="font-weight: 600; color: #065f46; margin-bottom: 4px;">✅ Final Deployment:</div>
+                                            <div style="color: #047857;">• <strong>{int(estimated_units):,} units</strong> @ <strong>${actual_price:,.2f}</strong> = <strong>${actual_deploy_amount:,.2f}</strong></div>
+                                            <div style="color: #047857; font-size: 0.85rem;">• After deploy: ${new_total_spent_actual:,.2f} ({new_total_pct:.1f}% of target)</div>
                                         </div>
                                     ''', unsafe_allow_html=True)
                                     
@@ -1698,21 +1737,24 @@ else:
                                         st.error(f"⚠️ This exceeds remaining budget by ${over_amount:,.2f}. Max units: {max_whole_units:,}.")
                                 else:
                                     st.warning(f"⚠️ Could not fetch price for {deploy_date}.")
+                                    actual_price = None
+                                    actual_deploy_amount = 0
                                 
                                 can_deploy = preview_price is not None and deploy_pct > 0 and not exceeds_limit and estimated_units >= 1
                                 
                                 if st.button("📥 Record Deployment", type="primary", use_container_width=True, 
                                             key="record_deploy_btn", disabled=not can_deploy):
                                     try:
-                                        price = preview_price
-                                        quantity = int(estimated_units)  # Ensure whole units
+                                        price = actual_price  # Use actual price entered by user
+                                        quantity = int(estimated_units)
+                                        final_amount = actual_deploy_amount  # Use actual amount
                                         
                                         purchase = {"date": str(deploy_date), "deploy_pct": deploy_pct,
-                                                   "amount": deploy_amount, "price": price, "quantity": quantity}
+                                                   "amount": final_amount, "price": price, "quantity": quantity}
                                         asset_data.setdefault("purchases", []).append(purchase)
                                         asset_data["units"] = asset_data.get("units", 0) + quantity
-                                        asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)  # Cap at 100%
-                                        log_profile(prof, f"Deployed {quantity:,} units of {selected_ticker} (${deploy_amount:,.2f} @ ${price:.2f})")
+                                        asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)
+                                        log_profile(prof, f"Deployed {quantity:,} units of {selected_ticker} (${final_amount:,.2f} @ ${price:.2f})")
                                         save_db(st.session_state.db)
                                         st.success(f"✅ Deployed {quantity:,} units of {selected_ticker} @ ${price:.2f}")
                                         if asset_data['allocated_pct'] >= 100.0:
@@ -2537,11 +2579,19 @@ else:
             3. **③ Benchmark**: Choose a market benchmark for comparison
             4. **④ Asset Allocation**: Add ticker symbols and set target percentages
             5. **⑤ Lock Asset Mix**: Lock your allocation when it totals 100%
-            6. **⑥ Asset Deployment**: Record your purchases at actual prices
+            6. **⑥ Asset Deployment**: Record your purchases at actual broker prices
             
             **After deployment:**
             - **Monitor Drift**: System alerts when rebalancing is needed
             - **Rebalance**: Execute trades to restore target allocations
+            """)
+            
+            st.info("""
+            💡 **Pro Tip - Backtest First!**  
+            Before setting your asset allocation and drift strategy, use a backtesting tool like 
+            [Portfolio Visualizer](https://www.portfoliovisualizer.com/) or [Testfol.io](https://testfol.io/) 
+            to validate your strategy with historical data. This helps you understand expected returns, 
+            volatility, and drawdowns before committing real capital.
             """)
             st.stop()
         
