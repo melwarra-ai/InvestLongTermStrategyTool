@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.3.1"
+VERSION = "6.3.2"
 VERSION_DATE = "2026-01-20"
-VERSION_TIME = "10:00:00"
-VERSION_NAME = "Multi-User Auth + Actual Price Entry"
+VERSION_TIME = "11:00:00"
+VERSION_NAME = "Multi-User Auth + Enhanced Dashboard Analytics"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2172,6 +2172,53 @@ else:
                                 - **Best/Worst Day**: Single-day extremes show tail risk exposure.
                                 """)
                             
+                            # Per-Account Risk Metrics
+                            st.markdown("")
+                            with st.expander("📊 Risk Metrics by Account", expanded=False):
+                                account_risk_data = []
+                                for p_name, p_data in profiles.items():
+                                    p_assets = p_data.get("assets", {})
+                                    if not p_assets:
+                                        continue
+                                    
+                                    # Calculate per-account daily values
+                                    p_daily = pd.Series(0.0, index=hist_data.index)
+                                    for ticker, asset in p_assets.items():
+                                        if ticker in hist_data.columns:
+                                            units = float(asset.get("units", 0))
+                                            p_daily += hist_data[ticker].ffill() * units
+                                    
+                                    p_daily = p_daily[p_daily > 0]
+                                    
+                                    if len(p_daily) > 20:
+                                        p_returns = p_daily.pct_change().dropna()
+                                        p_vol = p_returns.std() * np.sqrt(252) * 100
+                                        
+                                        p_cum = (1 + p_returns).cumprod()
+                                        p_rolling_max = p_cum.expanding().max()
+                                        p_drawdowns = (p_cum - p_rolling_max) / p_rolling_max
+                                        p_max_dd = p_drawdowns.min() * 100
+                                        
+                                        p_excess = p_returns.mean() * 252 - 0.05
+                                        p_sharpe = p_excess / (p_returns.std() * np.sqrt(252)) if p_returns.std() > 0 else 0
+                                        
+                                        account_risk_data.append({
+                                            "Account": p_name,
+                                            "Volatility": f"{p_vol:.1f}%",
+                                            "Max Drawdown": f"{p_max_dd:.1f}%",
+                                            "Sharpe": f"{p_sharpe:.2f}",
+                                            "_vol": p_vol,
+                                            "_dd": p_max_dd,
+                                            "_sharpe": p_sharpe
+                                        })
+                                
+                                if account_risk_data:
+                                    # Create styled dataframe
+                                    df_risk = pd.DataFrame(account_risk_data)[["Account", "Volatility", "Max Drawdown", "Sharpe"]]
+                                    st.dataframe(df_risk, use_container_width=True, hide_index=True)
+                                else:
+                                    st.caption("Insufficient data for per-account risk metrics")
+                            
                             st.markdown("")
                             
                             # === NEW FEATURE 2: Combined Portfolio Timeline ===
@@ -2415,51 +2462,80 @@ else:
                     
                     attribution_list.append({
                         "Asset": ticker,
-                        "Cost Basis": f"${data['cost_basis']:,.0f}",
-                        "Current Value": f"${data['current_value']:,.0f}",
-                        "Gain/Loss": f"${gain:,.0f}",
-                        "Return %": f"{return_pct:+.1f}%",
-                        "_gain": gain,
-                        "_cost_basis": data["cost_basis"],
+                        "Cost Basis": data['cost_basis'],
+                        "Current Value": data['current_value'],
+                        "Gain/Loss": gain,
+                        "Return %": return_pct,
                         "In Portfolios": ", ".join(data["portfolios"])
                     })
                 
-                # Sort by absolute gain
-                attribution_list_sorted = sorted(attribution_list, key=lambda x: abs(x["_gain"]), reverse=True)
+                # Sort by gain for chart
+                attribution_sorted = sorted(attribution_list, key=lambda x: x["Gain/Loss"], reverse=True)
                 
-                # Separate into contributors and detractors
-                contributors = [a for a in attribution_list_sorted if a["_gain"] > 0]
-                detractors = [a for a in attribution_list_sorted if a["_gain"] < 0]
+                # Create horizontal bar chart for attribution
+                fig_attr = go.Figure()
                 
-                col_attr1, col_attr2 = st.columns(2)
-                with col_attr1:
-                    st.markdown("#### 💚 Top Contributors")
-                    if contributors:
-                        for asset in contributors[:5]:
-                            contribution = (asset["_gain"] / abs(total_portfolio_gain) * 100) if total_portfolio_gain != 0 else 0
-                            st.success(f"**{asset['Asset']}**: {asset['Gain/Loss']} ({asset['Return %']}) - {contribution:.1f}% of gains")
-                    else:
-                        st.info("No assets with gains currently")
+                colors = ['#10b981' if x["Gain/Loss"] >= 0 else '#ef4444' for x in attribution_sorted]
                 
-                with col_attr2:
-                    st.markdown("#### 💔 Top Detractors")
-                    if detractors:
-                        for asset in sorted(detractors, key=lambda x: x["_gain"])[:5]:
-                            contribution = (abs(asset["_gain"]) / abs(total_portfolio_gain) * 100) if total_portfolio_gain != 0 else 0
-                            st.error(f"**{asset['Asset']}**: {asset['Gain/Loss']} ({asset['Return %']}) - {contribution:.1f}% of losses")
-                    else:
-                        st.success("✅ No detractors - all assets profitable!")
+                fig_attr.add_trace(go.Bar(
+                    y=[x["Asset"] for x in attribution_sorted],
+                    x=[x["Gain/Loss"] for x in attribution_sorted],
+                    orientation='h',
+                    marker=dict(color=colors, line=dict(width=0)),
+                    text=[f'${x["Gain/Loss"]:+,.0f} ({x["Return %"]:+.1f}%)' for x in attribution_sorted],
+                    textposition='outside',
+                    textfont=dict(size=11),
+                    hovertemplate='<b>%{y}</b><br>' +
+                                 'Gain/Loss: $%{x:,.0f}<br>' +
+                                 '<extra></extra>'
+                ))
                 
-                # Summary
+                fig_attr.add_vline(x=0, line_dash="solid", line_color="#94a3b8", line_width=1)
+                
+                fig_attr.update_layout(
+                    height=max(250, len(attribution_sorted) * 45),
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    margin=dict(l=80, r=120, t=20, b=40),
+                    xaxis=dict(
+                        title="Gain/Loss ($)",
+                        showgrid=True,
+                        gridcolor='#f1f5f9',
+                        zeroline=True,
+                        zerolinecolor='#94a3b8'
+                    ),
+                    yaxis=dict(
+                        showgrid=False,
+                        categoryorder='total ascending'
+                    ),
+                    showlegend=False
+                )
+                
+                st.plotly_chart(fig_attr, use_container_width=True)
+                
+                # Summary metric
                 net_color = "normal" if total_portfolio_gain >= 0 else "inverse"
+                total_cost = sum(a['Cost Basis'] for a in attribution_list)
                 st.metric("📊 Net Portfolio Gain/Loss", f"${total_portfolio_gain:,.0f}", 
-                         delta=f"{((total_portfolio_gain / sum(a['_cost_basis'] for a in attribution_list_sorted)) * 100):+.1f}%" if sum(a['_cost_basis'] for a in attribution_list_sorted) > 0 else "N/A",
+                         delta=f"{((total_portfolio_gain / total_cost) * 100):+.1f}%" if total_cost > 0 else "N/A",
                          delta_color=net_color)
             
             st.divider()
             
             # Portfolio Comparison Table
             st.markdown("### 📊 Portfolio Comparison Table")
+            with st.expander("ℹ️ Understanding the comparison table", expanded=False):
+                st.markdown("""
+                **Column explanations:**
+                - **Profile**: Your portfolio strategy name
+                - **Account**: Bank and account type (TFSA, RRSP, IRA, etc.)
+                - **Value**: Current market value of all holdings
+                - **CAGR**: Compound Annual Growth Rate - your annualized return
+                - **ROI**: Total Return on Investment since inception
+                - **Goal**: Your target annual return percentage
+                - **Assets**: Number of different assets in this portfolio
+                - **Status**: Current state (Balanced, Needs Rebalancing, Deploying, or New)
+                """)
             
             comparison_data = []
             for p_name, p_data in profiles.items():
