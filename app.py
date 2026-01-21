@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.3.6"
+VERSION = "6.3.7"
 VERSION_DATE = "2026-01-21"
-VERSION_TIME = "11:54:00"
-VERSION_NAME = "Multi-User Auth + Fixed CAGR for Partial Deployments"
+VERSION_TIME = "16:28:00"
+VERSION_NAME = "Multi-User Auth + Enhanced Comparison Table"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2556,12 +2556,19 @@ else:
                 **Column explanations:**
                 - **Profile**: Your portfolio strategy name
                 - **Account**: Bank and account type (TFSA, RRSP, IRA, etc.)
-                - **Value**: Current market value of all holdings
-                - **CAGR**: Compound Annual Growth Rate - your annualized return
+                - **Value**: Current market value of all holdings (— if $0)
+                - **Deployed**: Percentage of principal that has been invested
+                - **Age**: Time since portfolio inception (d=days, mo=months, yr=years)
+                - **CAGR**: Compound Annual Growth Rate (shows "< 90d" if portfolio too young)
                 - **ROI**: Total Return on Investment since inception
                 - **Goal**: Your target annual return percentage
-                - **Assets**: Number of different assets in this portfolio
+                - **Assets**: Number of different assets in this portfolio (— if none)
                 - **Status**: Current state (Balanced, Needs Rebalancing, Deploying, or New)
+                
+                **Notes:**
+                - *Asterisk (*) = Metrics calculated on deployed capital only
+                - "< 90d" = CAGR unreliable for portfolios under 90 days old
+                - "—" = Not applicable or no data
                 """)
             
             comparison_data = []
@@ -2579,24 +2586,44 @@ else:
                 ct_deployment_pct = (ct_deployed / start_val * 100) if start_val > 0 else 0
                 ct_is_fully_deployed = ct_deployment_pct >= 99.5
                 
-                # Calculate ROI and CAGR based on deployed capital
-                if ct_is_fully_deployed:
-                    roi = ((curr_val / start_val) - 1) * 100 if start_val > 0 else 0
-                else:
-                    roi = ((curr_val / ct_deployed) - 1) * 100 if ct_deployed > 0 else 0
-                
                 start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d')
-                years = max((date.today() - start_date.date()).days / 365.25, 0.01)
+                days_elapsed = (date.today() - start_date.date()).days
+                years = max(days_elapsed / 365.25, 0.01)
                 
-                if ct_is_fully_deployed:
-                    cagr = ((curr_val / start_val) ** (1 / years) - 1) * 100 if start_val > 0 else 0
+                # Age display
+                if days_elapsed < 30:
+                    age_display = f"{days_elapsed}d"
+                elif days_elapsed < 365:
+                    age_display = f"{days_elapsed // 30}mo"
                 else:
-                    cagr = ((curr_val / ct_deployed) ** (1 / years) - 1) * 100 if ct_deployed > 0 else 0
+                    age_display = f"{years:.1f}yr"
+                
+                total_assets = len(p_assets)
+                
+                # Handle $0 portfolios or 0 assets
+                if curr_val <= 0 or ct_deployed <= 0:
+                    cagr_display = "—"
+                    roi_display = "—"
+                elif days_elapsed < 90:
+                    # For portfolios < 90 days, show ROI but indicate CAGR is unreliable
+                    roi = ((curr_val / ct_deployed) - 1) * 100 if ct_deployed > 0 else 0
+                    roi_display = f"{roi:+.1f}%"
+                    cagr_display = f"< 90d"
+                else:
+                    # Calculate ROI and CAGR based on deployed capital
+                    if ct_is_fully_deployed:
+                        roi = ((curr_val / start_val) - 1) * 100 if start_val > 0 else 0
+                        cagr = ((curr_val / start_val) ** (1 / years) - 1) * 100 if start_val > 0 else 0
+                    else:
+                        roi = ((curr_val / ct_deployed) - 1) * 100 if ct_deployed > 0 else 0
+                        cagr = ((curr_val / ct_deployed) ** (1 / years) - 1) * 100 if ct_deployed > 0 else 0
+                    
+                    cagr_display = f"{cagr:+.1f}%" if ct_is_fully_deployed else f"{cagr:+.1f}%*"
+                    roi_display = f"{roi:+.1f}%" if ct_is_fully_deployed else f"{roi:+.1f}%*"
                 
                 needs_rebal, _ = calculate_drift_status(p_data, prices)
                 all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in p_assets.values()) if p_assets else False
                 deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 99.5)
-                total_assets = len(p_assets)
                 
                 if needs_rebal:
                     status = "🚨 Rebalance"
@@ -2607,27 +2634,36 @@ else:
                 else:
                     status = "⚪ New"
                 
-                # Add deployment indicator to CAGR/ROI labels if partial
-                cagr_display = f"{cagr:+.1f}%" if ct_is_fully_deployed else f"{cagr:+.1f}%*"
-                roi_display = f"{roi:+.1f}%" if ct_is_fully_deployed else f"{roi:+.1f}%*"
+                # Deployed % display
+                deployed_display = f"{ct_deployment_pct:.0f}%" if ct_deployment_pct > 0 else "—"
+                
+                # Assets display
+                assets_display = str(total_assets) if total_assets > 0 else "—"
                 
                 comparison_data.append({
                     "Profile": p_name,
                     "Account": f"{p_data.get('bank_name', 'N/A')} {p_data.get('account_type', '')}",
-                    "Value": f"${curr_val:,.0f}",
+                    "Value": f"${curr_val:,.0f}" if curr_val > 0 else "—",
+                    "Deployed": deployed_display,
+                    "Age": age_display,
                     "CAGR": cagr_display,
                     "ROI": roi_display,
                     "Goal": f"{p_data.get('yearly_goal_pct', 0):.1f}%/yr",
-                    "Assets": total_assets,
+                    "Assets": assets_display,
                     "Status": status
                 })
             
             df_comparison = pd.DataFrame(comparison_data)
             st.dataframe(df_comparison, use_container_width=True, hide_index=True)
             
-            # Note about asterisk for partially deployed
+            # Footnotes
+            footnotes = []
             if any('*' in str(row.get('CAGR', '')) or '*' in str(row.get('ROI', '')) for row in comparison_data):
-                st.caption("*CAGR/ROI calculated on deployed capital only (portfolio still deploying)")
+                footnotes.append("*Calculated on deployed capital only")
+            if any(row.get('CAGR') == '< 90d' for row in comparison_data):
+                footnotes.append("'< 90d' = Portfolio too young for reliable CAGR")
+            if footnotes:
+                st.caption(" | ".join(footnotes))
 
     elif view_mode == "Portfolio Manager":
         if not st.session_state.active_profile:
