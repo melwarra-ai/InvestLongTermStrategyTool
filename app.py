@@ -11,10 +11,10 @@ import secrets
 import re
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.3.2"
+VERSION = "6.3.3"
 VERSION_DATE = "2026-01-20"
-VERSION_TIME = "11:00:00"
-VERSION_NAME = "Multi-User Auth + Enhanced Dashboard Analytics"
+VERSION_TIME = "20:09:00"
+VERSION_NAME = "Multi-User Auth + Compact Portfolio Cards"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1959,45 +1959,90 @@ else:
                 p_flag = "🇺🇸" if p_data.get("currency") == "USD" else "🇨🇦"
                 all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in p_assets.values()) if p_assets else False
                 
+                # Goal progress calculation
+                goal_pct = float(p_data.get('yearly_goal_pct', 10))
+                expected_value = start_val * ((1 + goal_pct/100) ** years_elapsed)
+                goal_progress = min((curr_v / expected_value) * 100, 150) if expected_value > 0 else 0
+                
+                # Trend arrow
+                trend_arrow = "↗️" if roi_pct > 0 else "↘️" if roi_pct < 0 else "→"
+                
+                # Status and styling
                 if recently_rebalanced or (has_rebalanced and not needs_rebal):
-                    tile_class = "profile-tile-optimized"
-                    status_badge = '<span class="success-badge">✅ Balanced</span>'
+                    border_color = "#10b981"
+                    status_text = "✅ Balanced"
+                    status_bg = "#10b981"
                 elif needs_rebal:
-                    tile_class = "profile-tile-warning"
-                    status_badge = '<span class="drift-badge">🚨 REBALANCE</span>'
+                    border_color = "#ef4444"
+                    status_text = "🚨 Rebalance"
+                    status_bg = "#ef4444"
                 elif not all_deployed and len(p_assets) > 0:
-                    tile_class = "profile-tile"
+                    border_color = "#f59e0b"
                     deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 99.5)
-                    status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem;">📥 Deploying ({deployed_count}/{len(p_assets)})</span>'
+                    status_text = f"📥 {deployed_count}/{len(p_assets)}"
+                    status_bg = "#f59e0b"
                 elif all_deployed:
-                    tile_class = "profile-tile-optimized"
-                    status_badge = '<span class="success-badge">✅ Deployed</span>'
+                    border_color = "#10b981"
+                    status_text = "✅ Deployed"
+                    status_bg = "#10b981"
                 else:
-                    tile_class = "profile-tile"
-                    status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem;">⚪ New</span>'
+                    border_color = "#94a3b8"
+                    status_text = "⚪ New"
+                    status_bg = "#94a3b8"
+                
+                # Progress bar color
+                if goal_progress >= 100:
+                    progress_color = "#10b981"
+                elif goal_progress >= 75:
+                    progress_color = "#3b82f6"
+                elif goal_progress >= 50:
+                    progress_color = "#f59e0b"
+                else:
+                    progress_color = "#ef4444"
+                
+                roi_color = "#10b981" if roi_pct >= 0 else "#ef4444"
+                cagr_color = "#10b981" if cagr >= 0 else "#ef4444"
                 
                 with cols[i % 2]:
                     st.markdown(f'''
-                        <div class="{tile_class}" style="padding: 24px; margin-top: 0px;">
-                            <div class="profile-tile-header">{p_flag} {name}</div>
-                            <div style="margin-bottom: 16px; text-align: center;">{status_badge}</div>
-                            <div style="margin: 20px 0; text-align: center;">
-                                <div class="stat-label">Portfolio Value</div>
-                                <div class="stat-value" style="font-size: 2rem;">${curr_v:,.0f}</div>
+                        <div style="background: white; border: 2px solid {border_color}; border-radius: 12px; 
+                                    padding: 16px; margin-bottom: 8px; transition: all 0.2s ease;">
+                            <!-- Header Row -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <div style="font-weight: 700; font-size: 1.1rem; color: #1e293b;">{p_flag} {name}</div>
+                                <span style="background: {status_bg}; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600;">{status_text}</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; color: #64748b;">
-                                <div><div style="font-size: 0.75rem; opacity: 0.8;">Goal</div><div style="font-weight: 600;">{p_data['yearly_goal_pct']}%/yr</div></div>
-                                <div style="text-align: center;"><div style="font-size: 0.75rem; opacity: 0.8;">CAGR</div><div style="font-weight: 600; color: {'#10b981' if cagr >= 0 else '#ef4444'};">{cagr:+.1f}%</div></div>
-                                <div style="text-align: right;"><div style="font-size: 0.75rem; opacity: 0.8;">ROI</div><div style="font-weight: 600; color: {'#10b981' if roi_pct >= 0 else '#ef4444'};">{roi_pct:+.1f}%</div></div>
+                            
+                            <!-- Value Row -->
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
+                                <div style="font-size: 1.8rem; font-weight: 700; color: #0f172a;">${curr_v:,.0f}</div>
+                                <div style="font-size: 1.1rem; font-weight: 600; color: {roi_color};">{trend_arrow} {roi_pct:+.1f}%</div>
+                            </div>
+                            
+                            <!-- Goal Progress Bar -->
+                            <div style="margin-bottom: 10px;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #64748b; margin-bottom: 3px;">
+                                    <span>Goal Progress</span>
+                                    <span>{goal_progress:.0f}%</span>
+                                </div>
+                                <div style="background: #e2e8f0; border-radius: 4px; height: 6px; overflow: hidden;">
+                                    <div style="background: {progress_color}; height: 100%; width: {min(goal_progress, 100)}%; border-radius: 4px;"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Metrics Row -->
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b; padding-top: 10px; border-top: 1px solid #f1f5f9;">
+                                <div><span style="opacity: 0.7;">Goal:</span> <strong>{goal_pct:.0f}%/yr</strong></div>
+                                <div><span style="opacity: 0.7;">CAGR:</span> <strong style="color: {cagr_color};">{cagr:+.1f}%</strong></div>
+                                <div><span style="opacity: 0.7;">Assets:</span> <strong>{len(p_assets)}</strong></div>
                             </div>
                         </div>
                     ''', unsafe_allow_html=True)
                     
-                    if st.button(f"📊 Open {name}", key=f"open_{name}", use_container_width=True):
+                    if st.button(f"Open {name}", key=f"open_{name}", use_container_width=True):
                         st.session_state.active_profile = name
                         st.session_state.current_page = "Portfolio Manager"
                         st.rerun()
-                    st.markdown("")
             
             st.divider()
             
