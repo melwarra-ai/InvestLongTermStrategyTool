@@ -9,12 +9,15 @@ import os
 import hashlib
 import secrets
 import re
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.4.0"
+VERSION = "6.5.0"
 VERSION_DATE = "2026-01-21"
-VERSION_TIME = "16:34:00"
-VERSION_NAME = "Multi-User Auth + AI Assistant"
+VERSION_TIME = "22:08:00"
+VERSION_NAME = "Multi-User Auth + Email Notifications"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -399,7 +402,13 @@ def load_db():
             "require_email_verification": False,
             "default_drift_tolerance": 5.0,
             "ai_assistant_enabled": True,
-            "ai_assistant_api_key": ""
+            "ai_assistant_api_key": "",
+            "email_notifications_enabled": False,
+            "smtp_server": "smtp.gmail.com",
+            "smtp_port": 587,
+            "smtp_username": "",
+            "smtp_password": "",
+            "smtp_from_name": "AlphaStream Portfolio"
         },
         "system_logs": []
     }
@@ -846,6 +855,135 @@ def get_ai_response(user_message, chat_history, api_key):
     except Exception as e:
         return f"❌ Error: {str(e)}"
 
+# ===== EMAIL NOTIFICATIONS =====
+def send_email(to_email, subject, html_body, settings):
+    """Send email using SMTP settings"""
+    try:
+        smtp_server = settings.get("smtp_server", "smtp.gmail.com")
+        smtp_port = int(settings.get("smtp_port", 587))
+        smtp_username = settings.get("smtp_username", "")
+        smtp_password = settings.get("smtp_password", "")
+        from_name = settings.get("smtp_from_name", "AlphaStream Portfolio")
+        
+        if not smtp_username or not smtp_password:
+            return False, "SMTP credentials not configured"
+        
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{from_name} <{smtp_username}>"
+        msg["To"] = to_email
+        
+        # Plain text fallback
+        plain_text = html_body.replace("<br>", "\n").replace("</p>", "\n")
+        plain_text = re.sub('<[^<]+?>', '', plain_text)
+        
+        msg.attach(MIMEText(plain_text, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+        
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.sendmail(smtp_username, to_email, msg.as_string())
+        
+        return True, "Email sent successfully"
+    except Exception as e:
+        return False, str(e)
+
+def send_rebalance_notification(user_email, user_name, portfolios_needing_rebalance, settings):
+    """Send rebalance alert email"""
+    subject = f"🚨 AlphaStream Alert: {len(portfolios_needing_rebalance)} Portfolio(s) Need Rebalancing"
+    
+    portfolio_list = ""
+    for p in portfolios_needing_rebalance:
+        portfolio_list += f"""
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;"><strong>{p['name']}</strong></td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${p['value']:,.0f}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #ef4444;">{p['max_drift']:.1f}%</td>
+        </tr>
+        """
+    
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">🛡️ AlphaStream Portfolio</h1>
+        </div>
+        
+        <div style="padding: 20px;">
+            <p>Hi <strong>{user_name}</strong>,</p>
+            
+            <p>One or more of your portfolios have drifted beyond your tolerance threshold and require rebalancing:</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <thead>
+                    <tr style="background: #f1f5f9;">
+                        <th style="padding: 10px; text-align: left;">Portfolio</th>
+                        <th style="padding: 10px; text-align: left;">Value</th>
+                        <th style="padding: 10px; text-align: left;">Max Drift</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {portfolio_list}
+                </tbody>
+            </table>
+            
+            <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0;">
+                <strong>⚠️ Action Required:</strong> Log in to AlphaStream to review and execute rebalancing trades.
+            </div>
+            
+            <p style="color: #64748b; font-size: 12px; margin-top: 30px;">
+                You received this email because you enabled rebalance notifications in AlphaStream.<br>
+                To unsubscribe, disable notifications in your account settings.
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return send_email(user_email, subject, html_body, settings)
+
+def check_and_send_rebalance_notifications(db, username, portfolios_needing_rebalance):
+    """Check if notification should be sent and send it"""
+    settings = db.get("global_settings", {})
+    
+    # Check if email notifications are enabled globally
+    if not settings.get("email_notifications_enabled", False):
+        return False, "Email notifications disabled"
+    
+    # Check user preferences
+    user_data = db.get("users", {}).get(username, {})
+    user_settings = user_data.get("settings", {})
+    
+    if not user_settings.get("email_rebalance_alerts", False):
+        return False, "User has disabled rebalance alerts"
+    
+    user_email = user_data.get("email", "")
+    if not user_email or "@" not in user_email:
+        return False, "No valid email address"
+    
+    # Check last notification time (avoid spam - once per 24h per portfolio)
+    last_notified = user_settings.get("last_rebalance_notification", "")
+    if last_notified:
+        try:
+            last_time = datetime.strptime(last_notified, "%Y-%m-%d %H:%M:%S")
+            if (datetime.now() - last_time).total_seconds() < 86400:  # 24 hours
+                return False, "Already notified within 24 hours"
+        except:
+            pass
+    
+    # Send notification
+    user_name = user_data.get("display_name", username)
+    success, msg = send_rebalance_notification(user_email, user_name, portfolios_needing_rebalance, settings)
+    
+    if success:
+        # Update last notification time
+        if "settings" not in db["users"][username]:
+            db["users"][username]["settings"] = {}
+        db["users"][username]["settings"]["last_rebalance_notification"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    return success, msg
+
 # ===== SESSION STATE INITIALIZATION =====
 if "db" not in st.session_state:
     st.session_state.db = load_db()
@@ -864,6 +1002,14 @@ if "global_settings" not in st.session_state.db:
 if "ai_assistant_enabled" not in st.session_state.db.get("global_settings", {}):
     st.session_state.db["global_settings"]["ai_assistant_enabled"] = True
     st.session_state.db["global_settings"]["ai_assistant_api_key"] = ""
+# Ensure email settings exist in existing databases
+if "email_notifications_enabled" not in st.session_state.db.get("global_settings", {}):
+    st.session_state.db["global_settings"]["email_notifications_enabled"] = False
+    st.session_state.db["global_settings"]["smtp_server"] = "smtp.gmail.com"
+    st.session_state.db["global_settings"]["smtp_port"] = 587
+    st.session_state.db["global_settings"]["smtp_username"] = ""
+    st.session_state.db["global_settings"]["smtp_password"] = ""
+    st.session_state.db["global_settings"]["smtp_from_name"] = "AlphaStream Portfolio"
 if "system_logs" not in st.session_state.db:
     st.session_state.db["system_logs"] = []
 
@@ -1167,21 +1313,80 @@ def show_admin_dashboard():
             ai_api_key = st.text_input("Anthropic API Key", value=settings.get("ai_assistant_api_key", ""), 
                                        type="password", help="Enter your Anthropic API key for the AI assistant")
             
+            st.divider()
+            st.markdown("**📧 Email Notification Settings**")
+            email_enabled = st.checkbox("Enable Email Notifications", value=settings.get("email_notifications_enabled", False),
+                                       help="Send email alerts when portfolios need rebalancing")
+            
+            col_smtp1, col_smtp2 = st.columns(2)
+            with col_smtp1:
+                smtp_server = st.text_input("SMTP Server", value=settings.get("smtp_server", "smtp.gmail.com"),
+                                           help="e.g., smtp.gmail.com, smtp.outlook.com")
+            with col_smtp2:
+                smtp_port = st.number_input("SMTP Port", value=int(settings.get("smtp_port", 587)), 
+                                           min_value=1, max_value=65535, help="Usually 587 for TLS")
+            
+            smtp_username = st.text_input("SMTP Username (Email)", value=settings.get("smtp_username", ""),
+                                         help="Your email address for sending notifications")
+            smtp_password = st.text_input("SMTP Password", value=settings.get("smtp_password", ""), type="password",
+                                         help="For Gmail, use an App Password (not your regular password)")
+            smtp_from_name = st.text_input("From Name", value=settings.get("smtp_from_name", "AlphaStream Portfolio"),
+                                          help="Name shown in the 'From' field of emails")
+            
             if st.form_submit_button("💾 Save Settings", type="primary"):
                 st.session_state.db["global_settings"]["allow_registration"] = allow_reg
                 st.session_state.db["global_settings"]["default_drift_tolerance"] = default_tolerance
                 st.session_state.db["global_settings"]["ai_assistant_enabled"] = ai_enabled
                 st.session_state.db["global_settings"]["ai_assistant_api_key"] = ai_api_key
+                st.session_state.db["global_settings"]["email_notifications_enabled"] = email_enabled
+                st.session_state.db["global_settings"]["smtp_server"] = smtp_server
+                st.session_state.db["global_settings"]["smtp_port"] = smtp_port
+                st.session_state.db["global_settings"]["smtp_username"] = smtp_username
+                st.session_state.db["global_settings"]["smtp_password"] = smtp_password
+                st.session_state.db["global_settings"]["smtp_from_name"] = smtp_from_name
                 save_db(st.session_state.db)
                 st.success("✅ Settings saved!")
                 st.rerun()
         
-        # AI Assistant status
-        if settings.get("ai_assistant_enabled", False):
-            if settings.get("ai_assistant_api_key"):
-                st.success("✅ AI Assistant is **enabled** and configured")
+        # Status indicators
+        col_status1, col_status2 = st.columns(2)
+        with col_status1:
+            if settings.get("ai_assistant_enabled", False):
+                if settings.get("ai_assistant_api_key"):
+                    st.success("✅ AI Assistant: **Enabled**")
+                else:
+                    st.warning("⚠️ AI Assistant: **No API key**")
             else:
-                st.warning("⚠️ AI Assistant is enabled but **no API key** configured")
+                st.info("ℹ️ AI Assistant: Disabled")
+        
+        with col_status2:
+            if settings.get("email_notifications_enabled", False):
+                if settings.get("smtp_username") and settings.get("smtp_password"):
+                    st.success("✅ Email Alerts: **Enabled**")
+                else:
+                    st.warning("⚠️ Email Alerts: **No credentials**")
+            else:
+                st.info("ℹ️ Email Alerts: Disabled")
+        
+        # Test email button
+        if settings.get("email_notifications_enabled") and settings.get("smtp_username"):
+            st.divider()
+            test_email = st.text_input("Test Email Address", placeholder="Enter email to send test")
+            if st.button("📧 Send Test Email", type="secondary"):
+                if test_email and "@" in test_email:
+                    with st.spinner("Sending test email..."):
+                        success, msg = send_email(
+                            test_email,
+                            "🧪 AlphaStream Test Email",
+                            "<h2>✅ Email Configuration Successful!</h2><p>Your AlphaStream email notifications are working correctly.</p>",
+                            settings
+                        )
+                    if success:
+                        st.success(f"✅ Test email sent to {test_email}")
+                    else:
+                        st.error(f"❌ Failed: {msg}")
+                else:
+                    st.warning("Please enter a valid email address")
 
 # ===== MAIN APPLICATION FLOW =====
 if not st.session_state.authenticated:
@@ -1892,6 +2097,29 @@ else:
                         else:
                             st.error(msg)
         
+        # Notification Preferences (only show if email is enabled globally)
+        global_settings = st.session_state.db.get("global_settings", {})
+        if global_settings.get("email_notifications_enabled", False):
+            with st.expander("🔔 Notification Preferences", expanded=False):
+                user_settings = user_data.get("settings", {})
+                current_email = user_data.get("email", "")
+                
+                with st.form("notification_prefs_form"):
+                    notif_email = st.text_input("Notification Email", value=current_email,
+                                               help="Email address for receiving alerts")
+                    email_rebalance = st.checkbox("📧 Receive Rebalance Alerts", 
+                                                  value=user_settings.get("email_rebalance_alerts", False),
+                                                  help="Get notified when portfolios need rebalancing")
+                    
+                    if st.form_submit_button("💾 Save Preferences", use_container_width=True):
+                        if "settings" not in st.session_state.db["users"][current_user]:
+                            st.session_state.db["users"][current_user]["settings"] = {}
+                        st.session_state.db["users"][current_user]["email"] = notif_email
+                        st.session_state.db["users"][current_user]["settings"]["email_rebalance_alerts"] = email_rebalance
+                        save_db(st.session_state.db)
+                        st.success("✅ Notification preferences saved!")
+                        st.rerun()
+        
         # ===== AI ASSISTANT CHAT =====
         ai_settings = st.session_state.db.get("global_settings", {})
         ai_enabled = ai_settings.get("ai_assistant_enabled", False)
@@ -2062,6 +2290,31 @@ else:
                         "detail": ", ".join([f"{t} needs {100-pct:.0f}% more" for t, pct in remaining[:3]]),
                         "action": "Complete remaining asset deployments"
                     })
+            
+            # Check and send email notifications for rebalancing
+            rebalance_portfolios = [item for item in action_items if item["type"] == "rebalance"]
+            if rebalance_portfolios:
+                # Build portfolio data for email
+                portfolios_for_email = []
+                for item in rebalance_portfolios:
+                    p_name = item["profile"]
+                    p_data = profiles[p_name]
+                    p_assets = p_data.get("assets", {})
+                    curr_v = float(sum(p_assets[t]["units"] * prices.get(t, 0) for t in p_assets))
+                    _, drift_details = calculate_drift_status(p_data, prices)
+                    max_drift = max([d[1] for d in drift_details]) if drift_details else 0
+                    portfolios_for_email.append({
+                        "name": p_name,
+                        "value": curr_v,
+                        "max_drift": max_drift
+                    })
+                
+                # Send notification (function handles all checks)
+                success, msg = check_and_send_rebalance_notifications(
+                    st.session_state.db, current_user, portfolios_for_email
+                )
+                if success:
+                    save_db(st.session_state.db)  # Save updated notification timestamp
             
             st.markdown("### ⚡ Action Items Dashboard")
             action_items.sort(key=lambda x: x["priority"])
