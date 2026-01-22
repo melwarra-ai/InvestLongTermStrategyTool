@@ -14,10 +14,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.5.1"
+VERSION = "6.5.2"
 VERSION_DATE = "2026-01-21"
-VERSION_TIME = "22:15:00"
-VERSION_NAME = "Multi-User Auth + Email Setup Help"
+VERSION_TIME = "22:43:00"
+VERSION_NAME = "Multi-User Auth + Rebalance Confirmation Email"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -983,6 +983,140 @@ def check_and_send_rebalance_notifications(db, username, portfolios_needing_reba
         db["users"][username]["settings"]["last_rebalance_notification"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     return success, msg
+
+def send_rebalance_confirmation_email(db, username, profile_name, recommendations, actual_prices):
+    """Send email confirmation after rebalance is executed"""
+    settings = db.get("global_settings", {})
+    
+    # Check if email notifications are enabled globally
+    if not settings.get("email_notifications_enabled", False):
+        return False, "Email notifications disabled"
+    
+    # Check user preferences
+    user_data = db.get("users", {}).get(username, {})
+    user_settings = user_data.get("settings", {})
+    
+    if not user_settings.get("email_rebalance_confirmation", False):
+        return False, "User has disabled rebalance confirmation emails"
+    
+    user_email = user_data.get("email", "")
+    if not user_email or "@" not in user_email:
+        return False, "No valid email address"
+    
+    user_name = user_data.get("display_name", username)
+    
+    # Build trades table
+    trades_html = ""
+    total_recommended_value = 0
+    total_actual_value = 0
+    
+    for rec in recommendations:
+        ticker = rec['ticker']
+        action = rec['action']
+        shares = int(rec['shares'])
+        est_price = rec['estimated_price']
+        actual_price = actual_prices.get(ticker, est_price)
+        
+        est_value = shares * est_price
+        actual_value = shares * actual_price
+        slippage = ((actual_price / est_price) - 1) * 100 if est_price > 0 else 0
+        
+        total_recommended_value += est_value
+        total_actual_value += actual_value
+        
+        # Color coding
+        action_color = "#10b981" if action == "BUY" else "#ef4444"
+        slippage_color = "#10b981" if abs(slippage) < 0.5 else "#f59e0b" if abs(slippage) < 2 else "#ef4444"
+        
+        trades_html += f"""
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">
+                <span style="color: {action_color}; font-weight: 600;">{action}</span>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">{ticker}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">{shares:,}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">${est_price:.2f}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">${actual_price:.2f}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">
+                <span style="color: {slippage_color};">{slippage:+.2f}%</span>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">${actual_value:,.2f}</td>
+        </tr>
+        """
+    
+    # Calculate total slippage
+    total_slippage = ((total_actual_value / total_recommended_value) - 1) * 100 if total_recommended_value > 0 else 0
+    total_slippage_color = "#10b981" if abs(total_slippage) < 0.5 else "#f59e0b" if abs(total_slippage) < 2 else "#ef4444"
+    
+    subject = f"✅ AlphaStream: Rebalance Complete - {profile_name}"
+    
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #1e293b; max-width: 700px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">✅ Rebalance Complete</h1>
+        </div>
+        
+        <div style="padding: 20px;">
+            <p>Hi <strong>{user_name}</strong>,</p>
+            
+            <p>Your portfolio <strong>"{profile_name}"</strong> has been successfully rebalanced.</p>
+            
+            <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
+                <strong>📅 Executed:</strong> {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+            </div>
+            
+            <h3 style="color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">📊 Trade Summary</h3>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
+                <thead>
+                    <tr style="background: #f1f5f9;">
+                        <th style="padding: 10px; text-align: left;">Action</th>
+                        <th style="padding: 10px; text-align: left;">Ticker</th>
+                        <th style="padding: 10px; text-align: right;">Shares</th>
+                        <th style="padding: 10px; text-align: right;">Est. Price</th>
+                        <th style="padding: 10px; text-align: right;">Actual Price</th>
+                        <th style="padding: 10px; text-align: right;">Slippage</th>
+                        <th style="padding: 10px; text-align: right;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {trades_html}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f8fafc; font-weight: 600;">
+                        <td colspan="5" style="padding: 10px; text-align: right;">TOTAL:</td>
+                        <td style="padding: 10px; text-align: right; color: {total_slippage_color};">{total_slippage:+.2f}%</td>
+                        <td style="padding: 10px; text-align: right;">${total_actual_value:,.2f}</td>
+                    </tr>
+                </tfoot>
+            </table>
+            
+            <h3 style="color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">📈 Comparison</h3>
+            
+            <table style="width: 100%; margin: 20px 0;">
+                <tr>
+                    <td style="padding: 10px; background: #f1f5f9; border-radius: 8px; text-align: center; width: 50%;">
+                        <div style="font-size: 12px; color: #64748b;">Recommended Value</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #1e293b;">${total_recommended_value:,.2f}</div>
+                    </td>
+                    <td style="padding: 10px; background: #f0fdf4; border-radius: 8px; text-align: center; width: 50%;">
+                        <div style="font-size: 12px; color: #64748b;">Actual Value</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #10b981;">${total_actual_value:,.2f}</div>
+                    </td>
+                </tr>
+            </table>
+            
+            <p style="color: #64748b; font-size: 12px; margin-top: 30px;">
+                This is an automated confirmation from AlphaStream Portfolio Optimizer.<br>
+                Log in to view your updated portfolio allocation.
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return send_email(user_email, subject, html_body, settings)
 
 # ===== SESSION STATE INITIALIZATION =====
 if "db" not in st.session_state:
@@ -2146,15 +2280,21 @@ else:
                 with st.form("notification_prefs_form"):
                     notif_email = st.text_input("Notification Email", value=current_email,
                                                help="Email address for receiving alerts")
-                    email_rebalance = st.checkbox("📧 Receive Rebalance Alerts", 
+                    
+                    st.markdown("**Email Notifications:**")
+                    email_rebalance = st.checkbox("🚨 Rebalance Needed Alerts", 
                                                   value=user_settings.get("email_rebalance_alerts", False),
-                                                  help="Get notified when portfolios need rebalancing")
+                                                  help="Get notified when portfolios need rebalancing (max once per 24h)")
+                    email_confirmation = st.checkbox("✅ Rebalance Confirmation Emails", 
+                                                     value=user_settings.get("email_rebalance_confirmation", False),
+                                                     help="Receive detailed summary after executing a rebalance")
                     
                     if st.form_submit_button("💾 Save Preferences", use_container_width=True):
                         if "settings" not in st.session_state.db["users"][current_user]:
                             st.session_state.db["users"][current_user]["settings"] = {}
                         st.session_state.db["users"][current_user]["email"] = notif_email
                         st.session_state.db["users"][current_user]["settings"]["email_rebalance_alerts"] = email_rebalance
+                        st.session_state.db["users"][current_user]["settings"]["email_rebalance_confirmation"] = email_confirmation
                         save_db(st.session_state.db)
                         st.success("✅ Notification preferences saved!")
                         st.rerun()
@@ -3840,13 +3980,27 @@ else:
                             prof["rebalance_stats"] = prof["rebalance_stats"][:50]
                             prof["last_rebalanced"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             
+                            # Store recommendations before clearing for email
+                            email_recommendations = recommendations.copy()
+                            
                             clear_rebalance_recommendation(prof)
                             log_profile(prof, "Portfolio rebalanced with actual prices - Status: Balanced")
                             save_db(st.session_state.db)
                             
+                            # Send confirmation email
+                            email_success, email_msg = send_rebalance_confirmation_email(
+                                st.session_state.db, 
+                                current_user, 
+                                st.session_state.active_profile,
+                                email_recommendations,
+                                actual_prices
+                            )
+                            
                             st.session_state.show_execute_form = False
                             st.session_state.show_rebalance_recommendation = False
                             st.success("✅ Portfolio rebalanced successfully!")
+                            if email_success:
+                                st.info("📧 Confirmation email sent!")
                             st.balloons()
                             st.rerun()
                         
