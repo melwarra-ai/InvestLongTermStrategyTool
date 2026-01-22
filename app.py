@@ -14,10 +14,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.5.2"
+VERSION = "6.5.3"
 VERSION_DATE = "2026-01-21"
-VERSION_TIME = "22:43:00"
-VERSION_NAME = "Multi-User Auth + Rebalance Confirmation Email"
+VERSION_TIME = "23:40:00"
+VERSION_NAME = "Multi-User Auth + Admin Tab Descriptions"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1296,6 +1296,8 @@ def show_admin_dashboard():
     ])
     
     with admin_tab1:
+        description_box("User Management", "View, activate, deactivate users and reset passwords.")
+        
         st.markdown("### 👥 All Users")
         users = st.session_state.db["users"]
         
@@ -1371,6 +1373,8 @@ def show_admin_dashboard():
                         st.rerun()
     
     with admin_tab2:
+        description_box("System Statistics", "Overview of total assets under management and platform usage metrics.")
+        
         st.markdown("### 📊 System Statistics")
         users = st.session_state.db["users"]
         total_value = 0
@@ -1418,6 +1422,8 @@ def show_admin_dashboard():
             """, unsafe_allow_html=True)
     
     with admin_tab3:
+        description_box("System Logs", "Track user activity including logins, logouts, password changes, and account events.")
+        
         st.markdown("### 📜 System Logs")
         logs = st.session_state.db.get("system_logs", [])
         if logs:
@@ -1434,6 +1440,8 @@ def show_admin_dashboard():
             st.info("No system logs yet")
     
     with admin_tab4:
+        description_box("Global Settings", "Configure registration, default values, AI assistant, and email notification settings.")
+        
         st.markdown("### ⚙️ Global Settings")
         settings = st.session_state.db.get("global_settings", {})
         with st.form("global_settings_form"):
