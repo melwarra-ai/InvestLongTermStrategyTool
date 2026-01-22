@@ -14,10 +14,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.5.0"
+VERSION = "6.5.1"
 VERSION_DATE = "2026-01-21"
-VERSION_TIME = "22:08:00"
-VERSION_NAME = "Multi-User Auth + Email Notifications"
+VERSION_TIME = "22:15:00"
+VERSION_NAME = "Multi-User Auth + Email Setup Help"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1315,13 +1315,52 @@ def show_admin_dashboard():
             
             st.divider()
             st.markdown("**📧 Email Notification Settings**")
+            
+            with st.expander("ℹ️ How to set up email for different providers", expanded=False):
+                st.markdown("""
+                **📧 Supported Providers & Settings:**
+                
+                | Provider | SMTP Server | Port |
+                |----------|-------------|------|
+                | Gmail | `smtp.gmail.com` | 587 |
+                | Outlook/Hotmail | `smtp.office365.com` | 587 |
+                | Yahoo | `smtp.mail.yahoo.com` | 587 |
+                | iCloud | `smtp.mail.me.com` | 587 |
+                
+                ---
+                
+                **🔐 Gmail App Password Setup:**
+                1. Go to [myaccount.google.com](https://myaccount.google.com)
+                2. Security → 2-Step Verification (must be ON)
+                3. Search "App passwords" in Google Account
+                4. Select app: "Mail", Select device: "Other" → name it "AlphaStream"
+                5. Click **Generate** → Copy the 16-character password
+                6. Use this password (not your regular Gmail password)
+                
+                ---
+                
+                **🔐 Outlook/Microsoft App Password Setup:**
+                1. Go to [account.microsoft.com](https://account.microsoft.com)
+                2. Security → Advanced security options
+                3. Enable Two-step verification (if not already)
+                4. Under "App passwords" → Create a new app password
+                5. Copy and use this password
+                
+                ---
+                
+                **⚠️ Important Notes:**
+                - Never use your regular email password - always use App Passwords
+                - App Passwords are required when 2FA is enabled (which it should be!)
+                - If emails fail, check spam folder first
+                """)
+            
             email_enabled = st.checkbox("Enable Email Notifications", value=settings.get("email_notifications_enabled", False),
                                        help="Send email alerts when portfolios need rebalancing")
             
             col_smtp1, col_smtp2 = st.columns(2)
             with col_smtp1:
                 smtp_server = st.text_input("SMTP Server", value=settings.get("smtp_server", "smtp.gmail.com"),
-                                           help="e.g., smtp.gmail.com, smtp.outlook.com")
+                                           help="See setup guide above for provider-specific servers")
             with col_smtp2:
                 smtp_port = st.number_input("SMTP Port", value=int(settings.get("smtp_port", 587)), 
                                            min_value=1, max_value=65535, help="Usually 587 for TLS")
@@ -1329,7 +1368,7 @@ def show_admin_dashboard():
             smtp_username = st.text_input("SMTP Username (Email)", value=settings.get("smtp_username", ""),
                                          help="Your email address for sending notifications")
             smtp_password = st.text_input("SMTP Password", value=settings.get("smtp_password", ""), type="password",
-                                         help="For Gmail, use an App Password (not your regular password)")
+                                         help="Use App Password (see setup guide above) - NOT your regular password")
             smtp_from_name = st.text_input("From Name", value=settings.get("smtp_from_name", "AlphaStream Portfolio"),
                                           help="Name shown in the 'From' field of emails")
             
