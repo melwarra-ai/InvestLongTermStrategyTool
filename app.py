@@ -878,7 +878,7 @@ def get_all_profiles_overview(db):
         user_email = user_data.get("email", "N/A")
         
         for profile_name, profile_data in profiles.items():
-            assets = profile_data.get("deployed_assets", {})
+            assets = profile_data.get("assets", {})
             target_allocation = profile_data.get("target_allocation", {})
             
             # Calculate status
@@ -901,15 +901,17 @@ def get_all_profiles_overview(db):
                             prices[ticker] = None
                     
                     # Calculate total value
-                    for ticker, units in assets.items():
+                    for ticker, asset_data in assets.items():
                         if ticker in prices and prices[ticker]:
+                            units = asset_data.get("units", 0)
                             total_value += units * prices[ticker]
                     
                     # Calculate current allocation
                     current_allocation = {}
                     if total_value > 0:
-                        for ticker, units in assets.items():
+                        for ticker, asset_data in assets.items():
                             if ticker in prices and prices[ticker]:
+                                units = asset_data.get("units", 0)
                                 value = units * prices[ticker]
                                 current_allocation[ticker] = (value / total_value) * 100
                     
