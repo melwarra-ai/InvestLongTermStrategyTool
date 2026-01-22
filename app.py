@@ -879,7 +879,6 @@ def get_all_profiles_overview(db):
         
         for profile_name, profile_data in profiles.items():
             assets = profile_data.get("assets", {})
-            target_allocation = profile_data.get("target_allocation", {})
             
             # Calculate status
             status = "empty"
@@ -887,7 +886,10 @@ def get_all_profiles_overview(db):
             total_value = 0
             needs_action = False
             
-            if assets and target_allocation:
+            # Check if profile has any assets with targets
+            has_targets = any(a.get("target", 0) > 0 for a in assets.values()) if assets else False
+            
+            if assets and has_targets:
                 try:
                     tickers = list(assets.keys())
                     prices = {}
@@ -918,8 +920,8 @@ def get_all_profiles_overview(db):
                     # Calculate drift
                     max_drift = 0
                     drift_tolerance = profile_data.get("drift_tolerance", 5.0)
-                    for ticker in target_allocation:
-                        target_pct = target_allocation[ticker]
+                    for ticker, asset_data in assets.items():
+                        target_pct = asset_data.get("target", 0)
                         current_pct = current_allocation.get(ticker, 0)
                         drift = abs(current_pct - target_pct)
                         max_drift = max(max_drift, drift)
@@ -933,7 +935,11 @@ def get_all_profiles_overview(db):
                     else:
                         status = "balanced"
                         drift_status = "Balanced"
-                except:
+                except Exception as e:
+                    # Log the error for debugging
+                    import traceback
+                    print(f"Error calculating portfolio {profile_name} for {username}: {str(e)}")
+                    traceback.print_exc()
                     status = "error"
                     drift_status = "Error"
             
