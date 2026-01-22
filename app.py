@@ -1527,7 +1527,7 @@ def show_admin_dashboard(db, current_user):
                                 </div>
                                 <div>
                                     <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Last Rebalanced</p>
-                                    <p style="margin: 4px 0 0 0; color: #1e293b; font-weight: 600; font-size: 0.85rem;">{profile['last_rebalanced'][:10] if profile['last_rebalanced'] != 'Never' else 'Never'}</p>
+                                    <p style="margin: 4px 0 0 0; color: #1e293b; font-weight: 600; font-size: 0.85rem;">{profile['last_rebalanced'][:10] if profile['last_rebalanced'] and profile['last_rebalanced'] != 'Never' else 'Never'}</p>
                                 </div>
                             </div>
                         </div>
@@ -1623,7 +1623,7 @@ def show_admin_dashboard(db, current_user):
                                 </div>
                                 <div>
                                     <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Last Rebalanced</p>
-                                    <p style="margin: 4px 0 0 0; color: #991b1b; font-weight: 600; font-size: 0.85rem;">{profile['last_rebalanced'][:10] if profile['last_rebalanced'] != 'Never' else 'Never'}</p>
+                                    <p style="margin: 4px 0 0 0; color: #991b1b; font-weight: 600; font-size: 0.85rem;">{profile['last_rebalanced'][:10] if profile['last_rebalanced'] and profile['last_rebalanced'] != 'Never' else 'Never'}</p>
                                 </div>
                             </div>
                         </div>
