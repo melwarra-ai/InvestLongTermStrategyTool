@@ -14,10 +14,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.5.3"
-VERSION_DATE = "2026-01-21"
-VERSION_TIME = "23:40:00"
-VERSION_NAME = "Multi-User Auth + Admin Tab Descriptions"
+VERSION = "6.5.4"
+VERSION_DATE = "2026-01-22"
+VERSION_TIME = "10:52:00"
+VERSION_NAME = "Multi-User Auth + Delete Users"
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -1317,7 +1317,7 @@ def show_admin_dashboard():
         st.divider()
         
         for username, user_data in users.items():
-            col_u1, col_u2, col_u3, col_u4 = st.columns([2, 2, 1, 1])
+            col_u1, col_u2, col_u3, col_u4, col_u5 = st.columns([2, 2, 1, 1, 1])
             with col_u1:
                 role_badge = "👑" if user_data.get("role") == "admin" else "👤"
                 status = "🟢" if user_data.get("is_active", True) else "🔴"
@@ -1345,9 +1345,52 @@ def show_admin_dashboard():
             with col_u4:
                 if username != st.session_state.current_user:
                     if st.button("🔑 Reset", key=f"rst_{username}"):
-                        st.session_state[f"reset_pwd_user"] = username
+                        st.session_state["reset_pwd_user"] = username
+            with col_u5:
+                if username != st.session_state.current_user:
+                    if st.button("🗑️ Delete", key=f"del_{username}", type="secondary"):
+                        st.session_state["delete_user"] = username
             st.divider()
         
+        # Delete user confirmation
+        if st.session_state.get("delete_user"):
+            target_user = st.session_state.delete_user
+            target_data = users.get(target_user, {})
+            portfolios_count = len(target_data.get("profiles", {}))
+            
+            st.markdown("---")
+            st.markdown(f'''
+                <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); 
+                            border-left: 4px solid #ef4444; padding: 16px; border-radius: 8px; margin: 12px 0;">
+                    <h3 style="margin: 0 0 8px 0; color: #991b1b;">⚠️ Delete User: @{target_user}</h3>
+                    <p style="margin: 0; color: #7f1d1d;">This will permanently delete the user and all their data ({portfolios_count} portfolios).</p>
+                    <p style="margin: 8px 0 0 0; color: #7f1d1d;"><strong>The username and email will be available for reuse.</strong></p>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            col_del1, col_del2 = st.columns(2)
+            with col_del1:
+                if st.button("🗑️ Confirm Delete", type="primary", use_container_width=True, key="confirm_delete"):
+                    deleted_email = target_data.get("email", "N/A")
+                    deleted_display = target_data.get("display_name", target_user)
+                    
+                    # Remove user from database
+                    del st.session_state.db["users"][target_user]
+                    
+                    log_system_event(st.session_state.db, "user_deleted", 
+                                    f"Deleted user: {target_user} ({deleted_display}, {deleted_email}) - {portfolios_count} portfolios removed", 
+                                    st.session_state.current_user)
+                    save_db(st.session_state.db)
+                    
+                    del st.session_state["delete_user"]
+                    st.success(f"✅ User @{target_user} has been permanently deleted.")
+                    st.rerun()
+            with col_del2:
+                if st.button("❌ Cancel", use_container_width=True, key="cancel_delete"):
+                    del st.session_state["delete_user"]
+                    st.rerun()
+        
+        # Reset password form
         if st.session_state.get("reset_pwd_user"):
             target_user = st.session_state.reset_pwd_user
             st.markdown(f"### 🔑 Reset Password for @{target_user}")
