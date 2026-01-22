@@ -1739,332 +1739,6 @@ def show_registration_page():
                 st.session_state.auth_page = "login"
                 st.rerun()
 
-def show_admin_dashboard():
-    """Display admin dashboard"""
-    st.title("👑 Admin Dashboard")
-    description_box("System Administration", "Manage users, view system logs, and configure global settings.")
-    
-    admin_tab1, admin_tab2, admin_tab3, admin_tab4 = st.tabs([
-        "👥 User Management", "📊 System Statistics", "📜 System Logs", "⚙️ Global Settings"
-    ])
-    
-    with admin_tab1:
-        description_box("User Management", "View, activate, deactivate users and reset passwords.")
-        
-        st.markdown("### 👥 All Users")
-        users = st.session_state.db["users"]
-        
-        col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-        with col_s1:
-            st.metric("Total Users", len(users))
-        with col_s2:
-            admin_count = sum(1 for u in users.values() if u.get("role") == "admin")
-            st.metric("Admins", admin_count)
-        with col_s3:
-            active_count = sum(1 for u in users.values() if u.get("is_active", True))
-            st.metric("Active Users", active_count)
-        with col_s4:
-            total_profiles = sum(len(u.get("profiles", {})) for u in users.values())
-            st.metric("Total Portfolios", total_profiles)
-        
-        st.divider()
-        
-        for username, user_data in users.items():
-            col_u1, col_u2, col_u3, col_u4, col_u5 = st.columns([2, 2, 1, 1, 1])
-            with col_u1:
-                role_badge = "👑" if user_data.get("role") == "admin" else "👤"
-                status = "🟢" if user_data.get("is_active", True) else "🔴"
-                st.markdown(f"**{role_badge} {user_data.get('display_name', username)}** {status}")
-                st.caption(f"@{username} • {user_data.get('email', 'N/A')}")
-            with col_u2:
-                profiles_count = len(user_data.get("profiles", {}))
-                st.caption(f"📁 {profiles_count} portfolios")
-                last_login = user_data.get('last_login', 'Never')
-                st.caption(f"📅 Last: {last_login[:10] if last_login else 'Never'}")
-            with col_u3:
-                if username != st.session_state.current_user:
-                    if user_data.get("is_active", True):
-                        if st.button("🔙 Deactivate", key=f"deact_{username}"):
-                            st.session_state.db["users"][username]["is_active"] = False
-                            log_system_event(st.session_state.db, "user_deactivated", f"Deactivated: {username}", st.session_state.current_user)
-                            save_db(st.session_state.db)
-                            st.rerun()
-                    else:
-                        if st.button("🔜 Activate", key=f"act_{username}"):
-                            st.session_state.db["users"][username]["is_active"] = True
-                            log_system_event(st.session_state.db, "user_activated", f"Activated: {username}", st.session_state.current_user)
-                            save_db(st.session_state.db)
-                            st.rerun()
-            with col_u4:
-                if username != st.session_state.current_user:
-                    if st.button("🔘 Reset", key=f"rst_{username}"):
-                        st.session_state["reset_pwd_user"] = username
-            with col_u5:
-                if username != st.session_state.current_user:
-                    if st.button("🗑️ Delete", key=f"del_{username}", type="secondary"):
-                        st.session_state["delete_user"] = username
-            st.divider()
-        
-        # Delete user confirmation
-        if st.session_state.get("delete_user"):
-            target_user = st.session_state.delete_user
-            target_data = users.get(target_user, {})
-            portfolios_count = len(target_data.get("profiles", {}))
-            
-            st.markdown("---")
-            st.markdown(f'''
-                <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); 
-                            border-left: 4px solid #ef4444; padding: 16px; border-radius: 8px; margin: 12px 0;">
-                    <h3 style="margin: 0 0 8px 0; color: #991b1b;">⚠️ Delete User: @{target_user}</h3>
-                    <p style="margin: 0; color: #7f1d1d;">This will permanently delete the user and all their data ({portfolios_count} portfolios).</p>
-                    <p style="margin: 8px 0 0 0; color: #7f1d1d;"><strong>The username and email will be available for reuse.</strong></p>
-                </div>
-            ''', unsafe_allow_html=True)
-            
-            col_del1, col_del2 = st.columns(2)
-            with col_del1:
-                if st.button("🗑️ Confirm Delete", type="primary", use_container_width=True, key="confirm_delete"):
-                    deleted_email = target_data.get("email", "N/A")
-                    deleted_display = target_data.get("display_name", target_user)
-                    
-                    # Remove user from database
-                    del st.session_state.db["users"][target_user]
-                    
-                    log_system_event(st.session_state.db, "user_deleted", 
-                                    f"Deleted user: {target_user} ({deleted_display}, {deleted_email}) - {portfolios_count} portfolios removed", 
-                                    st.session_state.current_user)
-                    save_db(st.session_state.db)
-                    
-                    del st.session_state["delete_user"]
-                    st.success(f"✅ User @{target_user} has been permanently deleted.")
-                    st.rerun()
-            with col_del2:
-                if st.button("❌ Cancel", use_container_width=True, key="cancel_delete"):
-                    del st.session_state["delete_user"]
-                    st.rerun()
-        
-        # Reset password form
-        if st.session_state.get("reset_pwd_user"):
-            target_user = st.session_state.reset_pwd_user
-            st.markdown(f"### 🔘 Reset Password for @{target_user}")
-            with st.form(f"reset_pwd_form"):
-                new_pwd = st.text_input("New Password", type="password")
-                new_pwd_confirm = st.text_input("Confirm", type="password")
-                col_r1, col_r2 = st.columns(2)
-                with col_r1:
-                    if st.form_submit_button("✅ Reset", type="primary"):
-                        if new_pwd != new_pwd_confirm:
-                            st.error("Passwords don't match")
-                        else:
-                            success, msg = admin_reset_password(st.session_state.db, st.session_state.current_user, target_user, new_pwd)
-                            if success:
-                                st.success(msg)
-                                del st.session_state["reset_pwd_user"]
-                                st.rerun()
-                            else:
-                                st.error(msg)
-                with col_r2:
-                    if st.form_submit_button("❌ Cancel"):
-                        del st.session_state["reset_pwd_user"]
-                        st.rerun()
-    
-    with admin_tab2:
-        description_box("System Statistics", "Overview of total assets under management and platform usage metrics.")
-        
-        st.markdown("### 📊 System Statistics")
-        users = st.session_state.db["users"]
-        total_value = 0
-        all_tickers = set()
-        
-        for user_data in users.values():
-            for profile in user_data.get("profiles", {}).values():
-                for ticker in profile.get("assets", {}).keys():
-                    all_tickers.add(ticker)
-        
-        if all_tickers:
-            try:
-                with st.spinner("Fetching market data..."):
-                    raw_px = yf.download(list(all_tickers), period="1d", progress=False)['Close']
-                    prices = {}
-                    if len(all_tickers) == 1:
-                        if not raw_px.empty:
-                            prices = {list(all_tickers)[0]: float(raw_px.iloc[-1])}
-                    else:
-                        for k, v in raw_px.iloc[-1].to_dict().items():
-                            if pd.notna(v):
-                                prices[k] = float(v)
-                    
-                    for user_data in users.values():
-                        for profile in user_data.get("profiles", {}).values():
-                            for ticker, asset in profile.get("assets", {}).items():
-                                total_value += asset.get("units", 0) * prices.get(ticker, 0)
-            except:
-                prices = {}
-        
-        col_stat1, col_stat2 = st.columns(2)
-        with col_stat1:
-            st.markdown(f"""
-                <div class="metric-showcase">
-                    <h3>${total_value:,.0f}</h3>
-                    <p>Total AUM</p>
-                </div>
-            """, unsafe_allow_html=True)
-        with col_stat2:
-            st.markdown(f"""
-                <div class="metric-showcase" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-                    <h3>{len(all_tickers)}</h3>
-                    <p>Unique Tickers</p>
-                </div>
-            """, unsafe_allow_html=True)
-    
-    with admin_tab3:
-        description_box("System Logs", "Track user activity including logins, logouts, password changes, and account events.")
-        
-        st.markdown("### 📜 System Logs")
-        logs = st.session_state.db.get("system_logs", [])
-        if logs:
-            log_types = list(set(log.get("type", "unknown") for log in logs))
-            selected_type = st.selectbox("Filter by Type", ["All"] + log_types)
-            filtered_logs = logs if selected_type == "All" else [l for l in logs if l.get("type") == selected_type]
-            st.caption(f"Showing {len(filtered_logs)} of {len(logs)} logs")
-            for log in filtered_logs[:100]:
-                type_emoji = {"login": "🔘", "registration": "📜", "logout": "🚪", "password_change": "🔙",
-                             "admin_password_reset": "👑", "lockout": "⚠️", "user_deactivated": "🔴",
-                             "user_activated": "🟢"}.get(log.get("type"), "📋")
-                st.caption(f"{type_emoji} **{log.get('timestamp')}** | {log.get('type')} | {log.get('message')}")
-        else:
-            st.info("No system logs yet")
-    
-    with admin_tab4:
-        description_box("Global Settings", "Configure registration, default values, AI assistant, and email notification settings.")
-        
-        st.markdown("### ⚙️ Global Settings")
-        settings = st.session_state.db.get("global_settings", {})
-        with st.form("global_settings_form"):
-            allow_reg = st.checkbox("Allow New Registrations", value=settings.get("allow_registration", True))
-            default_tolerance = st.number_input("Default Drift Tolerance (%)", value=float(settings.get("default_drift_tolerance", 5.0)), min_value=0.5, max_value=20.0, step=0.5)
-            
-            st.divider()
-            st.markdown("**🤖 AI Assistant Settings**")
-            ai_enabled = st.checkbox("Enable AI Assistant", value=settings.get("ai_assistant_enabled", True), 
-                                    help="Allow users to access the AI-powered help assistant")
-            ai_api_key = st.text_input("Anthropic API Key", value=settings.get("ai_assistant_api_key", ""), 
-                                       type="password", help="Enter your Anthropic API key for the AI assistant")
-            
-            st.divider()
-            st.markdown("**🔧 Email Notification Settings**")
-            
-            with st.expander("ℹ️ How to set up email for different providers", expanded=False):
-                st.markdown("""
-                **🔧 Supported Providers & Settings:**
-                
-                | Provider | SMTP Server | Port |
-                |----------|-------------|------|
-                | Gmail | `smtp.gmail.com` | 587 |
-                | Outlook/Hotmail | `smtp.office365.com` | 587 |
-                | Yahoo | `smtp.mail.yahoo.com` | 587 |
-                | iCloud | `smtp.mail.me.com` | 587 |
-                
-                ---
-                
-                **🔐 Gmail App Password Setup:**
-                1. Go to [myaccount.google.com](https://myaccount.google.com)
-                2. Security ↙ 2-Step Verification (must be ON)
-                3. Search "App passwords" in Google Account
-                4. Select app: "Mail", Select device: "Other" ↙ name it "AlphaStream"
-                5. Click **Generate** ↙ Copy the 16-character password
-                6. Use this password (not your regular Gmail password)
-                
-                ---
-                
-                **🔐 Outlook/Microsoft App Password Setup:**
-                1. Go to [account.microsoft.com](https://account.microsoft.com)
-                2. Security ↙ Advanced security options
-                3. Enable Two-step verification (if not already)
-                4. Under "App passwords" ↙ Create a new app password
-                5. Copy and use this password
-                
-                ---
-                
-                **⚠️ Important Notes:**
-                - Never use your regular email password - always use App Passwords
-                - App Passwords are required when 2FA is enabled (which it should be!)
-                - If emails fail, check spam folder first
-                """)
-            
-            email_enabled = st.checkbox("Enable Email Notifications", value=settings.get("email_notifications_enabled", False),
-                                       help="Send email alerts when portfolios need rebalancing")
-            
-            col_smtp1, col_smtp2 = st.columns(2)
-            with col_smtp1:
-                smtp_server = st.text_input("SMTP Server", value=settings.get("smtp_server", "smtp.gmail.com"),
-                                           help="See setup guide above for provider-specific servers")
-            with col_smtp2:
-                smtp_port = st.number_input("SMTP Port", value=int(settings.get("smtp_port", 587)), 
-                                           min_value=1, max_value=65535, help="Usually 587 for TLS")
-            
-            smtp_username = st.text_input("SMTP Username (Email)", value=settings.get("smtp_username", ""),
-                                         help="Your email address for sending notifications")
-            smtp_password = st.text_input("SMTP Password", value=settings.get("smtp_password", ""), type="password",
-                                         help="Use App Password (see setup guide above) - NOT your regular password")
-            smtp_from_name = st.text_input("From Name", value=settings.get("smtp_from_name", "AlphaStream Portfolio"),
-                                          help="Name shown in the 'From' field of emails")
-            
-            if st.form_submit_button("💾 Save Settings", type="primary"):
-                st.session_state.db["global_settings"]["allow_registration"] = allow_reg
-                st.session_state.db["global_settings"]["default_drift_tolerance"] = default_tolerance
-                st.session_state.db["global_settings"]["ai_assistant_enabled"] = ai_enabled
-                st.session_state.db["global_settings"]["ai_assistant_api_key"] = ai_api_key
-                st.session_state.db["global_settings"]["email_notifications_enabled"] = email_enabled
-                st.session_state.db["global_settings"]["smtp_server"] = smtp_server
-                st.session_state.db["global_settings"]["smtp_port"] = smtp_port
-                st.session_state.db["global_settings"]["smtp_username"] = smtp_username
-                st.session_state.db["global_settings"]["smtp_password"] = smtp_password
-                st.session_state.db["global_settings"]["smtp_from_name"] = smtp_from_name
-                save_db(st.session_state.db)
-                st.success("✅ Settings saved!")
-                st.rerun()
-        
-        # Status indicators
-        col_status1, col_status2 = st.columns(2)
-        with col_status1:
-            if settings.get("ai_assistant_enabled", False):
-                if settings.get("ai_assistant_api_key"):
-                    st.success("✅ AI Assistant: **Enabled**")
-                else:
-                    st.warning("⚠️ AI Assistant: **No API key**")
-            else:
-                st.info("ℹ️ AI Assistant: Disabled")
-        
-        with col_status2:
-            if settings.get("email_notifications_enabled", False):
-                if settings.get("smtp_username") and settings.get("smtp_password"):
-                    st.success("✅ Email Alerts: **Enabled**")
-                else:
-                    st.warning("⚠️ Email Alerts: **No credentials**")
-            else:
-                st.info("ℹ️ Email Alerts: Disabled")
-        
-        # Test email button
-        if settings.get("email_notifications_enabled") and settings.get("smtp_username"):
-            st.divider()
-            test_email = st.text_input("Test Email Address", placeholder="Enter email to send test")
-            if st.button("🔧 Send Test Email", type="secondary"):
-                if test_email and "@" in test_email:
-                    with st.spinner("Sending test email..."):
-                        success, msg = send_email(
-                            test_email,
-                            "🧪 AlphaStream Test Email",
-                            "<h2>✅ Email Configuration Successful!</h2><p>Your AlphaStream email notifications are working correctly.</p>",
-                            settings
-                        )
-                    if success:
-                        st.success(f"✅ Test email sent to {test_email}")
-                    else:
-                        st.error(f"❌ Failed: {msg}")
-                else:
-                    st.warning("Please enter a valid email address")
-
 # ===== MAIN APPLICATION FLOW =====
 if not st.session_state.authenticated:
     if st.session_state.auth_page == "login":
@@ -2072,16 +1746,41 @@ if not st.session_state.authenticated:
     else:
         show_registration_page()
 else:
-    current_user = st.session_state.current_user
-    user_data = st.session_state.db.get("users", {}).get(current_user, {})
+    # Get actual logged-in user and check for impersonation
+    actual_user = st.session_state.current_user
+    impersonating_user = st.session_state.get("impersonating_user")
+    current_user = impersonating_user if impersonating_user else actual_user
+    
+    user_data = st.session_state.db.get("users", {}).get(actual_user, {})
     is_admin_user = user_data.get("role") == "admin"
     
     # ===== SIDEBAR =====
     with st.sidebar:
-        role_badge = "admin-badge" if is_admin_user else "user-badge"
-        role_text = "👑 Admin" if is_admin_user else "👤 User"
-        st.markdown(f'<div class="{role_badge}">{role_text}: {user_data.get("display_name", current_user)}</div>', unsafe_allow_html=True)
-        st.caption(f"@{current_user}")
+        # Show impersonation status if applicable
+        if is_admin_user and impersonating_user:
+            st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
+                            color: white; padding: 16px; border-radius: 10px; margin-bottom: 20px;
+                            animation: pulse-impersonate 2s infinite;">
+                    <div>
+                        <p style="margin: 0; font-size: 0.75rem; opacity: 0.9;">👑 Admin viewing as</p>
+                        <p style="margin: 4px 0 0 0; font-size: 1.1rem; font-weight: 600;">👤 {current_user}</p>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.2); padding: 8px; border-radius: 6px; margin-top: 12px;">
+                        <p style="margin: 0; font-size: 0.75rem; text-align: center;">⚠️ IMPERSONATION MODE</p>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button("🔙 Return to Admin Dashboard", use_container_width=True, type="secondary", key="return_admin"):
+                stop_impersonation()
+                st.session_state.current_page = "Admin Dashboard"
+                st.rerun()
+        else:
+            role_badge = "admin-badge" if is_admin_user else "user-badge"
+            role_text = "👑 Admin" if is_admin_user else "👤 User"
+            st.markdown(f'<div class="{role_badge}">{role_text}: {user_data.get("display_name", actual_user)}</div>', unsafe_allow_html=True)
+            st.caption(f"@{actual_user}")
         
         st.divider()
         st.markdown("### 📊 Portfolio Optimizer")
@@ -2108,7 +1807,8 @@ else:
                 st.session_state.current_page = "Portfolio Manager"
                 st.rerun()
         
-        if is_admin_user:
+        # Show Admin Dashboard button only when admin and not impersonating
+        if is_admin_user and not impersonating_user:
             admin_type = "primary" if st.session_state.current_page == "Admin Dashboard" else "secondary"
             if st.button("👑 Admin Dashboard", use_container_width=True, type=admin_type, key="nav_admin"):
                 st.session_state.current_page = "Admin Dashboard"
@@ -2876,10 +2576,19 @@ else:
             st.rerun()
 
     # ===== MAIN CONTENT AREA =====
-    if view_mode == "Admin Dashboard" and is_admin_user:
-        show_admin_dashboard()
+    if view_mode == "Admin Dashboard" and is_admin_user and not impersonating_user:
+        show_admin_dashboard(st.session_state.db, actual_user)
     
     elif view_mode == "Global Dashboard":
+        # Show impersonation warning if admin is viewing as another user
+        if is_admin_user and impersonating_user:
+            st.markdown(f"""
+                <div class="warning-banner">
+                    <h4>⚠️ Admin Impersonation Mode</h4>
+                    <p style="margin: 0;">You are viewing <strong>{current_user}</strong>'s account. All actions will affect this user's data.</p>
+                </div>
+            """, unsafe_allow_html=True)
+        
         st.title("🏠 Global Portfolio Dashboard")
         
         description_box(
