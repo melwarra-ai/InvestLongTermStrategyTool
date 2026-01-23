@@ -14,11 +14,18 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.5"
+VERSION = "6.7.6"
 VERSION_DATE = "2026-01-23"
-VERSION_TIME = "07:00:00"
-VERSION_NAME = "Admin Visibility Fix"
+VERSION_TIME = "18:00:00"
+VERSION_NAME = "Cash Deployment Visibility"
 CHANGELOG = """
+v6.7.6 (2026-01-23 18:00)
+- Added: "Capital Overview" section in sidebar showing Principal, Deployed, and Undeployed cash
+- Added: "Undeployed $" column in Rebalance Analysis table
+- Added: Info box explaining why 100% deployment is impossible (can't buy fractional shares)
+- Enhanced: Clear visibility of cash drag and deployment efficiency
+- Insight: Shows exact $ amount that couldn't be deployed per asset
+
 v6.7.5 (2026-01-23 07:00)
 - Fixed: User registration now visible in Admin Dashboard → Activity & Logs
 - Fixed: User login now visible in Admin Dashboard → Activity Timeline
@@ -3369,6 +3376,30 @@ else:
                                     except Exception as e:
                                         st.error(f"❌ Error: {str(e)}")
             
+            # Capital Overview Section
+            st.divider()
+            st.markdown("### 💰 Capital Overview")
+            
+            # Calculate total deployed from purchases
+            total_deployed_capital = 0
+            for ticker, asset_data in assets.items():
+                purchases = asset_data.get("purchases", [])
+                total_deployed_capital += sum(p.get("amount", 0) for p in purchases)
+            
+            principal_amt = prof['principal']
+            undeployed_cash = principal_amt - total_deployed_capital
+            deployment_rate = (total_deployed_capital / principal_amt * 100) if principal_amt > 0 else 0
+            
+            col_cap1, col_cap2 = st.columns(2)
+            with col_cap1:
+                st.metric("Principal Set", f"${principal_amt:,.0f}")
+                st.metric("Capital Deployed", f"${total_deployed_capital:,.0f}")
+            with col_cap2:
+                st.metric("Undeployed Cash", f"${undeployed_cash:,.0f}",
+                         delta=f"{deployment_rate:.1f}% deployed" if undeployed_cash > 0 else None)
+                if undeployed_cash > 0:
+                    st.caption(f"💡 {(undeployed_cash/principal_amt*100):.1f}% idle cash")
+            
             # Activity Log
             st.divider()
             st.markdown("### 📜 Activity Log")
@@ -5054,11 +5085,12 @@ else:
                     "Actual %": st.column_config.TextColumn("Actual % ℹ️", help="Current portfolio percentage based on market values (this will differ from Target % due to price movements)", width="small"),
                     "Drift": st.column_config.TextColumn("Drift ℹ️", help="Difference between Actual % and Target % (🔴 = exceeds tolerance and needs rebalancing, ⚠️ = still deploying)", width="small"),
                     "Status": st.column_config.TextColumn("Status ℹ️", help="Current state: Deploying = still adding capital, Deployed = fully funded and monitoring drift", width="medium"),
+                    "Undeployed $": st.column_config.TextColumn("Undeployed $ ℹ️", help="Amount of target capital not yet deployed due to whole share requirements (can't buy fractional shares)", width="small"),
                     "Avg Cost": st.column_config.TextColumn("Avg Cost ℹ️", help="Weighted average cost per unit (calculated when 100% deployed)", width="small"),
                     "Units": st.column_config.TextColumn("Units ℹ️", help="Total shares/units owned", width="small"),
                     "Current Price": st.column_config.TextColumn("Price ℹ️", help="Latest market price per unit", width="small"),
                     "%Daily Change": st.column_config.TextColumn("%Change ℹ️", help="Price change from previous trading day", width="small"),
-                    "Amount": st.column_config.TextColumn("Value ℹ️", help="Current market value (Units Ã— Current Price)", width="medium"),
+                    "Amount": st.column_config.TextColumn("Value ℹ️", help="Current market value (Units × Current Price)", width="medium"),
                     "Buy/Sell Amt": st.column_config.TextColumn("Trade Amt ℹ️", help="Dollar amount to trade for rebalancing", width="medium"),
                     "Buy/Sell Shares": st.column_config.TextColumn("Trade Shares ℹ️", help="Number of shares to buy (+) or sell (-)", width="small")
                 }
@@ -5066,6 +5098,7 @@ else:
                 rows = []
                 total_turnover = 0
                 total_current_val = 0
+                total_undeployed = 0
                 
                 for t in v_t:
                     current_price = float(data[t].iloc[-1])
@@ -5116,10 +5149,19 @@ else:
                     else:
                         status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
                     
+                    # Calculate undeployed $ for this asset
+                    target_capital = (tar_w / 100) * start_val
+                    purchases = asset_dict[t].get("purchases", [])
+                    deployed_capital = sum(p.get("amount", 0) for p in purchases)
+                    undeployed_asset = max(0, target_capital - deployed_capital)
+                    total_undeployed += undeployed_asset
+                    
                     rows.append({
                         "Fund Name": fund_name, "Ticker": t, "Target %": f"{tar_w:.2f}%",
                         "Deployed": f"{min(allocated_pct, 100):.0f}%", "Actual %": f"{act_w:.2f}%",
-                        "Drift": drift_display, "Status": status_display, "Avg Cost": avg_cost_display,
+                        "Drift": drift_display, "Status": status_display,
+                        "Undeployed $": f"${undeployed_asset:,.0f}",
+                        "Avg Cost": avg_cost_display,
                         "Units": f"{cur_u:.0f}", "Current Price": f"${current_price:.2f}",
                         "%Daily Change": f"{daily_change_pct:+.2f}%", "Amount": f"${act_val:,.0f}",
                         "Buy/Sell Amt": f"${abs(val_diff):,.0f}", "Buy/Sell Shares": f"{round(unit_diff):+.0f}"
@@ -5143,6 +5185,7 @@ else:
                     "Fund Name": "**TOTAL**", "Ticker": "", "Target %": "**100.00%**",
                     "Deployed": f"**{deployment_pct:.0f}%**" if not is_fully_deployed else "**100%**", 
                     "Actual %": "**100.00%**", "Drift": "—", "Status": total_status,
+                    "Undeployed $": f"**${total_undeployed:,.0f}**",
                     "Avg Cost": "", "Units": "", "Current Price": "", "%Daily Change": "",
                     "Amount": f"**${total_current_val:,.0f}**",
                     "Buy/Sell Amt": f"**${total_turnover:,.0f}**", "Buy/Sell Shares": "—"
@@ -5150,6 +5193,27 @@ else:
                 
                 df_rebalance = pd.DataFrame(rows)
                 st.dataframe(df_rebalance, use_container_width=True, hide_index=True, column_config=column_config)
+                
+                # Explain undeployed cash if it exists
+                if total_undeployed > 0:
+                    undeployed_pct = (total_undeployed / start_val * 100) if start_val > 0 else 0
+                    st.info(f"""
+💡 **Why ${total_undeployed:,.0f} ({undeployed_pct:.1f}%) undeployed?**
+
+You can't buy fractional shares at most brokers, making it mathematically impossible to deploy exactly your target amounts.
+
+**Example:** If SPXL costs $173.73/share and your target is $5,000:
+- You can buy 28 shares = $4,864.44 ✅
+- OR buy 29 shares = $5,038.17 ❌ (over budget!)
+- **Undeployed:** $135.56
+
+This is **normal** in portfolio management. Your deployment efficiency of **{deployment_pct:.1f}%** is excellent given share price constraints.
+
+**Options for remaining ${total_undeployed:,.0f}:**
+- Keep as cash reserve for rebalancing
+- Buy additional shares if it won't over-allocate
+- Add to next capital injection
+                    """)
                 
                 col_metric1, col_metric2 = st.columns(2)
                 with col_metric1:
