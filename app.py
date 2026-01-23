@@ -14,11 +14,21 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.11"
+VERSION = "6.7.12"
 VERSION_DATE = "2026-01-23"
-VERSION_TIME = "16:19:27"  # EST
-VERSION_NAME = "Smart Fractional Detection & Add Capital"
+VERSION_TIME = "16:37:00"  # EST
+VERSION_NAME = "Progress Bar Consistency Fix"
 CHANGELOG = """
+v6.7.12 (2026-01-23 16:37 EST)
+- CRITICAL: Fixed progress bar showing "1/2 deployed" when portfolio truly 100% deployed
+- CRITICAL: Fixed table status showing "Deploying" when fractional remainder only
+- Enhanced: Progress bar uses smart fractional detection (checks cheapest asset price)
+- Enhanced: All assets show "✅ Deployed" when portfolio has only fractional remainder
+- Fixed: Consistency between progress bar, table status, and info box messages
+- Fixed: User case where SPXL at 99% showed "Deploying" despite no shares affordable
+- UX: Progress shows "2/2 assets fully deployed" when truly complete
+- UX: Success message includes fractional amount in progress section
+
 v6.7.11 (2026-01-23 16:19 EST)
 - CRITICAL: Smart fractional detection - checks if undeployed cash can buy cheapest asset
 - CRITICAL: Fixed false "deployable" warnings when cash < cheapest share price
@@ -3180,10 +3190,48 @@ else:
                 st.info("🔙 **Lock your asset mix first**")
             else:
                 assets = prof.get("assets", {})
-                # Use 99.5% threshold consistently (same as table "Deployed" status)
-                deployable_assets = {t: d for t, d in assets.items() if d.get("allocated_pct", 0) < 99.5}
-                fully_deployed_count = sum(1 for a in assets.values() if a.get("allocated_pct", 0) >= 99.5)
-                total_assets = len(assets)
+                
+                # Calculate total deployed and undeployed
+                total_deployed_capital = 0
+                for ticker, asset_data in assets.items():
+                    purchases = asset_data.get("purchases", [])
+                    total_deployed_capital += sum(p.get("amount", 0) for p in purchases)
+                
+                principal_amt = prof['principal']
+                undeployed_cash = principal_amt - total_deployed_capital
+                
+                # Smart fractional detection: check if can afford cheapest asset
+                cheapest_asset_price = None
+                import yfinance as yf
+                for ticker in assets.keys():
+                    try:
+                        ticker_obj = yf.Ticker(ticker)
+                        hist = ticker_obj.history(period="1d")
+                        if not hist.empty:
+                            price = float(hist['Close'].iloc[-1])
+                            if cheapest_asset_price is None or price < cheapest_asset_price:
+                                cheapest_asset_price = price
+                    except:
+                        pass
+                
+                # Determine if portfolio is truly fully deployed (fractional only)
+                is_truly_fully_deployed = False
+                if undeployed_cash > 0 and cheapest_asset_price is not None:
+                    is_truly_fully_deployed = undeployed_cash < cheapest_asset_price
+                elif undeployed_cash <= 0:
+                    is_truly_fully_deployed = True
+                
+                # Count deployed assets
+                if is_truly_fully_deployed:
+                    # Portfolio is truly fully deployed - count all assets as deployed
+                    deployable_assets = {}  # No deployable assets
+                    fully_deployed_count = len(assets)
+                    total_assets = len(assets)
+                else:
+                    # Use 99.5% threshold for normal deployment tracking
+                    deployable_assets = {t: d for t, d in assets.items() if d.get("allocated_pct", 0) < 99.5}
+                    fully_deployed_count = sum(1 for a in assets.values() if a.get("allocated_pct", 0) >= 99.5)
+                    total_assets = len(assets)
                 
                 st.markdown(f"**Progress:** {fully_deployed_count}/{total_assets} assets fully deployed")
                 
@@ -3206,7 +3254,10 @@ else:
                     ''', unsafe_allow_html=True)
                 
                 if not deployable_assets:
-                    st.success("✅ **All assets 100% deployed!**")
+                    if is_truly_fully_deployed and undeployed_cash > 0:
+                        st.success(f"✅ **All assets 100% deployed!** (${undeployed_cash:,.2f} fractional remainder)")
+                    else:
+                        st.success("✅ **All assets 100% deployed!**")
                 else:
                     with st.expander("➢ Record Asset Deployment", expanded=False):
                         st.markdown("**Deploy capital into a specific asset**")
@@ -5443,6 +5494,24 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 total_current_val = 0
                 total_undeployed = 0
                 
+                # Smart fractional detection for table status
+                # Calculate if portfolio is truly fully deployed (fractional only)
+                table_is_truly_fully_deployed = False
+                if actual_undeployed_cash > 0:
+                    # Find cheapest asset price in the table
+                    cheapest_price_in_table = None
+                    for t in v_t:
+                        try:
+                            price = float(data[t].iloc[-1])
+                            if cheapest_price_in_table is None or price < cheapest_price_in_table:
+                                cheapest_price_in_table = price
+                        except:
+                            pass
+                    
+                    # Check if undeployed cash can buy cheapest asset
+                    if cheapest_price_in_table is not None:
+                        table_is_truly_fully_deployed = actual_undeployed_cash < cheapest_price_in_table
+                
                 try:
                     for t in v_t:
                         try:
@@ -5509,8 +5578,12 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             else:
                                 drift_display = f"🟢 {drift:+.2f}%"
                             
-                            # Status - use 99.5 threshold for "fully deployed"
-                            if allocated_pct >= 99.5:
+                            # Status - use smart fractional detection
+                            if table_is_truly_fully_deployed:
+                                # Portfolio is truly fully deployed (fractional only)
+                                # Show all assets as Deployed
+                                status_display = "✅ Deployed"
+                            elif allocated_pct >= 99.5:
                                 status_display = "✅ Deployed"
                             else:
                                 status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
