@@ -14,11 +14,22 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.8"
+VERSION = "6.7.9"
 VERSION_DATE = "2026-01-23"
-VERSION_TIME = "12:52:48"  # EST
-VERSION_NAME = "Smart Deployment System"
+VERSION_TIME = "13:06:09"  # EST
+VERSION_NAME = "Deployment Protection & Error Handling"
 CHANGELOG = """
+v6.7.9 (2026-01-23 13:06 EST)
+- CRITICAL: Added over-deployment prevention (can't deploy more than principal)
+- CRITICAL: Fixed NaN error in rebalance table with comprehensive error handling
+- Added: Pre-deployment validation checks total capital before allowing deployment
+- Added: Over-deployment warning in Capital Overview (shows red alert)
+- Added: Validation prevents exceeding asset target budgets
+- Fixed: All table calculations now protected against NaN/infinite values
+- Fixed: Deploy All Remaining respects principal limit
+- Enhanced: Clear error messages explain what went wrong and how to fix
+- Protection: Multiple validation layers prevent invalid portfolio states
+
 v6.7.8 (2026-01-23 12:52 EST)
 - Added: "Deploy All Remaining Cash" auto-deployment button
 - Added: Smart analysis distinguishing deployable cash vs fractional remainder
@@ -3372,6 +3383,33 @@ else:
                                 
                                 can_deploy = preview_price is not None and deploy_pct > 0 and not exceeds_limit and estimated_units >= 1
                                 
+                                # Additional validation: check if this would cause over-deployment
+                                validation_error = None
+                                if can_deploy and actual_price:
+                                    # Calculate total deployed across ALL assets after this deployment
+                                    total_deployed_all_assets = 0
+                                    for t, a in assets.items():
+                                        purchases = a.get("purchases", [])
+                                        total_deployed_all_assets += sum(p.get("amount", 0) for p in purchases)
+                                    
+                                    # Add this new deployment
+                                    total_after_deploy = total_deployed_all_assets + actual_deploy_amount
+                                    
+                                    # Check 1: Would exceed principal?
+                                    if total_after_deploy > prof['principal']:
+                                        over_amt = total_after_deploy - prof['principal']
+                                        validation_error = f"❌ This would over-deploy by ${over_amt:,.2f}! You'd have ${total_after_deploy:,.2f} deployed but only ${prof['principal']:,.2f} principal."
+                                        can_deploy = False
+                                    
+                                    # Check 2: Would exceed asset target by too much?
+                                    elif new_total_spent_actual > target_budget * 1.01:  # Allow 1% buffer for rounding
+                                        over_amt = new_total_spent_actual - target_budget
+                                        validation_error = f"⚠️ This would exceed {selected_ticker}'s target by ${over_amt:,.2f}. Target: ${target_budget:,.2f}"
+                                        can_deploy = False
+                                
+                                if validation_error:
+                                    st.error(validation_error)
+                                
                                 if st.button("📥 Record Deployment", type="primary", use_container_width=True, 
                                             key="record_deploy_btn", disabled=not can_deploy):
                                     try:
@@ -3379,17 +3417,26 @@ else:
                                         quantity = int(estimated_units)
                                         final_amount = actual_deploy_amount  # Use actual amount
                                         
-                                        purchase = {"date": str(deploy_date), "deploy_pct": deploy_pct,
-                                                   "amount": final_amount, "price": price, "quantity": quantity}
-                                        asset_data.setdefault("purchases", []).append(purchase)
-                                        asset_data["units"] = asset_data.get("units", 0) + quantity
-                                        asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)
-                                        log_profile(prof, f"Deployed {quantity:,} units of {selected_ticker} (${final_amount:,.2f} @ ${price:.2f})")
-                                        save_db(st.session_state.db)
-                                        st.success(f"✅ Deployed {quantity:,} units of {selected_ticker} @ ${price:.2f}")
-                                        if asset_data['allocated_pct'] >= 100.0:
-                                            st.balloons()
-                                        st.rerun()
+                                        # FINAL validation before saving
+                                        total_deployed_check = 0
+                                        for t, a in assets.items():
+                                            purchases = a.get("purchases", [])
+                                            total_deployed_check += sum(p.get("amount", 0) for p in purchases)
+                                        
+                                        if total_deployed_check + final_amount > prof['principal']:
+                                            st.error(f"❌ Cannot deploy: This would exceed your principal of ${prof['principal']:,.2f}")
+                                        else:
+                                            purchase = {"date": str(deploy_date), "deploy_pct": deploy_pct,
+                                                       "amount": final_amount, "price": price, "quantity": quantity}
+                                            asset_data.setdefault("purchases", []).append(purchase)
+                                            asset_data["units"] = asset_data.get("units", 0) + quantity
+                                            asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)
+                                            log_profile(prof, f"Deployed {quantity:,} units of {selected_ticker} (${final_amount:,.2f} @ ${price:.2f})")
+                                            save_db(st.session_state.db)
+                                            st.success(f"✅ Deployed {quantity:,} units of {selected_ticker} @ ${price:.2f}")
+                                            if asset_data['allocated_pct'] >= 100.0:
+                                                st.balloons()
+                                            st.rerun()
                                     except Exception as e:
                                         st.error(f"❌ Error: {str(e)}")
             
@@ -3407,12 +3454,33 @@ else:
             undeployed_cash = principal_amt - total_deployed_capital
             deployment_rate = (total_deployed_capital / principal_amt * 100) if principal_amt > 0 else 0
             
+            # Check for over-deployment
+            is_over_deployed = total_deployed_capital > principal_amt
+            
+            if is_over_deployed:
+                over_deployed_amount = total_deployed_capital - principal_amt
+                st.error(f"""
+🚨 **CRITICAL: Portfolio Over-Deployed!**
+
+You have deployed MORE than your principal!
+- Principal: ${principal_amt:,.2f}
+- Deployed: ${total_deployed_capital:,.2f}
+- **Over-deployed by: ${over_deployed_amount:,.2f}**
+
+**This is impossible - you can't spend money you don't have!**
+
+**How to fix:**
+1. Review your asset deployments below
+2. Remove excess purchases to get under ${principal_amt:,.2f}
+3. Check for duplicate or incorrect deployments
+                """)
+            
             # Analyze what CAN still be deployed vs fractional remainder
             deployable_cash = 0
             fractional_cash = 0
             deployment_opportunities = []
             
-            if undeployed_cash > 0:
+            if undeployed_cash > 0 and not is_over_deployed:
                 import yfinance as yf
                 for ticker, asset_data in assets.items():
                     target_pct = asset_data.get("target", 0)
@@ -3433,18 +3501,36 @@ else:
                                 if shares_can_buy >= 1:
                                     # Can buy at least 1 share
                                     deployable_amount = shares_can_buy * current_price
-                                    fractional_amount = remaining_target - deployable_amount
                                     
-                                    deployable_cash += deployable_amount
-                                    fractional_cash += fractional_amount
-                                    
-                                    deployment_opportunities.append({
-                                        "ticker": ticker,
-                                        "shares": shares_can_buy,
-                                        "amount": deployable_amount,
-                                        "price": current_price,
-                                        "fund_name": asset_data.get("fund_name", ticker)
-                                    })
+                                    # But check if this would exceed principal
+                                    if total_deployed_capital + deployable_amount <= principal_amt:
+                                        fractional_amount = remaining_target - deployable_amount
+                                        
+                                        deployable_cash += deployable_amount
+                                        fractional_cash += fractional_amount
+                                        
+                                        deployment_opportunities.append({
+                                            "ticker": ticker,
+                                            "shares": shares_can_buy,
+                                            "amount": deployable_amount,
+                                            "price": current_price,
+                                            "fund_name": asset_data.get("fund_name", ticker)
+                                        })
+                                    else:
+                                        # Would exceed principal
+                                        max_deployable = principal_amt - total_deployed_capital
+                                        if max_deployable > current_price:
+                                            shares_can_afford = int(max_deployable / current_price)
+                                            if shares_can_afford >= 1:
+                                                deployable_amount = shares_can_afford * current_price
+                                                deployable_cash += deployable_amount
+                                                deployment_opportunities.append({
+                                                    "ticker": ticker,
+                                                    "shares": shares_can_afford,
+                                                    "amount": deployable_amount,
+                                                    "price": current_price,
+                                                    "fund_name": asset_data.get("fund_name", ticker)
+                                                })
                                 else:
                                     # Can't even buy 1 share - it's fractional
                                     fractional_cash += remaining_target
@@ -3457,13 +3543,17 @@ else:
                 st.metric("Principal Set", f"${principal_amt:,.0f}")
                 st.metric("Capital Deployed", f"${total_deployed_capital:,.0f}")
             with col_cap2:
-                st.metric("Undeployed Cash", f"${undeployed_cash:,.0f}",
-                         delta=f"{deployment_rate:.1f}% deployed" if undeployed_cash > 0 else None)
-                if undeployed_cash > 0:
-                    if deployable_cash > 0:
-                        st.caption(f"⚠️ ${deployable_cash:,.0f} can still be deployed!")
-                    if fractional_cash > 0:
-                        st.caption(f"💡 ${fractional_cash:,.0f} fractional (can't buy partial shares)")
+                if is_over_deployed:
+                    st.metric("Over-Deployed!", f"${abs(undeployed_cash):,.0f}",
+                             delta=f"{deployment_rate:.1f}% over limit", delta_color="inverse")
+                else:
+                    st.metric("Undeployed Cash", f"${undeployed_cash:,.0f}",
+                             delta=f"{deployment_rate:.1f}% deployed" if undeployed_cash > 0 else None)
+                    if undeployed_cash > 0:
+                        if deployable_cash > 0:
+                            st.caption(f"⚠️ ${deployable_cash:,.0f} can still be deployed!")
+                        if fractional_cash > 0:
+                            st.caption(f"💡 ${fractional_cash:,.0f} fractional (can't buy partial shares)")
             
             # Show deployment opportunities if available
             if deployment_opportunities:
@@ -5219,64 +5309,105 @@ else:
                 total_current_val = 0
                 total_undeployed = 0
                 
-                for t in v_t:
-                    current_price = float(data[t].iloc[-1])
-                    try:
-                        prev_price = float(data[t].iloc[-2])
-                        daily_change_pct = ((current_price / prev_price) - 1) * 100
-                    except:
-                        daily_change_pct = 0.0
+                try:
+                    for t in v_t:
+                        try:
+                            current_price = float(data[t].iloc[-1])
+                            if not np.isfinite(current_price) or current_price <= 0:
+                                st.warning(f"⚠️ Invalid price data for {t}, skipping from table")
+                                continue
+                                
+                            try:
+                                prev_price = float(data[t].iloc[-2])
+                                if np.isfinite(prev_price) and prev_price > 0:
+                                    daily_change_pct = ((current_price / prev_price) - 1) * 100
+                                else:
+                                    daily_change_pct = 0.0
+                            except:
+                                daily_change_pct = 0.0
+                            
+                            fund_name = asset_dict[t].get("fund_name", t)
+                            cur_u = float(asset_dict[t].get("units", 0))
+                            tar_w = float(asset_dict[t].get('target', 0))
+                            allocated_pct = asset_dict[t].get("allocated_pct", 0)
+                            
+                            # Validation fixes
+                            if not np.isfinite(allocated_pct) or allocated_pct > 100:
+                                allocated_pct = 100.0
+                            elif cur_u > 0 and allocated_pct == 0:
+                                allocated_pct = 100.0
+                            
+                            avg_cost = calculate_average_cost(asset_dict[t])
+                            avg_cost_display = f"${avg_cost:.2f}" if avg_cost and np.isfinite(avg_cost) else "Pending"
+                            
+                            act_val = cur_u * current_price
+                            if not np.isfinite(act_val):
+                                act_val = 0
+                                
+                            act_w = (act_val / curr_v * 100) if curr_v > 0 else 0
+                            if not np.isfinite(act_w):
+                                act_w = 0
+                                
+                            drift = act_w - tar_w
+                            if not np.isfinite(drift):
+                                drift = 0
+                            
+                            tar_val = (tar_w / 100) * curr_v
+                            tar_u = tar_val / current_price if current_price > 0 else 0
+                            val_diff = tar_val - act_val
+                            unit_diff = tar_u - cur_u
+                            
+                            # Ensure all values are finite
+                            if not np.isfinite(val_diff):
+                                val_diff = 0
+                            if not np.isfinite(unit_diff):
+                                unit_diff = 0
+                            
+                            total_turnover += abs(val_diff)
+                            total_current_val += act_val
+                            
+                            # Drift color - always apply based on drift magnitude
+                            drift_tolerance = prof.get("drift_tolerance", 5.0)
+                            if abs(drift) >= drift_tolerance:
+                                drift_display = f"🔴 {drift:+.2f}%"
+                            elif abs(drift) >= drift_tolerance * 0.6:  # Warning at 60% of tolerance
+                                drift_display = f"🟡 {drift:+.2f}%"
+                            else:
+                                drift_display = f"🟢 {drift:+.2f}%"
+                            
+                            # Status - use 99.5 threshold for "fully deployed"
+                            if allocated_pct >= 99.5:
+                                status_display = "✅ Deployed"
+                            else:
+                                status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
+                            
+                            rows.append({
+                                "Fund Name": fund_name, "Ticker": t, "Target %": f"{tar_w:.2f}%",
+                                "Deployed": f"{min(allocated_pct, 100):.0f}%", "Actual %": f"{act_w:.2f}%",
+                                "Drift": drift_display, "Status": status_display,
+                                "Avg Cost": avg_cost_display,
+                                "Units": f"{cur_u:.0f}", "Current Price": f"${current_price:.2f}",
+                                "%Daily Change": f"{daily_change_pct:+.2f}%", "Amount": f"${act_val:,.0f}",
+                                "Buy/Sell Amt": f"${abs(val_diff):,.0f}", "Buy/Sell Shares": f"{int(unit_diff):+.0f}" if np.isfinite(unit_diff) else "—"
+                            })
+                        except Exception as e:
+                            st.warning(f"⚠️ Error processing {t}: {str(e)}")
+                            continue
+                
+                except Exception as e:
+                    st.error(f"""
+                    ❌ **Error building rebalance table**
                     
-                    fund_name = asset_dict[t].get("fund_name", t)
-                    cur_u = float(asset_dict[t]["units"])
-                    tar_w = float(asset_dict[t]['target'])
-                    allocated_pct = asset_dict[t].get("allocated_pct", 0)
+                    {str(e)}
                     
-                    # Validation fixes
-                    if allocated_pct > 100:
-                        allocated_pct = 100.0
-                    elif cur_u > 0 and allocated_pct == 0:
-                        allocated_pct = 100.0
+                    This may be due to:
+                    - Over-deployment (deployed > principal)
+                    - Invalid price data
+                    - Corrupted purchase records
                     
-                    avg_cost = calculate_average_cost(asset_dict[t])
-                    avg_cost_display = f"${avg_cost:.2f}" if avg_cost else "Pending"
-                    
-                    act_val = cur_u * current_price
-                    act_w = (act_val / curr_v * 100) if curr_v > 0 else 0
-                    drift = act_w - tar_w
-                    
-                    tar_val = (tar_w / 100) * curr_v
-                    tar_u = tar_val / current_price if current_price > 0 else 0
-                    val_diff = tar_val - act_val
-                    unit_diff = tar_u - cur_u
-                    
-                    total_turnover += abs(val_diff)
-                    total_current_val += act_val
-                    
-                    # Drift color - always apply based on drift magnitude
-                    drift_tolerance = prof.get("drift_tolerance", 5.0)
-                    if abs(drift) >= drift_tolerance:
-                        drift_display = f"🔴 {drift:+.2f}%"
-                    elif abs(drift) >= drift_tolerance * 0.6:  # Warning at 60% of tolerance
-                        drift_display = f"🟡 {drift:+.2f}%"
-                    else:
-                        drift_display = f"🟢 {drift:+.2f}%"
-                    
-                    # Status - use 99.5 threshold for "fully deployed"
-                    if allocated_pct >= 99.5:
-                        status_display = "✅ Deployed"
-                    else:
-                        status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
-                    
-                    rows.append({
-                        "Fund Name": fund_name, "Ticker": t, "Target %": f"{tar_w:.2f}%",
-                        "Deployed": f"{min(allocated_pct, 100):.0f}%", "Actual %": f"{act_w:.2f}%",
-                        "Drift": drift_display, "Status": status_display,
-                        "Avg Cost": avg_cost_display,
-                        "Units": f"{cur_u:.0f}", "Current Price": f"${current_price:.2f}",
-                        "%Daily Change": f"{daily_change_pct:+.2f}%", "Amount": f"${act_val:,.0f}",
-                        "Buy/Sell Amt": f"${abs(val_diff):,.0f}", "Buy/Sell Shares": f"{round(unit_diff):+.0f}"
-                    })
+                    Please check your Capital Overview above for issues.
+                    """)
+                    st.stop()
                 
                 # Calculate overall drift status for TOTAL row
                 max_drift = max(abs(float(asset_dict[t].get("target", 0)) - 
