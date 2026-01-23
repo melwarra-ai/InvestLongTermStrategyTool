@@ -14,10 +14,26 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.0"
+VERSION = "6.7.1"
 VERSION_DATE = "2026-01-22"
-VERSION_TIME = "19:15:00"
-VERSION_NAME = "Enhanced Admin Dashboard + Login As User"
+VERSION_TIME = "22:30:00"
+VERSION_NAME = "Complete Admin Suite + Welcome Experience"
+CHANGELOG = """
+v6.7.1 (2026-01-22 22:30)
+- Added: First-time user welcome experience with beautiful onboarding
+- Restored: Full user management controls (Reset Password, Activate/Deactivate, Delete)
+- Added: Status badges for active/inactive users
+- Added: Delete confirmation for safety
+- Enhanced: Activity logging for all admin actions
+
+v6.7.0 (2026-01-22 19:15)
+- Added: 5-tab admin dashboard (Overview, Activity & Logs, Analytics, System, Security)
+- Added: Activity logging system
+- Added: Security monitoring and failed login tracking
+- Added: System analytics and health dashboard
+- Added: Backup/restore functionality
+- Added: Notification tracking
+"""
 
 # ===== CONFIGURATION =====
 st.set_page_config(
@@ -2476,6 +2492,17 @@ else:
         st.divider()
         st.markdown("### 📊 Portfolio Optimizer")
         st.caption(f"Long Term Strategy Suite v{VERSION}")
+        
+        # Version info expander
+        with st.expander("ℹ️ Version Info"):
+            st.markdown(f"""
+                **Version:** {VERSION}  
+                **Released:** {VERSION_DATE}  
+                **Build:** {VERSION_NAME}
+            """)
+            if st.button("📋 View Changelog", key="view_changelog", use_container_width=True):
+                st.info(CHANGELOG)
+        
         st.divider()
         
         # Navigation using buttons (no state management issues)
