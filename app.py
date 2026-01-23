@@ -14,7 +14,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.6.0"
+VERSION = "6.7.0"
 VERSION_DATE = "2026-01-22"
 VERSION_TIME = "19:15:00"
 VERSION_NAME = "Enhanced Admin Dashboard + Login As User"
@@ -646,6 +646,195 @@ def log_profile(prof, message):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     prof["rebalance_logs"].insert(0, {"date": timestamp, "event": str(message)})
     prof["rebalance_logs"] = prof["rebalance_logs"][:50]
+
+# ===== ADMIN SUITE HELPER FUNCTIONS =====
+
+def log_activity(db, username: str, action: str, details: str = "", ip_address: str = ""):
+    """Log user activity for audit trail"""
+    db.setdefault("activity_logs", [])
+    db["activity_logs"].insert(0, {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "username": username,
+        "action": action,
+        "details": details,
+        "ip_address": ip_address
+    })
+    db["activity_logs"] = db["activity_logs"][:1000]
+
+def log_notification(db, username: str, notification_type: str, subject: str, status: str, details: str = ""):
+    """Log email notifications sent"""
+    db.setdefault("notification_history", [])
+    db["notification_history"].insert(0, {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "username": username,
+        "type": notification_type,
+        "subject": subject,
+        "status": status,
+        "details": details
+    })
+    db["notification_history"] = db["notification_history"][:500]
+
+def log_failed_login(db, username: str, ip_address: str = ""):
+    """Log failed login attempts"""
+    db.setdefault("security_logs", [])
+    db["security_logs"].insert(0, {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "event_type": "failed_login",
+        "username": username,
+        "ip_address": ip_address,
+        "severity": "warning"
+    })
+    db["security_logs"] = db["security_logs"][:500]
+
+def log_security_event(db, event_type: str, username: str, details: str, severity: str = "info"):
+    """Log security events"""
+    db.setdefault("security_logs", [])
+    db["security_logs"].insert(0, {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "event_type": event_type,
+        "username": username,
+        "details": details,
+        "severity": severity
+    })
+    db["security_logs"] = db["security_logs"][:500]
+
+def get_analytics_data(db):
+    """Calculate system-wide analytics"""
+    users = db.get("users", {})
+    
+    total_users = len([u for u in users.values() if u.get("role") != "admin"])
+    total_portfolios = sum(len(u.get("profiles", {})) for u in users.values() if u.get("role") != "admin")
+    
+    total_aum = 0
+    for user_data in users.values():
+        if user_data.get("role") == "admin":
+            continue
+        profiles = user_data.get("profiles", {})
+        for profile_data in profiles.values():
+            assets = profile_data.get("assets", {})
+            for asset_data in assets.values():
+                units = asset_data.get("units", 0)
+                purchase_price = asset_data.get("purchase_price", 0)
+                total_aum += units * purchase_price
+    
+    asset_counts = {}
+    for user_data in users.values():
+        if user_data.get("role") == "admin":
+            continue
+        profiles = user_data.get("profiles", {})
+        for profile_data in profiles.values():
+            assets = profile_data.get("assets", {})
+            for ticker in assets.keys():
+                asset_counts[ticker] = asset_counts.get(ticker, 0) + 1
+    
+    top_assets = sorted(asset_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    activity_logs = db.get("activity_logs", [])
+    today = datetime.now().strftime("%Y-%m-%d")
+    recent_activities = len([log for log in activity_logs if log.get("timestamp", "")[:10] == today])
+    
+    return {
+        "total_users": total_users,
+        "total_portfolios": total_portfolios,
+        "total_aum": total_aum,
+        "top_assets": top_assets,
+        "recent_activities": recent_activities,
+        "total_activities": len(activity_logs)
+    }
+
+def get_system_health(db):
+    """Check system health metrics"""
+    health = {"status": "healthy", "checks": []}
+    
+    try:
+        db_size = os.path.getsize(DB_FILE) / (1024 * 1024)
+        health["checks"].append({
+            "name": "Database Size",
+            "value": f"{db_size:.2f} MB",
+            "status": "warning" if db_size > 50 else "healthy",
+            "icon": "🟡" if db_size > 50 else "🟢"
+        })
+    except:
+        health["checks"].append({
+            "name": "Database Size",
+            "value": "Unknown",
+            "status": "error",
+            "icon": "🔴"
+        })
+    
+    users = db.get("users", {})
+    health["checks"].append({
+        "name": "Total Users",
+        "value": str(len(users)),
+        "status": "healthy",
+        "icon": "🟢"
+    })
+    
+    system_logs = db.get("system_logs", [])
+    recent_errors = len([log for log in system_logs[:100] if log.get("type") == "error"])
+    health["checks"].append({
+        "name": "Recent Errors",
+        "value": f"{recent_errors}/100 logs",
+        "status": "warning" if recent_errors > 10 else "healthy",
+        "icon": "🟡" if recent_errors > 10 else "🟢"
+    })
+    
+    settings = db.get("global_settings", {})
+    email_configured = settings.get("email_notifications_enabled") and settings.get("smtp_username")
+    health["checks"].append({
+        "name": "Email Notifications",
+        "value": "Configured" if email_configured else "Not Configured",
+        "status": "healthy" if email_configured else "info",
+        "icon": "🟢" if email_configured else "ℹ️"
+    })
+    
+    if any(c["status"] == "error" for c in health["checks"]):
+        health["status"] = "error"
+    elif any(c["status"] == "warning" for c in health["checks"]):
+        health["status"] = "warning"
+    
+    return health
+
+def create_backup(db):
+    """Create a backup of the database"""
+    try:
+        backup_dir = "backups"
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = os.path.join(backup_dir, f"backup_{timestamp}.json")
+        
+        with open(backup_file, "w") as f:
+            json.dump(db, f, indent=2)
+        
+        log_system_event(db, "backup_created", f"Database backup created: {backup_file}", "admin")
+        return True, f"Backup created: {backup_file}"
+    except Exception as e:
+        return False, f"Backup failed: {str(e)}"
+
+def get_backup_list():
+    """Get list of available backups"""
+    try:
+        backup_dir = "backups"
+        if not os.path.exists(backup_dir):
+            return []
+        
+        backups = []
+        for filename in os.listdir(backup_dir):
+            if filename.startswith("backup_") and filename.endswith(".json"):
+                filepath = os.path.join(backup_dir, filename)
+                size = os.path.getsize(filepath) / (1024 * 1024)
+                mtime = datetime.fromtimestamp(os.path.getmtime(filepath))
+                backups.append({
+                    "filename": filename,
+                    "size": f"{size:.2f} MB",
+                    "created": mtime.strftime("%Y-%m-%d %H:%M:%S"),
+                    "path": filepath
+                })
+        
+        return sorted(backups, key=lambda x: x["created"], reverse=True)
+    except:
+        return []
 
 def check_account_lockout(user_data: dict) -> tuple:
     """Check if account is locked out."""
@@ -1372,281 +1561,620 @@ if "current_page" not in st.session_state:
 
 
 # ===== ADMIN DASHBOARD UI =====
-def show_admin_dashboard(db, current_user):
-    """Enhanced admin dashboard with all user profiles"""
-    st.markdown("""
-        <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); 
-                    color: white; padding: 30px; border-radius: 16px; margin-bottom: 30px;">
-            <h1 style="margin: 0; font-size: 2rem; color: white;">👑 Administrator Dashboard</h1>
-            <p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 1.1rem; color: white;">
-                System Overview & User Management
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
+# ADMIN TAB IMPLEMENTATIONS
+# These functions will be inserted before the show_admin_dashboard function
+
+def show_admin_overview_tab(db, all_profiles):
+    """Tab 1: Overview - Profiles, Users, Needs Action"""
+    sub_tab1, sub_tab2, sub_tab3 = st.tabs([
+        "📊 All Profiles Overview",
+        "👥 User Management",
+        "⚠️ Profiles Needing Action"
+    ])
     
-    # Get all profiles overview
-    all_profiles = get_all_profiles_overview(db)
-    
-    # Summary metrics
-    total_users = len([u for u in db["users"].values() if u.get("role") != "admin"])
-    total_profiles = len(all_profiles)
-    profiles_need_action = len([p for p in all_profiles if p["needs_action"]])
-    total_portfolio_value = sum([p["total_value"] for p in all_profiles])
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown(f"""
-            <div class="metric-showcase" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
-                <h3 style="color: white;">{total_users}</h3>
-                <p style="color: white;">Total Users</p>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-            <div class="metric-showcase" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-                <h3 style="color: white;">{total_profiles}</h3>
-                <p style="color: white;">Total Profiles</p>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f"""
-            <div class="metric-showcase" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
-                <h3 style="color: white;">{profiles_need_action}</h3>
-                <p style="color: white;">Need Action</p>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown(f"""
-            <div class="metric-showcase" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
-                <h3 style="color: white;">${total_portfolio_value:,.0f}</h3>
-                <p style="color: white;">Total AUM</p>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Tabs for different views
-    tab1, tab2, tab3 = st.tabs(["📊 All Profiles Overview", "👥 User Management", "⚠️ Profiles Needing Action"])
-    
-    with tab1:
-        st.markdown("### 📊 All User Profiles")
-        st.caption("Complete overview of all portfolios across all users")
+    # SUB-TAB 1: All Profiles Overview
+    with sub_tab1:
+        st.markdown("### 📊 All Profiles Overview")
+        st.caption("Complete view of all user portfolios across the system")
         
-        if not all_profiles:
-            st.info("No profiles created yet. Users will appear here once they create portfolios.")
+        # Filters
+        col_f1, col_f2, col_f3 = st.columns(3)
+        with col_f1:
+            users_list = ["All"] + sorted(list(set([p["username"] for p in all_profiles])))
+            filter_user = st.selectbox("Filter by User", users_list, key="filter_user_overview")
+        
+        with col_f2:
+            filter_status = st.selectbox("Filter by Status", 
+                                        ["All", "balanced", "needs_action", "empty"],
+                                        key="filter_status_overview")
+        
+        with col_f3:
+            sort_by = st.selectbox("Sort by",
+                                  ["User", "Portfolio Value", "Action Required", "Last Rebalanced"],
+                                  key="sort_by_overview")
+        
+        # Apply filters
+        filtered_profiles = all_profiles
+        if filter_user != "All":
+            filtered_profiles = [p for p in filtered_profiles if p["username"] == filter_user]
+        if filter_status != "All":
+            filtered_profiles = [p for p in filtered_profiles if p["status"] == filter_status]
+        
+        # Apply sorting
+        if sort_by == "User":
+            filtered_profiles.sort(key=lambda x: x["username"])
+        elif sort_by == "Portfolio Value":
+            filtered_profiles.sort(key=lambda x: x["total_value"], reverse=True)
+        elif sort_by == "Action Required":
+            filtered_profiles.sort(key=lambda x: x["needs_action"], reverse=True)
+        elif sort_by == "Last Rebalanced":
+            filtered_profiles.sort(key=lambda x: x["last_rebalanced"] or "Never", reverse=True)
+        
+        st.divider()
+        st.caption(f"Showing {len(filtered_profiles)} of {len(all_profiles)} profiles")
+        
+        # Display profiles
+        for profile in filtered_profiles:
+            col_card, col_action = st.columns([5, 1])
+            
+            with col_card:
+                status_color = {
+                    "balanced": "#10b981",
+                    "needs_action": "#ef4444",
+                    "empty": "#6b7280"
+                }.get(profile["status"], "#6b7280")
+                
+                status_label = {
+                    "balanced": "✅ Balanced",
+                    "needs_action": "⚠️ Action Required",
+                    "empty": "📭 Empty"
+                }.get(profile["status"], "Unknown")
+                
+                st.markdown(f"""
+                    <div style="background: white; border-left: 4px solid {status_color}; 
+                                padding: 16px; border-radius: 8px; margin-bottom: 12px;
+                                box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                            <div>
+                                <h4 style="margin: 0; color: #1e293b;">📊 {profile['profile_name']}</h4>
+                                <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.85rem;">
+                                    👤 {profile['username']} ({profile['user_email']})
+                                </p>
+                            </div>
+                            <span style="background: {status_color}; color: white; 
+                                         padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                {status_label}
+                            </span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+                            <div>
+                                <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Portfolio Value</p>
+                                <p style="margin: 4px 0 0 0; color: #1e293b; font-weight: 600; font-size: 1.1rem;">
+                                    ${profile['total_value']:,.2f}
+                                </p>
+                            </div>
+                            <div>
+                                <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Assets</p>
+                                <p style="margin: 4px 0 0 0; color: #1e293b; font-weight: 600; font-size: 1.1rem;">
+                                    {profile['asset_count']}
+                                </p>
+                            </div>
+                            <div>
+                                <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Drift Status</p>
+                                <p style="margin: 4px 0 0 0; color: #1e293b; font-weight: 600; font-size: 1.1rem;">
+                                    {profile['drift_status']}
+                                </p>
+                            </div>
+                            <div>
+                                <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Last Rebalanced</p>
+                                <p style="margin: 4px 0 0 0; color: #1e293b; font-weight: 600; font-size: 0.85rem;">
+                                    {profile['last_rebalanced'][:10] if profile['last_rebalanced'] and profile['last_rebalanced'] != 'Never' else 'Never'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col_action:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button(f"👁️ View", key=f"view_{profile['username']}_{profile['profile_name']}", use_container_width=True):
+                    login_as_user(profile['username'])
+                    st.session_state.active_profile = profile['profile_name']
+                    st.session_state.current_page = "Portfolio Manager"
+                    st.rerun()
+    
+    # SUB-TAB 2: User Management
+    with sub_tab2:
+        st.markdown("### 👥 User Management")
+        st.caption("View and manage all registered users")
+        
+        users = db.get("users", {})
+        non_admin_users = {k: v for k, v in users.items() if v.get("role") != "admin"}
+        
+        for username, user_data in non_admin_users.items():
+            st.markdown(f"""
+                <div style="background: white; padding: 20px; border-radius: 10px; 
+                            margin-bottom: 16px; border: 1px solid #e2e8f0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h4 style="margin: 0; color: #1e293b;">👤 {user_data.get('display_name', username)}</h4>
+                            <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.9rem;">
+                                @{username} • {user_data.get('email', 'N/A')}
+                            </p>
+                            <p style="margin: 8px 0 0 0; color: #64748b; font-size: 0.85rem;">
+                                📁 {len(user_data.get('profiles', {}))} portfolios • 
+                                Joined: {user_data.get('created_at', 'Unknown')[:10]}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button(f"🔐 Login as {username}", key=f"login_{username}", use_container_width=True):
+                login_as_user(username)
+                st.session_state.current_page = "Global Dashboard"
+                log_security_event(db, "admin_impersonation", "admin", f"Logged in as {username}", "info")
+                save_db(db)
+                st.rerun()
+    
+    # SUB-TAB 3: Profiles Needing Action
+    with sub_tab3:
+        st.markdown("### ⚠️ Profiles Needing Action")
+        st.caption("Portfolios requiring immediate rebalancing")
+        
+        needs_action = [p for p in all_profiles if p["needs_action"]]
+        
+        if not needs_action:
+            st.success("🎉 All portfolios are balanced! No action required.")
         else:
-            # Filter options
-            col_filter1, col_filter2, col_filter3 = st.columns(3)
+            st.warning(f"⚠️ {len(needs_action)} portfolio(s) need rebalancing")
             
-            with col_filter1:
-                user_filter = st.multiselect(
-                    "Filter by User",
-                    options=sorted(list(set([p["username"] for p in all_profiles]))),
-                    default=None,
-                    key="admin_user_filter"
-                )
+            for profile in needs_action:
+                col_card, col_action = st.columns([5, 1])
+                
+                with col_card:
+                    st.markdown(f"""
+                        <div style="background: #fef2f2; border-left: 4px solid #ef4444; 
+                                    padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+                            <h4 style="margin: 0; color: #991b1b;">📊 {profile['profile_name']}</h4>
+                            <p style="margin: 4px 0 0 0; color: #991b1b; font-size: 0.85rem;">
+                                👤 {profile['username']} ({profile['user_email']})
+                            </p>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 12px;">
+                                <div>
+                                    <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Portfolio Value</p>
+                                    <p style="margin: 4px 0 0 0; color: #991b1b; font-weight: 600; font-size: 1.1rem;">
+                                        ${profile['total_value']:,.2f}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Assets</p>
+                                    <p style="margin: 4px 0 0 0; color: #991b1b; font-weight: 600; font-size: 1.1rem;">
+                                        {profile['asset_count']}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Drift</p>
+                                    <p style="margin: 4px 0 0 0; color: #991b1b; font-weight: 600; font-size: 1.1rem;">
+                                        {profile['drift_status']}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                with col_action:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button(f"🔧 Fix", key=f"fix_{profile['username']}_{profile['profile_name']}", 
+                               use_container_width=True, type="primary"):
+                        login_as_user(profile['username'])
+                        st.session_state.active_profile = profile['profile_name']
+                        st.session_state.current_page = "Portfolio Manager"
+                        st.rerun()
+
+
+def show_activity_logs_tab(db):
+    """Tab 2: Activity & Logs"""
+    sub_tab1, sub_tab2, sub_tab3 = st.tabs([
+        "📝 User Activity",
+        "🚨 System Errors",
+        "📧 Notifications"
+    ])
+    
+    # SUB-TAB 1: User Activity
+    with sub_tab1:
+        st.markdown("### 📝 User Activity Log")
+        st.caption("Track all user actions for audit trail")
+        
+        activity_logs = db.get("activity_logs", [])
+        
+        if not activity_logs:
+            st.info("No activity logs yet. Actions will appear here as users interact with the system.")
+        else:
+            # Filters
+            col_f1, col_f2, col_f3 = st.columns(3)
+            with col_f1:
+                users_list = ["All"] + sorted(list(set([log.get("username", "") for log in activity_logs])))
+                filter_user = st.selectbox("Filter by User", users_list, key="activity_user")
             
-            with col_filter2:
-                status_filter = st.multiselect(
-                    "Filter by Status",
-                    options=["balanced", "needs_action", "empty"],
-                    default=None,
-                    key="admin_status_filter"
-                )
+            with col_f2:
+                actions = ["All"] + sorted(list(set([log.get("action", "") for log in activity_logs])))
+                filter_action = st.selectbox("Filter by Action", actions, key="activity_action")
             
-            with col_filter3:
-                sort_by = st.selectbox(
-                    "Sort by",
-                    options=["User", "Portfolio Value", "Action Required", "Last Rebalanced"],
-                    index=0,
-                    key="admin_sort_by"
-                )
+            with col_f3:
+                limit = st.selectbox("Show", [50, 100, 200, 500], key="activity_limit")
             
             # Apply filters
-            filtered_profiles = all_profiles.copy()
+            filtered = activity_logs
+            if filter_user != "All":
+                filtered = [log for log in filtered if log.get("username") == filter_user]
+            if filter_action != "All":
+                filtered = [log for log in filtered if log.get("action") == filter_action]
             
-            if user_filter:
-                filtered_profiles = [p for p in filtered_profiles if p["username"] in user_filter]
+            filtered = filtered[:limit]
             
-            if status_filter:
-                filtered_profiles = [p for p in filtered_profiles if p["status"] in status_filter]
+            st.caption(f"Showing {len(filtered)} of {len(activity_logs)} activities")
             
-            # Sort
-            if sort_by == "Portfolio Value":
-                filtered_profiles.sort(key=lambda x: x["total_value"], reverse=True)
-            elif sort_by == "Action Required":
-                filtered_profiles.sort(key=lambda x: x["needs_action"], reverse=True)
-            elif sort_by == "Last Rebalanced":
-                filtered_profiles.sort(key=lambda x: x["last_rebalanced"], reverse=True)
-            else:
-                filtered_profiles.sort(key=lambda x: (x["username"], x["profile_name"]))
+            # Display as table
+            if filtered:
+                for log in filtered:
+                    col1, col2, col3, col4 = st.columns([2, 1, 2, 3])
+                    with col1:
+                        st.caption(log.get("timestamp", ""))
+                    with col2:
+                        st.caption(f"👤 {log.get('username', '')}")
+                    with col3:
+                        st.caption(f"**{log.get('action', '')}**")
+                    with col4:
+                        st.caption(log.get("details", ""))
+                    st.divider()
+    
+    # SUB-TAB 2: System Errors
+    with sub_tab2:
+        st.markdown("### 🚨 System Error Logs")
+        st.caption("Monitor application errors and issues")
+        
+        system_logs = db.get("system_logs", [])
+        error_logs = [log for log in system_logs if log.get("type") in ["error", "warning"]]
+        
+        if not error_logs:
+            st.success("✅ No errors! System is running smoothly.")
+        else:
+            st.warning(f"⚠️ {len(error_logs)} error/warning events in logs")
             
-            st.markdown(f"**Showing {len(filtered_profiles)} of {len(all_profiles)} profiles**")
-            st.markdown("<br>", unsafe_allow_html=True)
+            # Display errors
+            for log in error_logs[:50]:
+                severity = "🔴" if log.get("type") == "error" else "🟡"
+                st.markdown(f"""
+                    <div style="background: #fef2f2; padding: 12px; border-radius: 6px; margin-bottom: 8px;">
+                        <p style="margin: 0; font-size: 0.85rem; color: #64748b;">
+                            {severity} {log.get('timestamp', '')} • {log.get('user_id', 'system')}
+                        </p>
+                        <p style="margin: 4px 0 0 0; color: #991b1b; font-weight: 500;">
+                            {log.get('message', '')}
+                        </p>
+                    </div>
+                """, unsafe_allow_html=True)
+    
+    # SUB-TAB 3: Notifications
+    with sub_tab3:
+        st.markdown("### 📧 Notification History")
+        st.caption("Track all email notifications sent to users")
+        
+        notifications = db.get("notification_history", [])
+        
+        if not notifications:
+            st.info("No notifications sent yet. Email alerts will appear here.")
+        else:
+            st.caption(f"Total notifications: {len(notifications)}")
             
-            # Display as cards
-            for profile in filtered_profiles:
-                status_class = f"status-{profile['status'].replace('_', '-')}"
+            for notif in notifications[:50]:
+                status_icon = "✅" if notif.get("status") == "sent" else "❌"
+                status_color = "#10b981" if notif.get("status") == "sent" else "#ef4444"
                 
-                if profile['status'] == 'needs_action':
-                    card_style = "profile-tile-warning"
-                    status_badge = f'<span class="drift-badge">⚠️ Action Required</span>'
-                elif profile['status'] == 'balanced':
-                    card_style = "profile-tile-optimized"
-                    status_badge = f'<span class="success-badge">✅ Balanced</span>'
+                st.markdown(f"""
+                    <div style="background: white; padding: 12px; border-radius: 6px; 
+                                margin-bottom: 8px; border-left: 3px solid {status_color};">
+                        <div style="display: flex; justify-content: space-between;">
+                            <div>
+                                <p style="margin: 0; font-weight: 600; color: #1e293b;">
+                                    {notif.get('subject', '')}
+                                </p>
+                                <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #64748b;">
+                                    To: {notif.get('username', '')} • Type: {notif.get('type', '')}
+                                </p>
+                                <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: #64748b;">
+                                    {notif.get('timestamp', '')}
+                                </p>
+                            </div>
+                            <span style="font-size: 1.5rem;">{status_icon}</span>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+
+def show_analytics_tab(db, analytics):
+    """Tab 3: Analytics & Reports"""
+    sub_tab1, sub_tab2 = st.tabs([
+        "📊 System Analytics",
+        "🎯 Top Assets"
+    ])
+    
+    # SUB-TAB 1: System Analytics
+    with sub_tab1:
+        st.markdown("### 📊 System Analytics")
+        st.caption("Platform-wide metrics and trends")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Users", analytics['total_users'])
+            st.metric("Total Portfolios", analytics['total_portfolios'])
+        
+        with col2:
+            avg_portfolios = analytics['total_portfolios'] / max(analytics['total_users'], 1)
+            st.metric("Avg Portfolios/User", f"{avg_portfolios:.1f}")
+            avg_value = analytics['total_aum'] / max(analytics['total_portfolios'], 1)
+            st.metric("Avg Portfolio Value", f"${avg_value:,.0f}")
+        
+        with col3:
+            st.metric("Total AUM", f"${analytics['total_aum']:,.0f}")
+            st.metric("Recent Activities", analytics['recent_activities'])
+        
+        st.divider()
+        
+        st.markdown("### 📈 Activity Timeline")
+        activity_logs = db.get("activity_logs", [])
+        if activity_logs:
+            st.caption(f"Total activities logged: {len(activity_logs)}")
+        else:
+            st.info("No activity data yet")
+    
+    # SUB-TAB 2: Top Assets
+    with sub_tab2:
+        st.markdown("### 🎯 Most Popular Assets")
+        st.caption("Assets most frequently held across all portfolios")
+        
+        if analytics['top_assets']:
+            for i, (ticker, count) in enumerate(analytics['top_assets'], 1):
+                st.markdown(f"""
+                    <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="color: #64748b; font-weight: 600;">#{i}</span>
+                                <span style="margin-left: 12px; font-weight: 600; color: #1e293b;">{ticker}</span>
+                            </div>
+                            <span style="background: #3b82f6; color: white; padding: 4px 12px; 
+                                         border-radius: 12px; font-size: 0.85rem;">
+                                {count} portfolios
+                            </span>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No asset data available yet")
+
+
+def show_system_management_tab(db):
+    """Tab 4: System Management"""
+    sub_tab1, sub_tab2, sub_tab3 = st.tabs([
+        "⚙️ Global Settings",
+        "🏥 System Health",
+        "💾 Backup & Restore"
+    ])
+    
+    # SUB-TAB 1: Global Settings
+    with sub_tab1:
+        st.markdown("### ⚙️ Global Settings")
+        st.caption("Configure system-wide settings")
+        
+        settings = db.get("global_settings", {})
+        
+        st.markdown("#### 📧 Email Configuration")
+        email_enabled = st.checkbox("Enable Email Notifications", 
+                                    value=settings.get("email_notifications_enabled", False),
+                                    key="email_enabled_setting")
+        
+        if email_enabled:
+            smtp_server = st.text_input("SMTP Server", value=settings.get("smtp_server", "smtp.gmail.com"))
+            smtp_port = st.number_input("SMTP Port", value=settings.get("smtp_port", 587), step=1)
+            smtp_username = st.text_input("SMTP Username", value=settings.get("smtp_username", ""))
+            smtp_password = st.text_input("SMTP Password", value=settings.get("smtp_password", ""), type="password")
+            
+            if st.button("💾 Save Email Settings"):
+                settings["email_notifications_enabled"] = email_enabled
+                settings["smtp_server"] = smtp_server
+                settings["smtp_port"] = smtp_port
+                settings["smtp_username"] = smtp_username
+                settings["smtp_password"] = smtp_password
+                db["global_settings"] = settings
+                save_db(db)
+                st.success("✅ Email settings saved!")
+                log_system_event(db, "settings_changed", "Email settings updated", "admin")
+        
+        st.divider()
+        
+        st.markdown("#### 🎯 Default Settings")
+        default_drift = st.number_input("Default Drift Tolerance (%)", 
+                                       value=settings.get("default_drift_tolerance", 5.0),
+                                       min_value=1.0, max_value=20.0, step=0.5)
+        
+        allow_registration = st.checkbox("Allow New User Registration",
+                                        value=settings.get("allow_registration", True))
+        
+        if st.button("💾 Save Default Settings"):
+            settings["default_drift_tolerance"] = default_drift
+            settings["allow_registration"] = allow_registration
+            db["global_settings"] = settings
+            save_db(db)
+            st.success("✅ Default settings saved!")
+            log_system_event(db, "settings_changed", "Default settings updated", "admin")
+    
+    # SUB-TAB 2: System Health
+    with sub_tab2:
+        st.markdown("### 🏥 System Health Dashboard")
+        st.caption("Monitor system status and performance")
+        
+        health = get_system_health(db)
+        
+        status_color = {
+            "healthy": "#10b981",
+            "warning": "#f59e0b",
+            "error": "#ef4444"
+        }.get(health["status"], "#6b7280")
+        
+        status_icon = {
+            "healthy": "🟢",
+            "warning": "🟡",
+            "error": "🔴"
+        }.get(health["status"], "⚪")
+        
+        st.markdown(f"""
+            <div style="background: linear-gradient(135deg, {status_color}20, {status_color}10); 
+                        padding: 20px; border-radius: 12px; border-left: 4px solid {status_color};">
+                <h3 style="margin: 0; color: {status_color};">
+                    {status_icon} System Status: {health['status'].title()}
+                </h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.divider()
+        
+        for check in health["checks"]:
+            col1, col2, col3 = st.columns([3, 2, 1])
+            with col1:
+                st.markdown(f"**{check['name']}**")
+            with col2:
+                st.caption(check['value'])
+            with col3:
+                st.markdown(check['icon'])
+    
+    # SUB-TAB 3: Backup & Restore
+    with sub_tab3:
+        st.markdown("### 💾 Backup & Restore")
+        st.caption("Protect your data with regular backups")
+        
+        if st.button("📦 Create Backup Now", type="primary", use_container_width=True):
+            with st.spinner("Creating backup..."):
+                success, message = create_backup(db)
+                if success:
+                    st.success(message)
                 else:
-                    card_style = "profile-tile"
-                    status_badge = f'<span class="status-empty">📭 Empty</span>'
-                
-                col_info, col_action = st.columns([4, 1])
-                
-                with col_info:
-                    st.markdown(f"""
-                        <div class="{card_style}" style="padding: 20px; margin-bottom: 16px;">
-                            <div style="display: flex; justify-content: space-between; align-items: start;">
-                                <div>
-                                    <h3 style="margin: 0; color: #1e293b; font-size: 1.2rem;">
-                                        📊 {profile['profile_name']}
-                                    </h3>
-                                    <p style="margin: 6px 0; color: #64748b; font-size: 0.9rem;">
-                                        👤 User: <strong>{profile['username']}</strong> ({profile['user_email']})
-                                    </p>
-                                </div>
-                                <div>
-                                    {status_badge}
-                                </div>
-                            </div>
-                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-                                <div>
-                                    <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Portfolio Value</p>
-                                    <p style="margin: 4px 0 0 0; color: #1e293b; font-weight: 600; font-size: 1.1rem;">${profile['total_value']:,.2f}</p>
-                                </div>
-                                <div>
-                                    <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Assets</p>
-                                    <p style="margin: 4px 0 0 0; color: #1e293b; font-weight: 600; font-size: 1.1rem;">{profile['asset_count']}</p>
-                                </div>
-                                <div>
-                                    <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Drift Status</p>
-                                    <p style="margin: 4px 0 0 0; color: #1e293b; font-weight: 600; font-size: 1.1rem;">{profile['drift_status']}</p>
-                                </div>
-                                <div>
-                                    <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Last Rebalanced</p>
-                                    <p style="margin: 4px 0 0 0; color: #1e293b; font-weight: 600; font-size: 0.85rem;">{profile['last_rebalanced'][:10] if profile['last_rebalanced'] and profile['last_rebalanced'] != 'Never' else 'Never'}</p>
-                                </div>
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                
-                with col_action:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button(f"👁️ View", key=f"admin_view_{profile['username']}_{profile['profile_name']}", use_container_width=True):
-                        login_as_user(profile['username'])
-                        st.session_state.active_profile = profile['profile_name']
-                        st.session_state.current_page = "Portfolio Manager"
-                        st.rerun()
-    
-    with tab2:
-        st.markdown("### 👥 User Management")
-        st.caption("Manage all user accounts in the system")
+                    st.error(message)
         
-        users = [u for u, d in db["users"].items() if d.get("role") != "admin"]
+        st.divider()
         
-        if not users:
-            st.info("No users registered yet.")
+        st.markdown("### 📋 Backup History")
+        backups = get_backup_list()
+        
+        if not backups:
+            st.info("No backups available yet. Create your first backup above!")
         else:
-            for username in users:
-                user_data = db["users"][username]
-                email = user_data.get("email", "N/A")
-                created_at = user_data.get("created_at", "Unknown")
-                profile_count = len(user_data.get("profiles", {}))
-                
-                col_user, col_action = st.columns([4, 1])
-                
-                with col_user:
-                    st.markdown(f"""
-                        <div class="user-info-card">
-                            <h4 style="margin: 0; color: #1e293b;">👤 {username}</h4>
-                            <p style="margin: 6px 0; color: #64748b; font-size: 0.9rem;">📧 {email}</p>
-                            <div style="display: flex; gap: 20px; margin-top: 12px;">
-                                <div>
-                                    <span style="color: #64748b; font-size: 0.75rem;">Profiles:</span>
-                                    <strong style="color: #1e293b; margin-left: 4px;">{profile_count}</strong>
-                                </div>
-                                <div>
-                                    <span style="color: #64748b; font-size: 0.75rem;">Joined:</span>
-                                    <strong style="color: #1e293b; margin-left: 4px;">{created_at[:10]}</strong>
-                                </div>
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                
-                with col_action:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("🔐 Login", key=f"admin_login_as_{username}", help="Login as this user", use_container_width=True):
-                        login_as_user(username)
-                        st.session_state.current_page = "Global Dashboard"
-                        st.rerun()
+            for backup in backups:
+                col1, col2, col3 = st.columns([3, 2, 2])
+                with col1:
+                    st.caption(f"**{backup['filename']}**")
+                with col2:
+                    st.caption(f"📅 {backup['created']}")
+                    st.caption(f"📦 {backup['size']}")
+                with col3:
+                    if st.button("📥 Download", key=f"dl_{backup['filename']}", use_container_width=True):
+                        st.info("Download functionality - file path: " + backup['path'])
+
+
+def show_security_tab(db):
+    """Tab 5: Security & Audit"""
+    sub_tab1, sub_tab2 = st.tabs([
+        "🔐 Security Logs",
+        "🚨 Failed Logins"
+    ])
     
-    with tab3:
-        st.markdown("### ⚠️ Profiles Needing Action")
-        st.caption("Portfolios with drift exceeding tolerance threshold")
+    # SUB-TAB 1: Security Logs
+    with sub_tab1:
+        st.markdown("### 🔐 Security Event Log")
+        st.caption("Monitor security-related events and activities")
         
-        action_profiles = [p for p in all_profiles if p["needs_action"]]
+        security_logs = db.get("security_logs", [])
         
-        if not action_profiles:
-            st.success("🎉 All profiles are balanced! No action required.")
+        if not security_logs:
+            st.success("✅ No security events logged")
         else:
-            st.warning(f"**{len(action_profiles)} profile(s) need rebalancing**")
-            st.markdown("<br>", unsafe_allow_html=True)
+            # Filter by severity
+            severity_filter = st.selectbox("Filter by Severity", 
+                                          ["All", "info", "warning", "critical"],
+                                          key="security_severity")
             
-            for profile in action_profiles:
-                col_info, col_action = st.columns([4, 1])
+            filtered = security_logs
+            if severity_filter != "All":
+                filtered = [log for log in filtered if log.get("severity") == severity_filter]
+            
+            st.caption(f"Showing {len(filtered)} of {len(security_logs)} events")
+            
+            for log in filtered[:100]:
+                severity_icon = {
+                    "info": "ℹ️",
+                    "warning": "⚠️",
+                    "critical": "🚨"
+                }.get(log.get("severity", "info"), "ℹ️")
                 
-                with col_info:
-                    st.markdown(f"""
-                        <div class="profile-tile-warning" style="padding: 20px; margin-bottom: 16px;">
-                            <div style="display: flex; justify-content: space-between; align-items: start;">
-                                <div>
-                                    <h3 style="margin: 0; color: #991b1b; font-size: 1.2rem;">
-                                        ⚠️ {profile['profile_name']}
-                                    </h3>
-                                    <p style="margin: 6px 0; color: #64748b; font-size: 0.9rem;">
-                                        👤 User: <strong>{profile['username']}</strong> ({profile['user_email']})
-                                    </p>
-                                </div>
-                                <span class="drift-badge">Drift: {profile['drift_status']}</span>
-                            </div>
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #fecaca;">
-                                <div>
-                                    <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Portfolio Value</p>
-                                    <p style="margin: 4px 0 0 0; color: #991b1b; font-weight: 600; font-size: 1.1rem;">${profile['total_value']:,.2f}</p>
-                                </div>
-                                <div>
-                                    <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Assets</p>
-                                    <p style="margin: 4px 0 0 0; color: #991b1b; font-weight: 600; font-size: 1.1rem;">{profile['asset_count']}</p>
-                                </div>
-                                <div>
-                                    <p style="margin: 0; color: #64748b; font-size: 0.75rem;">Last Rebalanced</p>
-                                    <p style="margin: 4px 0 0 0; color: #991b1b; font-weight: 600; font-size: 0.85rem;">{profile['last_rebalanced'][:10] if profile['last_rebalanced'] and profile['last_rebalanced'] != 'Never' else 'Never'}</p>
-                                </div>
+                severity_color = {
+                    "info": "#3b82f6",
+                    "warning": "#f59e0b",
+                    "critical": "#ef4444"
+                }.get(log.get("severity", "info"), "#6b7280")
+                
+                st.markdown(f"""
+                    <div style="background: white; padding: 12px; border-radius: 6px; 
+                                margin-bottom: 8px; border-left: 3px solid {severity_color};">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <p style="margin: 0; font-size: 0.75rem; color: #64748b;">
+                                    {log.get('timestamp', '')}
+                                </p>
+                                <p style="margin: 4px 0; font-weight: 600; color: #1e293b;">
+                                    {severity_icon} {log.get('event_type', '')}
+                                </p>
+                                <p style="margin: 0; font-size: 0.85rem; color: #64748b;">
+                                    User: {log.get('username', '')} • {log.get('details', '')}
+                                </p>
                             </div>
                         </div>
-                    """, unsafe_allow_html=True)
-                
-                with col_action:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button(f"🔧 Fix", key=f"admin_fix_{profile['username']}_{profile['profile_name']}", use_container_width=True, type="primary"):
-                        login_as_user(profile['username'])
-                        st.session_state.active_profile = profile['profile_name']
-                        st.session_state.current_page = "Portfolio Manager"
-                        st.rerun()
+                    </div>
+                """, unsafe_allow_html=True)
+    
+    # SUB-TAB 2: Failed Logins
+    with sub_tab2:
+        st.markdown("### 🚨 Failed Login Attempts")
+        st.caption("Monitor and prevent unauthorized access")
+        
+        security_logs = db.get("security_logs", [])
+        failed_logins = [log for log in security_logs if log.get("event_type") == "failed_login"]
+        
+        if not failed_logins:
+            st.success("✅ No failed login attempts")
+        else:
+            st.warning(f"⚠️ {len(failed_logins)} failed login attempts detected")
+            
+            # Group by username
+            from collections import Counter
+            username_counts = Counter([log.get("username", "") for log in failed_logins[:100]])
+            
+            st.markdown("#### Top Failed Login Attempts")
+            for username, count in username_counts.most_common(10):
+                col1, col2, col3 = st.columns([3, 1, 2])
+                with col1:
+                    st.caption(f"**{username}**")
+                with col2:
+                    st.caption(f"🔴 {count} attempts")
+                with col3:
+                    if count >= 5:
+                        st.caption("⚠️ Potential brute force")
+            
+            st.divider()
+            
+            st.markdown("#### Recent Failed Logins")
+            for log in failed_logins[:20]:
+                st.caption(f"🔴 {log.get('timestamp', '')} - {log.get('username', '')} from {log.get('ip_address', 'unknown')}")
 
-
-# ===== AUTHENTICATION UI =====
 def show_login_page():
     """Display login page"""
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -2577,6 +3105,7 @@ else:
         if st.button("🚪 Logout", use_container_width=True, key="logout_btn"):
             log_system_event(st.session_state.db, "logout", f"User logged out: {current_user}", current_user)
             save_db(st.session_state.db)
+            log_activity(st.session_state.db, current_user, "user_logout", "User logged out", "")
             st.session_state.authenticated = False
             st.session_state.current_user = None
             st.session_state.session_token = None
