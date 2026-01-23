@@ -14,11 +14,21 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.7"
+VERSION = "6.7.8"
 VERSION_DATE = "2026-01-23"
-VERSION_TIME = "12:31:47"  # EST
-VERSION_NAME = "Cash Calculation Consistency Fix"
+VERSION_TIME = "12:52:48"  # EST
+VERSION_NAME = "Smart Deployment System"
 CHANGELOG = """
+v6.7.8 (2026-01-23 12:52 EST)
+- Added: "Deploy All Remaining Cash" auto-deployment button
+- Added: Smart analysis distinguishing deployable cash vs fractional remainder
+- Added: Deployment opportunities showing exactly what you can buy
+- Enhanced: Capital Overview shows which assets can still be deployed to
+- Enhanced: Info box warns if you have deployable cash (not just fractional)
+- Removed: Confusing per-asset "Undeployed $" column from table
+- Fixed: Now correctly identifies when portfolio is truly fully deployed vs partially deployed
+- User Experience: Clear guidance on deploying remaining capital with one click
+
 v6.7.7 (2026-01-23 12:31 EST)
 - Fixed: Undeployed cash now consistent across sidebar, table, and info box
 - Fixed: Info box example now uses actual portfolio data (not hardcoded $5,000)
@@ -3397,6 +3407,51 @@ else:
             undeployed_cash = principal_amt - total_deployed_capital
             deployment_rate = (total_deployed_capital / principal_amt * 100) if principal_amt > 0 else 0
             
+            # Analyze what CAN still be deployed vs fractional remainder
+            deployable_cash = 0
+            fractional_cash = 0
+            deployment_opportunities = []
+            
+            if undeployed_cash > 0:
+                import yfinance as yf
+                for ticker, asset_data in assets.items():
+                    target_pct = asset_data.get("target", 0)
+                    target_amount = (target_pct / 100) * principal_amt
+                    purchases = asset_data.get("purchases", [])
+                    deployed_amount = sum(p.get("amount", 0) for p in purchases)
+                    remaining_target = target_amount - deployed_amount
+                    
+                    if remaining_target > 0:
+                        # Get current price
+                        try:
+                            ticker_obj = yf.Ticker(ticker)
+                            hist = ticker_obj.history(period="1d")
+                            if not hist.empty:
+                                current_price = float(hist['Close'].iloc[-1])
+                                shares_can_buy = int(remaining_target / current_price)
+                                
+                                if shares_can_buy >= 1:
+                                    # Can buy at least 1 share
+                                    deployable_amount = shares_can_buy * current_price
+                                    fractional_amount = remaining_target - deployable_amount
+                                    
+                                    deployable_cash += deployable_amount
+                                    fractional_cash += fractional_amount
+                                    
+                                    deployment_opportunities.append({
+                                        "ticker": ticker,
+                                        "shares": shares_can_buy,
+                                        "amount": deployable_amount,
+                                        "price": current_price,
+                                        "fund_name": asset_data.get("fund_name", ticker)
+                                    })
+                                else:
+                                    # Can't even buy 1 share - it's fractional
+                                    fractional_cash += remaining_target
+                        except:
+                            # If can't get price, assume it's deployable
+                            deployable_cash += remaining_target
+            
             col_cap1, col_cap2 = st.columns(2)
             with col_cap1:
                 st.metric("Principal Set", f"${principal_amt:,.0f}")
@@ -3405,7 +3460,65 @@ else:
                 st.metric("Undeployed Cash", f"${undeployed_cash:,.0f}",
                          delta=f"{deployment_rate:.1f}% deployed" if undeployed_cash > 0 else None)
                 if undeployed_cash > 0:
-                    st.caption(f"💡 {(undeployed_cash/principal_amt*100):.1f}% idle cash")
+                    if deployable_cash > 0:
+                        st.caption(f"⚠️ ${deployable_cash:,.0f} can still be deployed!")
+                    if fractional_cash > 0:
+                        st.caption(f"💡 ${fractional_cash:,.0f} fractional (can't buy partial shares)")
+            
+            # Show deployment opportunities if available
+            if deployment_opportunities:
+                st.markdown("#### 🚀 Deploy Remaining Cash")
+                st.caption(f"You have ${deployable_cash:,.0f} that can be deployed:")
+                
+                for opp in deployment_opportunities[:3]:  # Show top 3
+                    st.markdown(f"""
+                        <div style="background: #fef3c7; padding: 12px; border-radius: 8px; 
+                                    margin: 8px 0; border-left: 4px solid #f59e0b;">
+                            <div style="font-weight: 600; color: #92400e; margin-bottom: 4px;">
+                                {opp['ticker']} - {opp['fund_name']}
+                            </div>
+                            <div style="color: #78350f; font-size: 0.9rem;">
+                                Buy {opp['shares']} shares × ${opp['price']:.2f} = ${opp['amount']:,.0f}
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                # Add Deploy All button
+                if st.button("🚀 Deploy All Remaining Cash", type="primary", use_container_width=True, 
+                           key="deploy_all_remaining"):
+                    # Execute all deployments
+                    for opp in deployment_opportunities:
+                        ticker = opp['ticker']
+                        shares = opp['shares']
+                        price = opp['price']
+                        amount = opp['amount']
+                        
+                        asset_data = assets[ticker]
+                        target_pct = asset_data.get("target", 0)
+                        target_amount = (target_pct / 100) * principal_amt
+                        
+                        # Add purchase
+                        purchase = {
+                            "date": str(date.today()),
+                            "deploy_pct": (amount / target_amount) * 100,
+                            "amount": amount,
+                            "price": price,
+                            "quantity": shares
+                        }
+                        asset_data.setdefault("purchases", []).append(purchase)
+                        asset_data["units"] = asset_data.get("units", 0) + shares
+                        
+                        # Update allocated percentage
+                        purchases = asset_data.get("purchases", [])
+                        total_spent = sum(p.get("amount", 0) for p in purchases)
+                        asset_data["allocated_pct"] = min(100.0, (total_spent / target_amount) * 100)
+                        
+                        log_profile(prof, f"Auto-deployed {shares:,} units of {ticker} (${amount:,.2f} @ ${price:.2f})")
+                    
+                    save_db(st.session_state.db)
+                    st.success(f"✅ Deployed ${deployable_cash:,.0f} across {len(deployment_opportunities)} assets!")
+                    st.balloons()
+                    st.rerun()
             
             # Activity Log
             st.divider()
@@ -5092,7 +5205,6 @@ else:
                     "Actual %": st.column_config.TextColumn("Actual % ℹ️", help="Current portfolio percentage based on market values (this will differ from Target % due to price movements)", width="small"),
                     "Drift": st.column_config.TextColumn("Drift ℹ️", help="Difference between Actual % and Target % (🔴 = exceeds tolerance and needs rebalancing, ⚠️ = still deploying)", width="small"),
                     "Status": st.column_config.TextColumn("Status ℹ️", help="Current state: Deploying = still adding capital, Deployed = fully funded and monitoring drift", width="medium"),
-                    "Undeployed $": st.column_config.TextColumn("Undeployed $ ℹ️", help="Amount of target capital not yet deployed due to whole share requirements (can't buy fractional shares)", width="small"),
                     "Avg Cost": st.column_config.TextColumn("Avg Cost ℹ️", help="Weighted average cost per unit (calculated when 100% deployed)", width="small"),
                     "Units": st.column_config.TextColumn("Units ℹ️", help="Total shares/units owned", width="small"),
                     "Current Price": st.column_config.TextColumn("Price ℹ️", help="Latest market price per unit", width="small"),
@@ -5156,18 +5268,10 @@ else:
                     else:
                         status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
                     
-                    # Calculate undeployed $ for this asset
-                    target_capital = (tar_w / 100) * start_val
-                    purchases = asset_dict[t].get("purchases", [])
-                    deployed_capital = sum(p.get("amount", 0) for p in purchases)
-                    undeployed_asset = max(0, target_capital - deployed_capital)
-                    total_undeployed += undeployed_asset
-                    
                     rows.append({
                         "Fund Name": fund_name, "Ticker": t, "Target %": f"{tar_w:.2f}%",
                         "Deployed": f"{min(allocated_pct, 100):.0f}%", "Actual %": f"{act_w:.2f}%",
                         "Drift": drift_display, "Status": status_display,
-                        "Undeployed $": f"${undeployed_asset:,.0f}",
                         "Avg Cost": avg_cost_display,
                         "Units": f"{cur_u:.0f}", "Current Price": f"${current_price:.2f}",
                         "%Daily Change": f"{daily_change_pct:+.2f}%", "Amount": f"${act_val:,.0f}",
@@ -5196,7 +5300,6 @@ else:
                     "Fund Name": "**TOTAL**", "Ticker": "", "Target %": "**100.00%**",
                     "Deployed": f"**{deployment_pct:.0f}%**" if not is_fully_deployed else "**100%**", 
                     "Actual %": "**100.00%**", "Drift": "—", "Status": total_status,
-                    "Undeployed $": f"**${actual_undeployed_cash:,.0f}**",
                     "Avg Cost": "", "Units": "", "Current Price": "", "%Daily Change": "",
                     "Amount": f"**${total_current_val:,.0f}**",
                     "Buy/Sell Amt": f"**${total_turnover:,.0f}**", "Buy/Sell Shares": "—"
@@ -5205,26 +5308,48 @@ else:
                 df_rebalance = pd.DataFrame(rows)
                 st.dataframe(df_rebalance, use_container_width=True, hide_index=True, column_config=column_config)
                 
-                # Explain undeployed cash if it exists
+                # Explain undeployed cash if it exists - distinguish between deployable and fractional
                 if actual_undeployed_cash > 0:
-                    # Find first asset for dynamic example
-                    example_ticker = v_t[0] if v_t else "ASSET"
-                    example_price = float(data[example_ticker].iloc[-1]) if v_t else 100.0
-                    example_target_pct = float(asset_dict[example_ticker]['target']) if v_t else 50.0
-                    example_target_amt = (example_target_pct / 100) * start_val
-                    
-                    # Calculate example shares
-                    exact_shares = example_target_amt / example_price
-                    shares_down = int(exact_shares)
-                    shares_up = shares_down + 1
-                    cost_down = shares_down * example_price
-                    cost_up = shares_up * example_price
-                    undeployed_example = example_target_amt - cost_down
-                    
-                    st.info(f"""
+                    # Check Capital Overview calculations for deployable vs fractional
+                    # (These were calculated earlier in the Capital Overview section)
+                    if actual_undeployed_cash > 100:  # More than just fractional remainder
+                        st.warning(f"""
+⚠️ **You have ${actual_undeployed_cash:,.0f} ({actual_undeployed_pct:.1f}%) undeployed**
+
+This is NOT just fractional remainder - you can still deploy more capital!
+
+**Why this matters:**
+- You haven't fully deployed your portfolio yet
+- Capital is sitting idle instead of working for you
+- You're not at your target allocation levels
+
+**What to do:**
+1. Go to **💰 Capital Overview** section above
+2. Click **"🚀 Deploy All Remaining Cash"** button
+3. Or manually deploy more in **Asset Deployment** section
+
+After full deployment, you'll typically have only $100-300 left as true fractional remainder (can't buy partial shares).
+                        """)
+                    else:
+                        # This IS just fractional remainder
+                        # Find first asset for dynamic example
+                        example_ticker = v_t[0] if v_t else "ASSET"
+                        example_price = float(data[example_ticker].iloc[-1]) if v_t else 100.0
+                        example_target_pct = float(asset_dict[example_ticker]['target']) if v_t else 50.0
+                        example_target_amt = (example_target_pct / 100) * start_val
+                        
+                        # Calculate example shares
+                        exact_shares = example_target_amt / example_price
+                        shares_down = int(exact_shares)
+                        shares_up = shares_down + 1
+                        cost_down = shares_down * example_price
+                        cost_up = shares_up * example_price
+                        undeployed_example = example_target_amt - cost_down
+                        
+                        st.info(f"""
 💡 **Why ${actual_undeployed_cash:,.0f} ({actual_undeployed_pct:.1f}%) undeployed?**
 
-You can't buy fractional shares at most brokers, making it mathematically impossible to deploy exactly your target amounts.
+This is the **fractional remainder** - you literally cannot deploy it because you can't buy partial shares!
 
 **Real Example from Your Portfolio:**
 **{example_ticker}** costs ${example_price:.2f}/share, your target is ${example_target_amt:,.2f} ({example_target_pct:.0f}% of ${start_val:,.0f})
@@ -5236,13 +5361,12 @@ You can't buy fractional shares at most brokers, making it mathematically imposs
 
 This happens with EVERY asset in your portfolio, causing the total ${actual_undeployed_cash:,.0f} undeployed.
 
-This is **NORMAL** in portfolio management. Your deployment efficiency of **{deployment_pct:.1f}%** is excellent given share price constraints.
+This is **NORMAL** in portfolio management. Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
 
 **Options for remaining ${actual_undeployed_cash:,.0f}:**
 - Keep as cash reserve for rebalancing (recommended)
-- Buy additional shares if it won't over-allocate
 - Add to next capital injection
-                    """)
+                        """)
                 
                 col_metric1, col_metric2 = st.columns(2)
                 with col_metric1:
