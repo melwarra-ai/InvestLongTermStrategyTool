@@ -14,11 +14,18 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.1"
-VERSION_DATE = "2026-01-22"
-VERSION_TIME = "22:30:00"
-VERSION_NAME = "Complete Admin Suite + Welcome Experience"
+VERSION = "6.7.2"
+VERSION_DATE = "2026-01-23"
+VERSION_TIME = "04:15:00"
+VERSION_NAME = "Enhanced Profile Creation UX"
 CHANGELOG = """
+v6.7.2 (2026-01-23 04:15)
+- Enhanced: Profile creation now guides users to next step
+- Added: Auto-select newly created profile
+- Added: Clear instructions after profile creation
+- Added: Visual navigation hint with styled box
+- Added: Activity logging for profile creation
+
 v6.7.1 (2026-01-22 22:30)
 - Added: First-time user welcome experience with beautiful onboarding
 - Restored: Full user management controls (Reset Password, Activate/Deactivate, Delete)
@@ -2574,7 +2581,33 @@ else:
                         save_db(st.session_state.db)
                         prof = st.session_state.db["users"][current_user]["profiles"][n_name]
                         log_profile(prof, "Profile created")
-                        st.success(f"✅ '{n_name}' created!")
+                        
+                        # Auto-select the newly created profile
+                        st.session_state.active_profile = n_name
+                        
+                        # Enhanced success message with guidance
+                        st.success(f"✅ Portfolio '{n_name}' created successfully!")
+                        st.info(f"""
+📊 **Next Step:** Click '**Portfolio Manager**' button in the sidebar to:
+- Set target allocation percentages for **{n_name}**
+- Deploy your initial capital
+- Start tracking performance
+""")
+                        
+                        # Visual navigation hint
+                        st.markdown("""
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; padding: 15px; border-radius: 10px; text-align: center; margin-top: 15px;">
+    <p style="margin: 0; font-size: 1rem; font-weight: 600;">
+        👉 Click '<strong>📊 Portfolio Manager</strong>' in the sidebar above to continue →
+    </p>
+</div>
+""", unsafe_allow_html=True)
+                        
+                        # Log the activity
+                        log_activity(st.session_state.db, current_user, "profile_created", 
+                                   f"Created portfolio: {n_name}", "")
+                        
                         st.rerun()
         
         # Profile-specific sidebar
