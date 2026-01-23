@@ -3216,15 +3216,193 @@ else:
         profiles = get_user_profiles(st.session_state.db, current_user)
         
         if not profiles:
-            st.info("👋 Welcome! Create your first investment profile using the sidebar.")
-            st.markdown("### 🎯 Key Features")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.markdown('<div class="premium-card"><h4>🎯 Drift Detection</h4><p style="color: #64748b;">Automatic alerts when assets deviate from target allocation.</p></div>', unsafe_allow_html=True)
-            with col2:
-                st.markdown('<div class="premium-card"><h4>📈 Performance Tracking</h4><p style="color: #64748b;">Real-time portfolio valuation vs. your target growth path.</p></div>', unsafe_allow_html=True)
-            with col3:
-                st.markdown('<div class="premium-card"><h4>⚖️ Smart Rebalancing</h4><p style="color: #64748b;">Two-step workflow with slippage management.</p></div>', unsafe_allow_html=True)
+            # ===== FIRST-TIME USER WELCOME EXPERIENCE =====
+            
+            # Hero Section
+            st.markdown("""
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                            color: white; padding: 60px 40px; border-radius: 20px; text-align: center; 
+                            margin-bottom: 40px; box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);">
+                    <h1 style="font-size: 3rem; margin: 0 0 20px 0; font-weight: 700; color: white;">
+                        🎉 Welcome to Your Portfolio Command Center!
+                    </h1>
+                    <p style="font-size: 1.3rem; margin: 0 0 30px 0; opacity: 0.95; color: white;">
+                        Institutional-grade portfolio management, simplified for you
+                    </p>
+                    <p style="font-size: 1.1rem; margin: 0; opacity: 0.9; color: white;">
+                        Let's get started by creating your first investment strategy →
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Quick Start Guide
+            st.markdown("## 🚀 Quick Start Guide")
+            st.caption("Follow these steps to set up your first portfolio")
+            
+            col_step1, col_step2, col_step3 = st.columns(3)
+            
+            with col_step1:
+                st.markdown("""
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                padding: 30px; border-radius: 15px; height: 100%; 
+                                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);">
+                        <div style="background: white; width: 60px; height: 60px; border-radius: 50%; 
+                                    display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                            <span style="font-size: 2rem;">①</span>
+                        </div>
+                        <h3 style="color: white; text-align: center; margin: 0 0 15px 0;">Create Profile</h3>
+                        <p style="color: rgba(255,255,255,0.9); text-align: center; margin: 0; font-size: 0.95rem;">
+                            Click "📁 Create New Profile" in the sidebar to set up your portfolio strategy
+                        </p>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col_step2:
+                st.markdown("""
+                    <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                                padding: 30px; border-radius: 15px; height: 100%;
+                                box-shadow: 0 4px 15px rgba(240, 147, 251, 0.2);">
+                        <div style="background: white; width: 60px; height: 60px; border-radius: 50%; 
+                                    display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                            <span style="font-size: 2rem;">②</span>
+                        </div>
+                        <h3 style="color: white; text-align: center; margin: 0 0 15px 0;">Set Targets</h3>
+                        <p style="color: rgba(255,255,255,0.9); text-align: center; margin: 0; font-size: 0.95rem;">
+                            Define your asset allocation with target percentages for each holding
+                        </p>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col_step3:
+                st.markdown("""
+                    <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                                padding: 30px; border-radius: 15px; height: 100%;
+                                box-shadow: 0 4px 15px rgba(79, 172, 254, 0.2);">
+                        <div style="background: white; width: 60px; height: 60px; border-radius: 50%; 
+                                    display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                            <span style="font-size: 2rem;">③</span>
+                        </div>
+                        <h3 style="color: white; text-align: center; margin: 0 0 15px 0;">Deploy Capital</h3>
+                        <p style="color: rgba(255,255,255,0.9); text-align: center; margin: 0; font-size: 0.95rem;">
+                            Record your purchases and start tracking performance automatically
+                        </p>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            st.divider()
+            
+            # Feature Highlights
+            st.markdown("## ✨ Powerful Features at Your Fingertips")
+            
+            col_feat1, col_feat2 = st.columns(2)
+            
+            with col_feat1:
+                st.markdown("""
+                    <div style="background: white; padding: 25px; border-radius: 12px; 
+                                border-left: 4px solid #667eea; margin-bottom: 20px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                        <h3 style="margin: 0 0 12px 0; color: #1e293b;">🎯 Automated Drift Detection</h3>
+                        <p style="margin: 0; color: #64748b; line-height: 1.6;">
+                            Set your tolerance levels and get instant alerts when your portfolio drifts 
+                            from target allocation. Never miss a rebalancing opportunity.
+                        </p>
+                    </div>
+                    
+                    <div style="background: white; padding: 25px; border-radius: 12px; 
+                                border-left: 4px solid #f093fb; margin-bottom: 20px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                        <h3 style="margin: 0 0 12px 0; color: #1e293b;">📈 Real-Time Performance Tracking</h3>
+                        <p style="margin: 0; color: #64748b; line-height: 1.6;">
+                            Monitor portfolio value, returns (CAGR & ROI), and compare against 
+                            benchmarks like SPY, QQQ, and VTI in real-time.
+                        </p>
+                    </div>
+                    
+                    <div style="background: white; padding: 25px; border-radius: 12px; 
+                                border-left: 4px solid #4facfe; margin-bottom: 20px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                        <h3 style="margin: 0 0 12px 0; color: #1e293b;">⚖️ Smart Rebalancing Engine</h3>
+                        <p style="margin: 0; color: #64748b; line-height: 1.6;">
+                            Two-step rebalancing workflow shows exactly what to buy/sell, 
+                            manages slippage, and tracks execution history.
+                        </p>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col_feat2:
+                st.markdown("""
+                    <div style="background: white; padding: 25px; border-radius: 12px; 
+                                border-left: 4px solid #fbbf24; margin-bottom: 20px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                        <h3 style="margin: 0 0 12px 0; color: #1e293b;">📊 Multiple Portfolio Management</h3>
+                        <p style="margin: 0; color: #64748b; line-height: 1.6;">
+                            Manage unlimited portfolios across different accounts 
+                            (401k, IRA, Roth IRA, TFSA, RRSP, Taxable). All in one place.
+                        </p>
+                    </div>
+                    
+                    <div style="background: white; padding: 25px; border-radius: 12px; 
+                                border-left: 4px solid #10b981; margin-bottom: 20px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                        <h3 style="margin: 0 0 12px 0; color: #1e293b;">🔔 Email Notifications</h3>
+                        <p style="margin: 0; color: #64748b; line-height: 1.6;">
+                            Get automatic alerts when portfolios drift beyond your tolerance. 
+                            Stay informed without constantly checking.
+                        </p>
+                    </div>
+                    
+                    <div style="background: white; padding: 25px; border-radius: 12px; 
+                                border-left: 4px solid #8b5cf6; margin-bottom: 20px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                        <h3 style="margin: 0 0 12px 0; color: #1e293b;">📜 Complete History & Logs</h3>
+                        <p style="margin: 0; color: #64748b; line-height: 1.6;">
+                            Every rebalancing action, deployment, and adjustment is logged 
+                            with timestamps for perfect record-keeping.
+                        </p>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            st.divider()
+            
+            # Call to Action
+            st.markdown("""
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                            color: white; padding: 40px; border-radius: 15px; text-align: center;
+                            margin-top: 40px; box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);">
+                    <h2 style="margin: 0 0 15px 0; font-size: 2rem; color: white;">Ready to Take Control?</h2>
+                    <p style="margin: 0 0 25px 0; font-size: 1.1rem; opacity: 0.95; color: white;">
+                        Start by creating your first investment profile in the sidebar
+                    </p>
+                    <div style="background: white; display: inline-block; padding: 15px 40px; 
+                                border-radius: 25px; font-weight: 600; color: #667eea; font-size: 1.1rem;">
+                        📁 Look for "Create New Profile" →
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Tips Section
+            st.markdown("")
+            st.markdown("## 💡 Pro Tips")
+            
+            tip_col1, tip_col2, tip_col3 = st.columns(3)
+            
+            with tip_col1:
+                st.info("""
+                    **🎯 Start Simple**  
+                    Begin with 3-5 core holdings. You can always add more complexity later as you get comfortable with the system.
+                """)
+            
+            with tip_col2:
+                st.success("""
+                    **⚖️ Set Drift Tolerance**  
+                    5% is a good starting point for most investors. Adjust based on your rebalancing preferences.
+                """)
+            
+            with tip_col3:
+                st.warning("""
+                    **📈 Track Benchmarks**  
+                    Compare against SPY (S&P 500) or VTI (Total Market) to measure your strategy's performance.
+                """)
         else:
             # Fetch all prices
             all_tickers = set()
