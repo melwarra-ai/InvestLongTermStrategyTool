@@ -14,11 +14,17 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.9"
+VERSION = "6.7.10"
 VERSION_DATE = "2026-01-23"
-VERSION_TIME = "13:06:09"  # EST
-VERSION_NAME = "Deployment Protection & Error Handling"
+VERSION_TIME = "13:21:05"  # EST
+VERSION_NAME = "Calendar Quick Select"
 CHANGELOG = """
+v6.7.10 (2026-01-23 13:21 EST)
+- Added: "Today" quick select button next to deployment calendar
+- Enhanced: Two-column layout for date picker (calendar + Today button)
+- UX: Click "Today" to instantly select current date without calendar navigation
+- Improved: Faster deployment date selection for same-day purchases
+
 v6.7.9 (2026-01-23 13:06 EST)
 - CRITICAL: Added over-deployment prevention (can't deploy more than principal)
 - CRITICAL: Fixed NaN error in rebalance table with comprehensive error handling
@@ -3227,8 +3233,26 @@ else:
                                 deploy_method = st.radio("Deployment Method", ["By Percentage", "By Units"], 
                                                         horizontal=True, key="deploy_method_radio")
                                 
-                                deploy_date = st.date_input("Deployment Date", value=date.today(),
-                                                           max_value=date.today(), key="deploy_date_input")
+                                # Date selection with Today button
+                                col_date, col_today = st.columns([3, 1])
+                                with col_date:
+                                    # Initialize session state for deployment date
+                                    if 'deploy_date_value' not in st.session_state:
+                                        st.session_state.deploy_date_value = date.today()
+                                    
+                                    deploy_date = st.date_input("Deployment Date", 
+                                                               value=st.session_state.deploy_date_value,
+                                                               max_value=date.today(), 
+                                                               key="deploy_date_input")
+                                    
+                                    # Update session state when date changes
+                                    st.session_state.deploy_date_value = deploy_date
+                                
+                                with col_today:
+                                    st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                                    if st.button("📅 Today", key="set_today_btn", use_container_width=True):
+                                        st.session_state.deploy_date_value = date.today()
+                                        st.rerun()
                                 
                                 # Fetch price for preview
                                 preview_price = None
