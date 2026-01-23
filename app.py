@@ -14,11 +14,22 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.10"
+VERSION = "6.7.11"
 VERSION_DATE = "2026-01-23"
-VERSION_TIME = "13:21:05"  # EST
-VERSION_NAME = "Calendar Quick Select"
+VERSION_TIME = "16:19:27"  # EST
+VERSION_NAME = "Smart Fractional Detection & Add Capital"
 CHANGELOG = """
+v6.7.11 (2026-01-23 16:19 EST)
+- CRITICAL: Smart fractional detection - checks if undeployed cash can buy cheapest asset
+- CRITICAL: Fixed false "deployable" warnings when cash < cheapest share price
+- Added: "Add More Capital" feature to inject additional funds into portfolio
+- Enhanced: Shows green success when truly 100% deployed (fractional remainder only)
+- Enhanced: Capital Overview shows "100% deployed" when can't afford any shares
+- Enhanced: Info box now uses smart detection for accurate messages
+- Fixed: User case where $216 undeployed but can't buy SPXL ($225) or GLD ($467)
+- UX: Suggested capital amount to buy 1 more share of cheapest asset
+- Feature: Track capital injections in activity log
+
 v6.7.10 (2026-01-23 13:21 EST)
 - Added: "Today" quick select button next to deployment calendar
 - Enhanced: Two-column layout for date picker (calendar + Today button)
@@ -3562,6 +3573,29 @@ You have deployed MORE than your principal!
                             # If can't get price, assume it's deployable
                             deployable_cash += remaining_target
             
+            # Smart Fractional Detection: Check if undeployed cash can buy even 1 share of cheapest asset
+            cheapest_asset_price = None
+            asset_prices = {}
+            
+            if undeployed_cash > 0 and not is_over_deployed:
+                import yfinance as yf
+                for ticker in assets.keys():
+                    try:
+                        ticker_obj = yf.Ticker(ticker)
+                        hist = ticker_obj.history(period="1d")
+                        if not hist.empty:
+                            price = float(hist['Close'].iloc[-1])
+                            asset_prices[ticker] = price
+                            if cheapest_asset_price is None or price < cheapest_asset_price:
+                                cheapest_asset_price = price
+                    except:
+                        pass
+            
+            # Determine if truly fractional (can't afford even 1 share of cheapest asset)
+            is_truly_fractional = False
+            if undeployed_cash > 0 and cheapest_asset_price is not None:
+                is_truly_fractional = undeployed_cash < cheapest_asset_price
+            
             col_cap1, col_cap2 = st.columns(2)
             with col_cap1:
                 st.metric("Principal Set", f"${principal_amt:,.0f}")
@@ -3570,6 +3604,11 @@ You have deployed MORE than your principal!
                 if is_over_deployed:
                     st.metric("Over-Deployed!", f"${abs(undeployed_cash):,.0f}",
                              delta=f"{deployment_rate:.1f}% over limit", delta_color="inverse")
+                elif is_truly_fractional:
+                    # Show success - portfolio is fully deployed
+                    st.metric("Undeployed Cash", f"${undeployed_cash:,.0f}",
+                             delta="100% deployed", delta_color="normal")
+                    st.caption(f"✅ Fractional remainder (can't buy partial shares)")
                 else:
                     st.metric("Undeployed Cash", f"${undeployed_cash:,.0f}",
                              delta=f"{deployment_rate:.1f}% deployed" if undeployed_cash > 0 else None)
@@ -3579,8 +3618,79 @@ You have deployed MORE than your principal!
                         if fractional_cash > 0:
                             st.caption(f"💡 ${fractional_cash:,.0f} fractional (can't buy partial shares)")
             
-            # Show deployment opportunities if available
-            if deployment_opportunities:
+            # Show fractional explanation or deployment opportunities
+            if is_truly_fractional and undeployed_cash > 0:
+                # Show success message with fractional explanation
+                st.success(f"""
+✅ **Portfolio 100% Deployed!**
+
+You have ${undeployed_cash:,.2f} remaining, which is a **fractional remainder**.
+
+**Why can't this be deployed?**
+You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_asset_price:.2f}/share, but you only have ${undeployed_cash:,.2f}.
+
+**This is NORMAL and expected in portfolio management!** Your deployment efficiency of {deployment_rate:.1f}% is excellent.
+
+**Options for ${undeployed_cash:,.2f}:**
+- Keep as cash reserve for rebalancing (recommended)
+- Add more capital to reach next share (see button below)
+- Add to next capital injection
+                """)
+                
+                # Add Capital button
+                if st.button("➕ Add More Capital to Portfolio", use_container_width=True, key="add_capital_btn"):
+                    st.session_state.show_add_capital_form = True
+                    st.rerun()
+            
+            # Show add capital form if triggered
+            if st.session_state.get('show_add_capital_form', False):
+                with st.form("add_capital_form"):
+                    st.markdown("### ➕ Add Capital to Portfolio")
+                    st.caption("Inject additional capital into your portfolio")
+                    
+                    current_principal = prof['principal']
+                    st.info(f"Current Principal: ${current_principal:,.2f}")
+                    
+                    # Calculate suggested amount to buy 1 more share of cheapest asset
+                    if cheapest_asset_price and is_truly_fractional:
+                        suggested = cheapest_asset_price - undeployed_cash + 1
+                        st.caption(f"💡 Suggested: ${suggested:.2f} (enough to buy 1 share of cheapest asset)")
+                    
+                    additional_amount = st.number_input(
+                        "Additional Capital Amount",
+                        min_value=0.01,
+                        value=float(cheapest_asset_price) if cheapest_asset_price and is_truly_fractional else 1000.0,
+                        step=100.0,
+                        format="%.2f",
+                        help="Amount to add to your portfolio principal"
+                    )
+                    
+                    new_principal = current_principal + additional_amount
+                    st.markdown(f"**New Principal:** ${new_principal:,.2f}")
+                    st.caption(f"Increase: +${additional_amount:,.2f} ({(additional_amount/current_principal*100):.2f}%)")
+                    
+                    col_submit, col_cancel = st.columns(2)
+                    with col_submit:
+                        submit_add = st.form_submit_button("✅ Add Capital", type="primary", use_container_width=True)
+                    with col_cancel:
+                        cancel_add = st.form_submit_button("❌ Cancel", use_container_width=True)
+                    
+                    if submit_add:
+                        # Update principal
+                        prof['principal'] = new_principal
+                        log_profile(prof, f"Added capital: ${additional_amount:,.2f} (Principal: ${current_principal:,.2f} → ${new_principal:,.2f})")
+                        save_db(st.session_state.db)
+                        st.session_state.show_add_capital_form = False
+                        st.success(f"✅ Added ${additional_amount:,.2f} to portfolio! New principal: ${new_principal:,.2f}")
+                        st.balloons()
+                        st.rerun()
+                    
+                    if cancel_add:
+                        st.session_state.show_add_capital_form = False
+                        st.rerun()
+            
+            # Show deployment opportunities if available (and NOT truly fractional)
+            if deployment_opportunities and not is_truly_fractional:
                 st.markdown("#### 🚀 Deploy Remaining Cash")
                 st.caption(f"You have ${deployable_cash:,.0f} that can be deployed:")
                 
@@ -5463,11 +5573,41 @@ You have deployed MORE than your principal!
                 df_rebalance = pd.DataFrame(rows)
                 st.dataframe(df_rebalance, use_container_width=True, hide_index=True, column_config=column_config)
                 
-                # Explain undeployed cash if it exists - distinguish between deployable and fractional
+                # Explain undeployed cash if it exists - use smart fractional detection
                 if actual_undeployed_cash > 0:
-                    # Check Capital Overview calculations for deployable vs fractional
-                    # (These were calculated earlier in the Capital Overview section)
-                    if actual_undeployed_cash > 100:  # More than just fractional remainder
+                    # Get cheapest asset price for smart detection
+                    cheapest_price_table = None
+                    try:
+                        for t in v_t:
+                            price = float(data[t].iloc[-1])
+                            if cheapest_price_table is None or price < cheapest_price_table:
+                                cheapest_price_table = price
+                    except:
+                        pass
+                    
+                    # Determine if truly fractional
+                    is_truly_fractional_table = False
+                    if cheapest_price_table is not None:
+                        is_truly_fractional_table = actual_undeployed_cash < cheapest_price_table
+                    
+                    if is_truly_fractional_table:
+                        # TRUE FRACTIONAL - show success
+                        st.success(f"""
+✅ **Portfolio 100% Deployed!**
+
+You have ${actual_undeployed_cash:,.2f} ({actual_undeployed_pct:.1f}%) remaining as **fractional remainder**.
+
+**Why can't this be deployed?**
+You can't buy partial shares. The cheapest asset in your portfolio costs ${cheapest_price_table:.2f}/share, but you only have ${actual_undeployed_cash:.2f}.
+
+**This is NORMAL and expected!** Your deployment efficiency of **{deployment_pct:.1f}%** is excellent.
+
+**Options for ${actual_undeployed_cash:,.0f}:**
+- Keep as cash reserve for rebalancing (recommended)
+- Add more capital via **💰 Capital Overview** section above
+- Add to next capital injection
+                        """)
+                    elif actual_undeployed_cash > 100:  # More than just fractional remainder
                         st.warning(f"""
 ⚠️ **You have ${actual_undeployed_cash:,.0f} ({actual_undeployed_pct:.1f}%) undeployed**
 
@@ -5486,41 +5626,13 @@ This is NOT just fractional remainder - you can still deploy more capital!
 After full deployment, you'll typically have only $100-300 left as true fractional remainder (can't buy partial shares).
                         """)
                     else:
-                        # This IS just fractional remainder
-                        # Find first asset for dynamic example
-                        example_ticker = v_t[0] if v_t else "ASSET"
-                        example_price = float(data[example_ticker].iloc[-1]) if v_t else 100.0
-                        example_target_pct = float(asset_dict[example_ticker]['target']) if v_t else 50.0
-                        example_target_amt = (example_target_pct / 100) * start_val
-                        
-                        # Calculate example shares
-                        exact_shares = example_target_amt / example_price
-                        shares_down = int(exact_shares)
-                        shares_up = shares_down + 1
-                        cost_down = shares_down * example_price
-                        cost_up = shares_up * example_price
-                        undeployed_example = example_target_amt - cost_down
-                        
+                        # Small amount but might still be deployable
                         st.info(f"""
-💡 **Why ${actual_undeployed_cash:,.0f} ({actual_undeployed_pct:.1f}%) undeployed?**
+💡 **${actual_undeployed_cash:,.0f} ({actual_undeployed_pct:.1f}%) undeployed**
 
-This is the **fractional remainder** - you literally cannot deploy it because you can't buy partial shares!
+This is likely fractional remainder - check if you can still deploy any amount in the **💰 Capital Overview** section above.
 
-**Real Example from Your Portfolio:**
-**{example_ticker}** costs ${example_price:.2f}/share, your target is ${example_target_amt:,.2f} ({example_target_pct:.0f}% of ${start_val:,.0f})
-
-- **Exact shares needed:** {exact_shares:.2f} shares
-- **You can buy {shares_down} shares** = ${cost_down:,.2f} ✅
-- **OR buy {shares_up} shares** = ${cost_up:,.2f} ❌ (over budget!)
-- **Undeployed per this asset:** ${undeployed_example:,.2f}
-
-This happens with EVERY asset in your portfolio, causing the total ${actual_undeployed_cash:,.0f} undeployed.
-
-This is **NORMAL** in portfolio management. Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
-
-**Options for remaining ${actual_undeployed_cash:,.0f}:**
-- Keep as cash reserve for rebalancing (recommended)
-- Add to next capital injection
+Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                         """)
                 
                 col_metric1, col_metric2 = st.columns(2)
