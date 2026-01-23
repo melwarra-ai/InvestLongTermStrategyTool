@@ -14,11 +14,19 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.3"
+VERSION = "6.7.4"
 VERSION_DATE = "2026-01-23"
-VERSION_TIME = "05:00:00"
-VERSION_NAME = "Workflow Clarity + Status Fix"
+VERSION_TIME = "06:00:00"
+VERSION_NAME = "Analytics Optimization + Timeline"
 CHANGELOG = """
+v6.7.4 (2026-01-23 06:00)
+- Fixed: AUM calculation now uses current market prices (not purchase prices)
+- Fixed: Avg Portfolio Value calculation corrected
+- Added: Activity Timeline chart showing activities by date (last 14 days)
+- Added: Activity Types breakdown with top 5 types
+- Added: Recent Activity feed with last 10 activities
+- Enhanced: System Analytics now shows real-time accurate values
+
 v6.7.3 (2026-01-23 05:00)
 - Fixed: Renamed "Phase A/C" to "Step 1/2" for two-step workflow clarity
 - Fixed: TOTAL row Status now shows drift status instead of confusing deployment %
@@ -734,18 +742,58 @@ def get_analytics_data(db):
     total_users = len([u for u in users.values() if u.get("role") != "admin"])
     total_portfolios = sum(len(u.get("profiles", {})) for u in users.values() if u.get("role") != "admin")
     
+    # Calculate total AUM using current market prices
     total_aum = 0
+    all_tickers = set()
+    portfolio_values = []
+    
+    # Collect all tickers first
     for user_data in users.values():
         if user_data.get("role") == "admin":
             continue
         profiles = user_data.get("profiles", {})
         for profile_data in profiles.values():
             assets = profile_data.get("assets", {})
-            for asset_data in assets.values():
-                units = asset_data.get("units", 0)
-                purchase_price = asset_data.get("purchase_price", 0)
-                total_aum += units * purchase_price
+            all_tickers.update(assets.keys())
     
+    # Fetch current prices for all tickers
+    current_prices = {}
+    if all_tickers:
+        try:
+            import yfinance as yf
+            data = yf.download(list(all_tickers), period="1d", progress=False)['Close']
+            if len(all_tickers) == 1:
+                ticker = list(all_tickers)[0]
+                if not data.empty:
+                    current_prices[ticker] = float(data.iloc[-1])
+            else:
+                for ticker in all_tickers:
+                    try:
+                        if ticker in data.columns and not data[ticker].empty:
+                            current_prices[ticker] = float(data[ticker].iloc[-1])
+                    except:
+                        pass
+        except:
+            pass
+    
+    # Calculate AUM and portfolio values
+    for user_data in users.values():
+        if user_data.get("role") == "admin":
+            continue
+        profiles = user_data.get("profiles", {})
+        for profile_data in profiles.values():
+            assets = profile_data.get("assets", {})
+            portfolio_value = 0
+            for ticker, asset_data in assets.items():
+                units = float(asset_data.get("units", 0))
+                price = current_prices.get(ticker, 0)
+                portfolio_value += units * price
+            
+            if portfolio_value > 0:
+                portfolio_values.append(portfolio_value)
+                total_aum += portfolio_value
+    
+    # Count asset popularity
     asset_counts = {}
     for user_data in users.values():
         if user_data.get("role") == "admin":
@@ -758,17 +806,23 @@ def get_analytics_data(db):
     
     top_assets = sorted(asset_counts.items(), key=lambda x: x[1], reverse=True)[:10]
     
+    # Activity metrics
     activity_logs = db.get("activity_logs", [])
     today = datetime.now().strftime("%Y-%m-%d")
     recent_activities = len([log for log in activity_logs if log.get("timestamp", "")[:10] == today])
+    
+    # Calculate average portfolio value
+    avg_portfolio_value = total_aum / len(portfolio_values) if portfolio_values else 0
     
     return {
         "total_users": total_users,
         "total_portfolios": total_portfolios,
         "total_aum": total_aum,
+        "avg_portfolio_value": avg_portfolio_value,
         "top_assets": top_assets,
         "recent_activities": recent_activities,
-        "total_activities": len(activity_logs)
+        "total_activities": len(activity_logs),
+        "activity_logs": activity_logs
     }
 
 def get_system_health(db):
@@ -2017,8 +2071,7 @@ def show_analytics_tab(db, analytics):
         with col2:
             avg_portfolios = analytics['total_portfolios'] / max(analytics['total_users'], 1)
             st.metric("Avg Portfolios/User", f"{avg_portfolios:.1f}")
-            avg_value = analytics['total_aum'] / max(analytics['total_portfolios'], 1)
-            st.metric("Avg Portfolio Value", f"${avg_value:,.0f}")
+            st.metric("Avg Portfolio Value", f"${analytics['avg_portfolio_value']:,.0f}")
         
         with col3:
             st.metric("Total AUM", f"${analytics['total_aum']:,.0f}")
@@ -2026,10 +2079,102 @@ def show_analytics_tab(db, analytics):
         
         st.divider()
         
+        # Activity Timeline
         st.markdown("### 📈 Activity Timeline")
-        activity_logs = db.get("activity_logs", [])
+        activity_logs = analytics.get('activity_logs', [])
+        
         if activity_logs:
             st.caption(f"Total activities logged: {len(activity_logs)}")
+            
+            # Group activities by date
+            from collections import defaultdict
+            activity_by_date = defaultdict(int)
+            activity_by_type = defaultdict(int)
+            
+            for log in activity_logs:
+                timestamp = log.get("timestamp", "")
+                action = log.get("action", "unknown")
+                
+                # Extract date
+                date_str = timestamp[:10] if len(timestamp) >= 10 else "Unknown"
+                activity_by_date[date_str] += 1
+                activity_by_type[action] += 1
+            
+            # Create timeline chart
+            col_chart1, col_chart2 = st.columns([2, 1])
+            
+            with col_chart1:
+                st.markdown("#### 📅 Activity by Date")
+                if activity_by_date:
+                    # Sort by date
+                    sorted_dates = sorted(activity_by_date.items())
+                    dates = [d[0] for d in sorted_dates[-14:]]  # Last 14 days
+                    counts = [d[1] for d in sorted_dates[-14:]]
+                    
+                    chart_data = pd.DataFrame({
+                        'Date': dates,
+                        'Activities': counts
+                    })
+                    
+                    st.bar_chart(chart_data.set_index('Date'))
+                else:
+                    st.info("No timeline data available")
+            
+            with col_chart2:
+                st.markdown("#### 🎯 Activity Types")
+                if activity_by_type:
+                    # Show top 5 activity types
+                    top_types = sorted(activity_by_type.items(), key=lambda x: x[1], reverse=True)[:5]
+                    for action, count in top_types:
+                        action_display = action.replace("_", " ").title()
+                        percentage = (count / len(activity_logs)) * 100
+                        st.markdown(f"""
+                            <div style="background: white; padding: 8px; border-radius: 6px; 
+                                        margin-bottom: 6px; border-left: 3px solid #3b82f6;">
+                                <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">
+                                    {action_display}
+                                </div>
+                                <div style="color: #64748b; font-size: 0.85rem;">
+                                    {count} activities ({percentage:.1f}%)
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.info("No activity types data")
+            
+            # Recent activity list
+            st.markdown("#### 🕐 Recent Activity")
+            recent_logs = sorted(activity_logs, key=lambda x: x.get("timestamp", ""), reverse=True)[:10]
+            
+            for log in recent_logs:
+                timestamp = log.get("timestamp", "Unknown")
+                username = log.get("username", "Unknown")
+                action = log.get("action", "unknown").replace("_", " ").title()
+                details = log.get("details", "")
+                
+                # Format timestamp
+                try:
+                    dt = datetime.fromisoformat(timestamp)
+                    time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    time_str = timestamp
+                
+                st.markdown(f"""
+                    <div style="background: #f8fafc; padding: 10px; border-radius: 6px; 
+                                margin-bottom: 6px; border-left: 2px solid #cbd5e1;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <span style="font-weight: 600; color: #3b82f6;">@{username}</span>
+                                <span style="color: #64748b; margin: 0 8px;">•</span>
+                                <span style="color: #1e293b;">{action}</span>
+                                {f'<div style="color: #64748b; font-size: 0.85rem; margin-top: 4px;">{details}</div>' if details else ''}
+                            </div>
+                            <div style="color: #94a3b8; font-size: 0.8rem; white-space: nowrap; margin-left: 12px;">
+                                {time_str}
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
         else:
             st.info("No activity data yet")
     
