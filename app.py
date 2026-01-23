@@ -1691,31 +1691,106 @@ def show_admin_overview_tab(db, all_profiles):
         users = db.get("users", {})
         non_admin_users = {k: v for k, v in users.items() if v.get("role") != "admin"}
         
-        for username, user_data in non_admin_users.items():
-            st.markdown(f"""
-                <div style="background: white; padding: 20px; border-radius: 10px; 
-                            margin-bottom: 16px; border: 1px solid #e2e8f0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <h4 style="margin: 0; color: #1e293b;">👤 {user_data.get('display_name', username)}</h4>
-                            <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.9rem;">
-                                @{username} • {user_data.get('email', 'N/A')}
-                            </p>
-                            <p style="margin: 8px 0 0 0; color: #64748b; font-size: 0.85rem;">
-                                📁 {len(user_data.get('profiles', {}))} portfolios • 
-                                Joined: {user_data.get('created_at', 'Unknown')[:10]}
-                            </p>
+        if not non_admin_users:
+            st.info("No users registered yet.")
+        else:
+            for username, user_data in non_admin_users.items():
+                is_active = user_data.get("is_active", True)
+                status_color = "#10b981" if is_active else "#ef4444"
+                status_text = "Active" if is_active else "Inactive"
+                status_icon = "✅" if is_active else "🔴"
+                
+                st.markdown(f"""
+                    <div style="background: white; padding: 20px; border-radius: 10px; 
+                                margin-bottom: 16px; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <h4 style="margin: 0; color: #1e293b;">👤 {user_data.get('display_name', username)}</h4>
+                                <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.9rem;">
+                                    @{username} • {user_data.get('email', 'N/A')}
+                                </p>
+                                <p style="margin: 8px 0 0 0; color: #64748b; font-size: 0.85rem;">
+                                    📁 {len(user_data.get('profiles', {}))} portfolios • 
+                                    Joined: {user_data.get('created_at', 'Unknown')[:10]}
+                                </p>
+                            </div>
+                            <span style="background: {status_color}; color: white; padding: 4px 12px; 
+                                         border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                {status_icon} {status_text}
+                            </span>
                         </div>
                     </div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button(f"🔐 Login as {username}", key=f"login_{username}", use_container_width=True):
-                login_as_user(username)
-                st.session_state.current_page = "Global Dashboard"
-                log_security_event(db, "admin_impersonation", "admin", f"Logged in as {username}", "info")
-                save_db(db)
-                st.rerun()
+                """, unsafe_allow_html=True)
+                
+                # Action buttons
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    if st.button(f"🔐 Login as User", key=f"login_{username}", use_container_width=True):
+                        login_as_user(username)
+                        st.session_state.current_page = "Global Dashboard"
+                        log_security_event(db, "admin_impersonation", "admin", f"Logged in as {username}", "info")
+                        save_db(db)
+                        st.rerun()
+                
+                with col2:
+                    if st.button(f"🔑 Reset Password", key=f"reset_{username}", use_container_width=True):
+                        # Generate a temporary password
+                        import secrets
+                        import string
+                        temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+                        
+                        # Hash the new password
+                        pw_hash, pw_salt = hash_password(temp_password)
+                        user_data["password_hash"] = pw_hash
+                        user_data["password_salt"] = pw_salt
+                        
+                        # Log the action
+                        log_activity(db, username, "password_reset_admin", "Admin reset user password", "")
+                        log_security_event(db, "password_reset", username, "Admin reset password", "info")
+                        save_db(db)
+                        
+                        st.success(f"✅ Password reset! New password: `{temp_password}`")
+                        st.info("⚠️ User should change this password immediately after login.")
+                
+                with col3:
+                    if is_active:
+                        if st.button(f"🚫 Deactivate", key=f"deactivate_{username}", use_container_width=True):
+                            user_data["is_active"] = False
+                            log_activity(db, username, "user_deactivated", "Admin deactivated user account", "")
+                            log_security_event(db, "user_deactivated", username, "Admin deactivated account", "warning")
+                            save_db(db)
+                            st.warning(f"User {username} has been deactivated")
+                            st.rerun()
+                    else:
+                        if st.button(f"✅ Activate", key=f"activate_{username}", use_container_width=True, type="primary"):
+                            user_data["is_active"] = True
+                            user_data["login_attempts"] = 0
+                            user_data["lockout_until"] = None
+                            log_activity(db, username, "user_activated", "Admin activated user account", "")
+                            log_security_event(db, "user_activated", username, "Admin activated account", "info")
+                            save_db(db)
+                            st.success(f"User {username} has been activated")
+                            st.rerun()
+                
+                with col4:
+                    if st.button(f"🗑️ Delete User", key=f"delete_{username}", use_container_width=True):
+                        # Show confirmation
+                        if f"confirm_delete_{username}" not in st.session_state:
+                            st.session_state[f"confirm_delete_{username}"] = True
+                            st.error(f"⚠️ Click again to confirm deletion of {username}")
+                        else:
+                            # Actually delete
+                            portfolio_count = len(user_data.get('profiles', {}))
+                            del db["users"][username]
+                            log_activity(db, username, "user_deleted", f"Admin deleted user account ({portfolio_count} portfolios removed)", "")
+                            log_security_event(db, "user_deleted", username, "Admin deleted account", "critical")
+                            save_db(db)
+                            del st.session_state[f"confirm_delete_{username}"]
+                            st.success(f"✅ User {username} has been permanently deleted")
+                            st.rerun()
+                
+                st.divider()
     
     # SUB-TAB 3: Profiles Needing Action
     with sub_tab3:
