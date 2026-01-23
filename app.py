@@ -14,11 +14,18 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.12"
+VERSION = "6.7.13"
 VERSION_DATE = "2026-01-23"
-VERSION_TIME = "16:37:00"  # EST
-VERSION_NAME = "Progress Bar Consistency Fix"
+VERSION_TIME = "16:48:52"  # EST
+VERSION_NAME = "Rebalance Table Error Fix"
 CHANGELOG = """
+v6.7.13 (2026-01-23 16:48 EST)
+- CRITICAL: Fixed 'actual_undeployed_cash' not defined error in Rebalance Analysis table
+- Fixed: Calculate actual_undeployed_cash before using it in smart fractional detection
+- Fixed: Error occurred when viewing Portfolio Manager with deployed assets
+- Technical: Moved capital calculation to proper location in code flow
+- Impact: Rebalance table now displays correctly for all users
+
 v6.7.12 (2026-01-23 16:37 EST)
 - CRITICAL: Fixed progress bar showing "1/2 deployed" when portfolio truly 100% deployed
 - CRITICAL: Fixed table status showing "Deploying" when fractional remainder only
@@ -5493,6 +5500,16 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 total_turnover = 0
                 total_current_val = 0
                 total_undeployed = 0
+                
+                # Calculate actual_undeployed_cash for smart fractional detection
+                # This must be calculated BEFORE using it in the table logic below
+                total_deployed_capital = 0
+                for ticker_calc, asset_data_calc in asset_dict.items():
+                    purchases_calc = asset_data_calc.get("purchases", [])
+                    total_deployed_capital += sum(p.get("amount", 0) for p in purchases_calc)
+                
+                principal_amt = prof['principal']
+                actual_undeployed_cash = principal_amt - total_deployed_capital
                 
                 # Smart fractional detection for table status
                 # Calculate if portfolio is truly fully deployed (fractional only)
