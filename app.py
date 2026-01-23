@@ -14,11 +14,18 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.6"
+VERSION = "6.7.7"
 VERSION_DATE = "2026-01-23"
-VERSION_TIME = "18:00:00"
-VERSION_NAME = "Cash Deployment Visibility"
+VERSION_TIME = "12:31:47"  # EST
+VERSION_NAME = "Cash Calculation Consistency Fix"
 CHANGELOG = """
+v6.7.7 (2026-01-23 12:31 EST)
+- Fixed: Undeployed cash now consistent across sidebar, table, and info box
+- Fixed: Info box example now uses actual portfolio data (not hardcoded $5,000)
+- Fixed: Example shows real asset prices and target amounts
+- Enhanced: Dynamic calculation shows why YOUR specific portfolio has undeployed cash
+- Technical: Uses actual deployed capital (sum of purchases) for all calculations
+
 v6.7.6 (2026-01-23 18:00)
 - Added: "Capital Overview" section in sidebar showing Principal, Deployed, and Undeployed cash
 - Added: "Undeployed $" column in Rebalance Analysis table
@@ -5173,6 +5180,10 @@ else:
                                for t in v_t) if v_t else 0
                 drift_tolerance = prof.get("drift_tolerance", 5.0)
                 
+                # Calculate ACTUAL undeployed cash (same as sidebar)
+                actual_undeployed_cash = start_val - total_deployed
+                actual_undeployed_pct = (actual_undeployed_cash / start_val * 100) if start_val > 0 else 0
+                
                 # Determine overall status
                 if max_drift >= drift_tolerance:
                     total_status = "⚠️ Rebalance Needed"
@@ -5185,7 +5196,7 @@ else:
                     "Fund Name": "**TOTAL**", "Ticker": "", "Target %": "**100.00%**",
                     "Deployed": f"**{deployment_pct:.0f}%**" if not is_fully_deployed else "**100%**", 
                     "Actual %": "**100.00%**", "Drift": "—", "Status": total_status,
-                    "Undeployed $": f"**${total_undeployed:,.0f}**",
+                    "Undeployed $": f"**${actual_undeployed_cash:,.0f}**",
                     "Avg Cost": "", "Units": "", "Current Price": "", "%Daily Change": "",
                     "Amount": f"**${total_current_val:,.0f}**",
                     "Buy/Sell Amt": f"**${total_turnover:,.0f}**", "Buy/Sell Shares": "—"
@@ -5195,22 +5206,40 @@ else:
                 st.dataframe(df_rebalance, use_container_width=True, hide_index=True, column_config=column_config)
                 
                 # Explain undeployed cash if it exists
-                if total_undeployed > 0:
-                    undeployed_pct = (total_undeployed / start_val * 100) if start_val > 0 else 0
+                if actual_undeployed_cash > 0:
+                    # Find first asset for dynamic example
+                    example_ticker = v_t[0] if v_t else "ASSET"
+                    example_price = float(data[example_ticker].iloc[-1]) if v_t else 100.0
+                    example_target_pct = float(asset_dict[example_ticker]['target']) if v_t else 50.0
+                    example_target_amt = (example_target_pct / 100) * start_val
+                    
+                    # Calculate example shares
+                    exact_shares = example_target_amt / example_price
+                    shares_down = int(exact_shares)
+                    shares_up = shares_down + 1
+                    cost_down = shares_down * example_price
+                    cost_up = shares_up * example_price
+                    undeployed_example = example_target_amt - cost_down
+                    
                     st.info(f"""
-💡 **Why ${total_undeployed:,.0f} ({undeployed_pct:.1f}%) undeployed?**
+💡 **Why ${actual_undeployed_cash:,.0f} ({actual_undeployed_pct:.1f}%) undeployed?**
 
 You can't buy fractional shares at most brokers, making it mathematically impossible to deploy exactly your target amounts.
 
-**Example:** If SPXL costs $173.73/share and your target is $5,000:
-- You can buy 28 shares = $4,864.44 ✅
-- OR buy 29 shares = $5,038.17 ❌ (over budget!)
-- **Undeployed:** $135.56
+**Real Example from Your Portfolio:**
+**{example_ticker}** costs ${example_price:.2f}/share, your target is ${example_target_amt:,.2f} ({example_target_pct:.0f}% of ${start_val:,.0f})
 
-This is **normal** in portfolio management. Your deployment efficiency of **{deployment_pct:.1f}%** is excellent given share price constraints.
+- **Exact shares needed:** {exact_shares:.2f} shares
+- **You can buy {shares_down} shares** = ${cost_down:,.2f} ✅
+- **OR buy {shares_up} shares** = ${cost_up:,.2f} ❌ (over budget!)
+- **Undeployed per this asset:** ${undeployed_example:,.2f}
 
-**Options for remaining ${total_undeployed:,.0f}:**
-- Keep as cash reserve for rebalancing
+This happens with EVERY asset in your portfolio, causing the total ${actual_undeployed_cash:,.0f} undeployed.
+
+This is **NORMAL** in portfolio management. Your deployment efficiency of **{deployment_pct:.1f}%** is excellent given share price constraints.
+
+**Options for remaining ${actual_undeployed_cash:,.0f}:**
+- Keep as cash reserve for rebalancing (recommended)
 - Buy additional shares if it won't over-allocate
 - Add to next capital injection
                     """)
