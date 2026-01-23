@@ -14,11 +14,17 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.2"
+VERSION = "6.7.3"
 VERSION_DATE = "2026-01-23"
-VERSION_TIME = "04:15:00"
-VERSION_NAME = "Enhanced Profile Creation UX"
+VERSION_TIME = "05:00:00"
+VERSION_NAME = "Workflow Clarity + Status Fix"
 CHANGELOG = """
+v6.7.3 (2026-01-23 05:00)
+- Fixed: Renamed "Phase A/C" to "Step 1/2" for two-step workflow clarity
+- Fixed: TOTAL row Status now shows drift status instead of confusing deployment %
+- Enhanced: Status shows "⚠️ Rebalance Needed", "🟡 Monitor", or "✅ Balanced"
+- Fixed: Eliminated conflicting deployment information (94% vs 100%)
+
 v6.7.2 (2026-01-23 04:15)
 - Enhanced: Profile creation now guides users to next step
 - Added: Auto-select newly created profile
@@ -4951,10 +4957,24 @@ else:
                         "Buy/Sell Amt": f"${abs(val_diff):,.0f}", "Buy/Sell Shares": f"{round(unit_diff):+.0f}"
                     })
                 
+                # Calculate overall drift status for TOTAL row
+                max_drift = max(abs(float(asset_dict[t].get("target", 0)) - 
+                                   (float(asset_dict[t]["units"]) * float(data[t].iloc[-1]) / curr_v * 100 if curr_v > 0 else 0)) 
+                               for t in v_t) if v_t else 0
+                drift_tolerance = prof.get("drift_tolerance", 5.0)
+                
+                # Determine overall status
+                if max_drift >= drift_tolerance:
+                    total_status = "⚠️ Rebalance Needed"
+                elif max_drift >= drift_tolerance * 0.6:
+                    total_status = "🟡 Monitor"
+                else:
+                    total_status = "✅ Balanced"
+                
                 rows.append({
                     "Fund Name": "**TOTAL**", "Ticker": "", "Target %": "**100.00%**",
                     "Deployed": f"**{deployment_pct:.0f}%**" if not is_fully_deployed else "**100%**", 
-                    "Actual %": "**100.00%**", "Drift": "—", "Status": "✅" if is_fully_deployed else f"📥 {deployment_pct:.0f}%",
+                    "Actual %": "**100.00%**", "Drift": "—", "Status": total_status,
                     "Avg Cost": "", "Units": "", "Current Price": "", "%Daily Change": "",
                     "Amount": f"**${total_current_val:,.0f}**",
                     "Buy/Sell Amt": f"**${total_turnover:,.0f}**", "Buy/Sell Shares": "—"
@@ -4992,7 +5012,7 @@ else:
                 col_exec1, col_exec2 = st.columns(2)
                 
                 with col_exec1:
-                    st.markdown("#### 📋 Phase A: Get Recommendation")
+                    st.markdown("#### 📋 Step 1: Get Recommendation")
                     if needs_rebalance:
                         st.warning("⚠️ **Rebalancing recommended**")
                     
@@ -5024,7 +5044,7 @@ else:
                         st.info("✔ Portfolio is optimally balanced")
                 
                 with col_exec2:
-                    st.markdown("#### ✅ Phase C: Execute with Actuals")
+                    st.markdown("#### ✅ Step 2: Execute with Actuals")
                     st.caption("After trading, enter your actual fill prices")
                     has_recommendation = "pending_rebalance" in prof
                     if st.button("✅ Execute Rebalance Now", type="primary", use_container_width=True,
@@ -5039,7 +5059,7 @@ else:
                 # Show recommendation details
                 if st.session_state.get("show_rebalance_recommendation", False) and "pending_rebalance" in prof:
                     st.markdown("---")
-                    st.markdown("### 📋 Phase B: Review & Execute at Broker")
+                    st.markdown("### 📊 Trade Recommendations - Execute at Your Broker")
                     st.caption(f"Generated: {prof['pending_rebalance']['timestamp']}")
                     
                     recommendations = prof["pending_rebalance"]["recommendations"]
