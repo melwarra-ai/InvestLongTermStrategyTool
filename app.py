@@ -2175,6 +2175,86 @@ def show_security_tab(db):
             for log in failed_logins[:20]:
                 st.caption(f"🔴 {log.get('timestamp', '')} - {log.get('username', '')} from {log.get('ip_address', 'unknown')}")
 
+def show_admin_dashboard(db, current_user):
+    """Enhanced Admin Dashboard with 5 comprehensive tabs"""
+    
+    st.title("👑 Administrator Dashboard")
+    st.markdown("""
+        <div style="background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); 
+                    color: white; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+            <h3 style="margin: 0 0 8px 0; color: white;">System Overview & Management</h3>
+            <p style="margin: 0; opacity: 0.9;">Complete administrative control and monitoring dashboard</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # System-wide metrics at the top
+    analytics = get_analytics_data(db)
+    all_profiles = get_all_profiles_overview(db)
+    needs_action_count = len([p for p in all_profiles if p["needs_action"]])
+    
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    with col_m1:
+        st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                        color: white; padding: 20px; border-radius: 10px; text-align: center;">
+                <h2 style="margin: 0; font-size: 2rem;">{analytics['total_users']}</h2>
+                <p style="margin: 8px 0 0 0; font-size: 0.9rem;">Total Users</p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with col_m2:
+        st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                        color: white; padding: 20px; border-radius: 10px; text-align: center;">
+                <h2 style="margin: 0; font-size: 2rem;">{analytics['total_portfolios']}</h2>
+                <p style="margin: 8px 0 0 0; font-size: 0.9rem;">Total Portfolios</p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with col_m3:
+        st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); 
+                        color: white; padding: 20px; border-radius: 10px; text-align: center;">
+                <h2 style="margin: 0; font-size: 2rem;">{needs_action_count}</h2>
+                <p style="margin: 8px 0 0 0; font-size: 0.9rem;">Need Action</p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with col_m4:
+        st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); 
+                        color: white; padding: 20px; border-radius: 10px; text-align: center;">
+                <h2 style="margin: 0; font-size: 2rem;">${analytics['total_aum']:,.0f}</h2>
+                <p style="margin: 8px 0 0 0; font-size: 0.9rem;">Total AUM</p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    st.divider()
+    
+    # 5 Main Tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📊 Overview",
+        "📜 Activity & Logs", 
+        "📈 Analytics",
+        "⚙️ System",
+        "🔐 Security"
+    ])
+    
+    with tab1:
+        show_admin_overview_tab(db, all_profiles)
+    
+    with tab2:
+        show_activity_logs_tab(db)
+    
+    with tab3:
+        show_analytics_tab(db, analytics)
+    
+    with tab4:
+        show_system_management_tab(db)
+    
+    with tab5:
+        show_security_tab(db)
+
 def show_login_page():
     """Display login page"""
     col1, col2, col3 = st.columns([1, 2, 1])
