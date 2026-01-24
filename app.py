@@ -14,11 +14,22 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.14"
+VERSION = "6.7.15"
 VERSION_DATE = "2026-01-24"
-VERSION_TIME = "16:23:14"  # EST
-VERSION_NAME = "Actual % Column Fix & Today Button Fix"
+VERSION_TIME = "16:38:01"  # EST
+VERSION_NAME = "Deployment Logic Overhaul"
 CHANGELOG = """
+v6.7.15 (2026-01-24 16:38 EST)
+- CRITICAL: Fixed max units calculation using per-asset budget instead of total undeployed cash
+- CRITICAL: Fixed "exceeds budget" validation showing backwards warning (negative = under budget)
+- CRITICAL: Fixed deployed % calculation to always use actual spent vs current target
+- Enhanced: Recalculate allocated_pct from purchases on every view (no stale data)
+- Enhanced: Max units now respects BOTH per-asset target AND total undeployed cash
+- Added: Deployment history events in Capital Overview sidebar
+- Added: Clear indication of remaining budget per asset vs total portfolio
+- Fixed: Validation now checks total portfolio cash before allowing deployment
+- Impact: Accurate deployment tracking, no more confusing warnings
+
 v6.7.14 (2026-01-24 16:23 EST)
 - CRITICAL: Fixed "Actual %" column showing confusing 100% when portfolio partially deployed
 - Changed: "Actual %" now calculates as % of PRINCIPAL instead of % of deployed capital
@@ -3293,12 +3304,32 @@ else:
                             actual_spent = sum(p.get("amount", 0) for p in purchases)
                             remaining_budget = max(0, target_budget - actual_spent)
                             
+                            # Calculate TOTAL undeployed cash across entire portfolio
+                            # This is critical - user might have less total cash than per-asset remaining budget
+                            total_deployed_all = 0
+                            for t_check, a_check in assets.items():
+                                purchases_check = a_check.get("purchases", [])
+                                total_deployed_all += sum(p.get("amount", 0) for p in purchases_check)
+                            
+                            total_undeployed_cash = prof['principal'] - total_deployed_all
+                            
+                            # The ACTUAL available budget is the minimum of:
+                            # 1. Per-asset remaining (to meet target allocation)
+                            # 2. Total undeployed cash (can't deploy what you don't have)
+                            actual_available_budget = min(remaining_budget, total_undeployed_cash)
+                            
                             # Display with consistent rounding
                             display_allocated = min(round(current_allocated), 100)
                             display_remaining = max(round(remaining_pct), 0)
                             
                             st.markdown(f"**{selected_ticker}:** Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
-                            st.caption(f"Deployed: ${actual_spent:,.0f} ({display_allocated}%) • Remaining: ${remaining_budget:,.0f} ({display_remaining}%)")
+                            st.caption(f"Deployed: ${actual_spent:,.0f} ({display_allocated}%) • Asset Remaining: ${remaining_budget:,.0f}")
+                            
+                            # Show total portfolio cash constraint
+                            if total_undeployed_cash < remaining_budget:
+                                st.info(f"ℹ️ **Portfolio cash available:** ${total_undeployed_cash:,.0f} (limits deployment to this asset)")
+                            else:
+                                st.caption(f"Portfolio undeployed cash: ${total_undeployed_cash:,.0f}")
                             
                             # Check if already fully deployed (use 99.5% as threshold, matching table)
                             if current_allocated >= 99.5 or remaining_pct < 0.5:
@@ -3395,16 +3426,17 @@ else:
                                             deploy_amount = estimated_units * preview_price
                                 else:
                                     # By Units - calculate max units allowed (whole units only)
+                                    # Use ACTUAL available budget (min of per-asset and total portfolio cash)
                                     if preview_price:
-                                        max_units = int(remaining_budget / preview_price)
+                                        max_units = int(actual_available_budget / preview_price)
                                         
                                         if max_units < 1:
-                                            st.warning(f"⚠️ Remaining budget (${remaining_budget:,.2f}) is less than 1 unit (${preview_price:,.2f}). Use 'By Percentage' or select another asset.")
+                                            st.warning(f"⚠️ Available budget (${actual_available_budget:,.2f}) is less than 1 unit (${preview_price:,.2f}). Use 'By Percentage' or select another asset.")
                                             estimated_units = 0
                                             deploy_amount = 0
                                             deploy_pct = 0
                                         else:
-                                            st.caption(f"💡 Max whole units for remaining budget: {max_units:,}")
+                                            st.caption(f"💡 Max whole units for available budget: {max_units:,} (${actual_available_budget:,.0f} / ${preview_price:.2f})")
                                             
                                             # Default to 1 unit or max_units, whichever is smaller
                                             default_units = min(1, max_units)
@@ -3417,8 +3449,11 @@ else:
                                             portfolio_pct = (deploy_amount / prof['principal']) * 100
                                             deploy_pct = (portfolio_pct / target_pct) * 100 if target_pct > 0 else 0
                                             
-                                            # Check if exceeds remaining (shouldn't happen with max_value set)
-                                            if deploy_pct > remaining_pct + 0.01:
+                                            # Check if exceeds ACTUAL available budget (not just per-asset remaining)
+                                            if deploy_amount > actual_available_budget + 0.01:
+                                                exceeds_limit = True
+                                            # Also check per-asset allocation
+                                            elif deploy_pct > remaining_pct + 0.01:
                                                 exceeds_limit = True
                                     else:
                                         deploy_units = st.number_input("Number of Units", min_value=1, value=1, 
@@ -3480,9 +3515,14 @@ else:
                                     
                                     # Warning if exceeds limit
                                     if exceeds_limit:
-                                        over_amount = deploy_amount - remaining_budget
-                                        max_whole_units = int(remaining_budget / preview_price)
-                                        st.error(f"⚠️ This exceeds remaining budget by ${over_amount:,.2f}. Max units: {max_whole_units:,}.")
+                                        over_amount = deploy_amount - actual_available_budget
+                                        if over_amount > 0:
+                                            # Actually over budget
+                                            max_whole_units = int(actual_available_budget / preview_price)
+                                            st.error(f"⚠️ This exceeds available budget by ${over_amount:,.2f}. Max units: {max_whole_units:,} (${actual_available_budget:,.0f} available).")
+                                        else:
+                                            # Exceeds per-asset target allocation (but under total portfolio budget)
+                                            st.warning(f"⚠️ This exceeds {selected_ticker}'s target allocation. Consider rebalancing other assets first.")
                                 else:
                                     st.warning(f"⚠️ Could not fetch price for {deploy_date}.")
                                     actual_price = None
@@ -3537,7 +3577,14 @@ else:
                                                        "amount": final_amount, "price": price, "quantity": quantity}
                                             asset_data.setdefault("purchases", []).append(purchase)
                                             asset_data["units"] = asset_data.get("units", 0) + quantity
-                                            asset_data["allocated_pct"] = min(100.0, current_allocated + deploy_pct)
+                                            
+                                            # Recalculate allocated_pct from scratch (not incremental)
+                                            # This ensures accuracy if principal or targets changed
+                                            all_purchases = asset_data.get("purchases", [])
+                                            total_spent_on_asset = sum(p.get("amount", 0) for p in all_purchases)
+                                            current_target_amount = (asset_data.get("target", 0) / 100) * prof['principal']
+                                            asset_data["allocated_pct"] = min(100.0, (total_spent_on_asset / current_target_amount * 100)) if current_target_amount > 0 else 0
+                                            
                                             log_profile(prof, f"Deployed {quantity:,} units of {selected_ticker} (${final_amount:,.2f} @ ${price:.2f})")
                                             save_db(st.session_state.db)
                                             st.success(f"✅ Deployed {quantity:,} units of {selected_ticker} @ ${price:.2f}")
@@ -3689,6 +3736,42 @@ You have deployed MORE than your principal!
                             st.caption(f"⚠️ ${deployable_cash:,.0f} can still be deployed!")
                         if fractional_cash > 0:
                             st.caption(f"💡 ${fractional_cash:,.0f} fractional (can't buy partial shares)")
+            
+            # Recent Deployment History
+            st.markdown("---")
+            st.markdown("**📋 Recent Deployments**")
+            
+            # Collect all purchases with dates
+            all_deployments = []
+            for ticker, asset_data in assets.items():
+                purchases = asset_data.get("purchases", [])
+                for purchase in purchases:
+                    all_deployments.append({
+                        "date": purchase.get("date", "Unknown"),
+                        "ticker": ticker,
+                        "fund_name": asset_data.get("fund_name", ticker),
+                        "quantity": purchase.get("quantity", 0),
+                        "price": purchase.get("price", 0),
+                        "amount": purchase.get("amount", 0)
+                    })
+            
+            if all_deployments:
+                # Sort by date (most recent first)
+                all_deployments.sort(key=lambda x: x["date"], reverse=True)
+                
+                # Show last 5 deployments
+                for i, deployment in enumerate(all_deployments[:5]):
+                    # Calculate remaining cash at time of this deployment
+                    # (Sum all deployments after this one)
+                    remaining_after = principal_amt - sum(d["amount"] for d in all_deployments[:i+1])
+                    
+                    icon = "💰" if i == 0 else "📌"
+                    st.caption(f"""{icon} **{deployment['date']}** • {deployment['ticker']}: {deployment['quantity']:.0f} units @ ${deployment['price']:.2f} = ${deployment['amount']:,.2f} • Cash left: ${remaining_after:,.0f}""")
+                
+                if len(all_deployments) > 5:
+                    st.caption(f"_... and {len(all_deployments) - 5} more deployments_")
+            else:
+                st.caption("_No deployments yet_")
             
             # Show fractional explanation or deployment opportunities
             if is_truly_fractional and undeployed_cash > 0:
@@ -5566,7 +5649,13 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             fund_name = asset_dict[t].get("fund_name", t)
                             cur_u = float(asset_dict[t].get("units", 0))
                             tar_w = float(asset_dict[t].get('target', 0))
-                            allocated_pct = asset_dict[t].get("allocated_pct", 0)
+                            
+                            # CRITICAL: Recalculate allocated_pct from scratch for accuracy
+                            # Don't rely on stored value - it may be stale if principal/targets changed
+                            purchases_for_calc = asset_dict[t].get("purchases", [])
+                            total_spent_calc = sum(p.get("amount", 0) for p in purchases_for_calc)
+                            target_amount_calc = (tar_w / 100) * start_val if tar_w > 0 else 1
+                            allocated_pct = (total_spent_calc / target_amount_calc * 100) if target_amount_calc > 0 else 0
                             
                             # Validation fixes
                             if not np.isfinite(allocated_pct) or allocated_pct > 100:
