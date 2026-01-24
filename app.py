@@ -14,11 +14,16 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.16"
+VERSION = "6.7.17"
 VERSION_DATE = "2026-01-24"
-VERSION_TIME = "16:48:21"  # EST
-VERSION_NAME = "Asset Allocation Workflow Fix"
+VERSION_TIME = "16:55:33"  # EST
+VERSION_NAME = "Asset Allocation Workflow Fix (Hotfix)"
 CHANGELOG = """
+v6.7.17 (2026-01-24 16:55 EST) - HOTFIX
+- CRITICAL: Fixed NameError in debug section - total_allocation not defined
+- Fixed: Moved variable calculation before use in troubleshooting panel
+- Impact: Debug section now works correctly without crashes
+
 v6.7.16 (2026-01-24 16:48 EST)
 - CRITICAL: Fixed asset allocation workflow after deployment
 - Enhanced: Ticker validation now shows loading state and timeout handling
@@ -3283,6 +3288,11 @@ else:
             st.divider()
             st.markdown("### ⑤ Lock Asset Mix")
             
+            # Calculate assets and total_allocation BEFORE using them
+            assets = prof.get("assets", {})
+            total_allocation = sum(a.get('target', 0) for a in assets.values())
+            is_complete = (total_allocation == 100.0 and len(assets) > 0)
+            
             # Debug info expander
             with st.expander("🔧 Troubleshooting / Current State", expanded=False):
                 st.caption("**Portfolio Status:**")
@@ -3305,10 +3315,6 @@ else:
                         log_profile(prof, "Emergency reset - all assets deleted")
                         st.success("✅ Portfolio reset!")
                         st.rerun()
-            
-            assets = prof.get("assets", {})
-            total_allocation = sum(a.get('target', 0) for a in assets.values())
-            is_complete = (total_allocation == 100.0 and len(assets) > 0)
             
             if prof.get("asset_mix_locked", False):
                 st.success("✅ **Asset Mix Locked**")
