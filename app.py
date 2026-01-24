@@ -14,11 +14,20 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.13"
-VERSION_DATE = "2026-01-23"
-VERSION_TIME = "16:48:52"  # EST
-VERSION_NAME = "Rebalance Table Error Fix"
+VERSION = "6.7.14"
+VERSION_DATE = "2026-01-24"
+VERSION_TIME = "16:23:14"  # EST
+VERSION_NAME = "Actual % Column Fix & Today Button Fix"
 CHANGELOG = """
+v6.7.14 (2026-01-24 16:23 EST)
+- CRITICAL: Fixed "Actual %" column showing confusing 100% when portfolio partially deployed
+- Changed: "Actual %" now calculates as % of PRINCIPAL instead of % of deployed capital
+- Renamed: "Actual %" → "Portfolio %" for clarity
+- Enhanced: Drift shows "⚠️ Deploying" status during deployment phase instead of misleading drift %
+- Fixed: "Today" button in deployment date picker now correctly sets today's date
+- UX: TOTAL row "Portfolio %" now matches deployment percentage (not always 100%)
+- Impact: Much clearer understanding of true portfolio allocation
+
 v6.7.13 (2026-01-23 16:48 EST)
 - CRITICAL: Fixed 'actual_undeployed_cash' not defined error in Rebalance Analysis table
 - Fixed: Calculate actual_undeployed_cash before using it in smart fractional detection
@@ -3314,13 +3323,18 @@ else:
                                                                max_value=date.today(), 
                                                                key="deploy_date_input")
                                     
-                                    # Update session state when date changes
-                                    st.session_state.deploy_date_value = deploy_date
+                                    # Update session state when date changes manually
+                                    if deploy_date != st.session_state.deploy_date_value:
+                                        st.session_state.deploy_date_value = deploy_date
                                 
                                 with col_today:
                                     st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
                                     if st.button("📅 Today", key="set_today_btn", use_container_width=True):
+                                        # Force update to today's date
                                         st.session_state.deploy_date_value = date.today()
+                                        # Clear the widget state to force refresh
+                                        if 'deploy_date_input' in st.session_state:
+                                            del st.session_state['deploy_date_input']
                                         st.rerun()
                                 
                                 # Fetch price for preview
@@ -5457,24 +5471,27 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         - 50% = halfway through planned purchases
                         - 100% = finished all planned purchases for this asset
                         - ⚠️ **NOTE:** This is NOT portfolio allocation percentage!
-                    - **Actual %**: Current portfolio percentage based on market values (changes with price movements)
-                    - **Drift**: Difference between Actual % and Target %
-                        - 🔴 Red = exceeds tolerance (action needed)
+                    - **Portfolio %**: Current portfolio percentage (% of your TOTAL PRINCIPAL, not just deployed capital)
+                        - Shows true portfolio allocation
+                        - Increases as you deploy more capital
+                        - Will match Target % when fully deployed (assuming no price changes)
+                    - **Drift**: Difference between Portfolio % and Target %
+                        - ⚠️ Gray "Deploying" = asset still being deployed (drift tracking not meaningful yet)
+                        - 🔴 Red = exceeds tolerance (action needed after deployment complete)
                         - 🟡 Yellow = warning (close to tolerance)
                         - 🟢 Green = within tolerance (good)
-                        - ⚠️ Gray = during deployment (drift tracking informational)
                     - **Status**: Current state (Deploying = adding capital, Deployed = monitoring drift)
                     
-                    **Example to clarify Deployed vs Actual %:**
-                    - You set Target % = 25% for SPXL (you want it to be 25% of your $100k portfolio = $25k)
-                    - You've bought $5k worth so far
-                    - Deployed = 20% (because $5k is 20% of your planned $25k target)
-                    - Actual % might be 4.7% (because $5k is 4.7% of your $100k portfolio right now)
-                    - As you buy more, Deployed increases toward 100%
-                    - When Deployed reaches 100%, you've invested the full $25k
-                    - Then Actual % will be near 25% (depending on whether other assets are also deployed)
+                    **Example to clarify Deployed vs Portfolio %:**
+                    - You set Target % = 50% for SPXL (you want it to be 50% of your $100k portfolio = $50k)
+                    - You've bought $25k worth so far
+                    - Deployed = 50% (because $25k is 50% of your planned $50k target)
+                    - Portfolio % = 25.0% (because $25k is 25% of your $100k principal)
+                    - As you buy more, both Deployed and Portfolio % increase
+                    - When Deployed reaches 100%, you've invested the full $50k
+                    - Then Portfolio % will be near 50% (your target)
                     
-                    💡 **Key Insight:** "Deployed" tracks YOUR deployment progress (0-100%), while "Actual %" shows current market-based portfolio allocation
+                    💡 **Key Insight:** "Deployed" tracks YOUR deployment progress (0-100%), while "Portfolio %" shows current portfolio allocation (% of total principal)
                     
                     💡 Use the two-step workflow below to rebalance with real broker prices
                     """)
@@ -5484,8 +5501,8 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     "Ticker": st.column_config.TextColumn("Ticker ℹ️", help="Stock ticker symbol", width="small"),
                     "Target %": st.column_config.TextColumn("Target % ℹ️", help="Your desired allocation percentage for this asset in the portfolio", width="small"),
                     "Deployed": st.column_config.TextColumn("Deployed ℹ️", help="Deployment progress: 0-100% shows how much of your planned capital for THIS ASSET has been deployed (NOT portfolio allocation). 100% = fully deployed.", width="small"),
-                    "Actual %": st.column_config.TextColumn("Actual % ℹ️", help="Current portfolio percentage based on market values (this will differ from Target % due to price movements)", width="small"),
-                    "Drift": st.column_config.TextColumn("Drift ℹ️", help="Difference between Actual % and Target % (🔴 = exceeds tolerance and needs rebalancing, ⚠️ = still deploying)", width="small"),
+                    "Portfolio %": st.column_config.TextColumn("Portfolio % ℹ️", help="Current portfolio percentage based on market values (% of total principal). Shows true portfolio allocation.", width="small"),
+                    "Drift": st.column_config.TextColumn("Drift ℹ️", help="Difference between Portfolio % and Target % (🔴 = exceeds tolerance and needs rebalancing, ⚠️ = still deploying)", width="small"),
                     "Status": st.column_config.TextColumn("Status ℹ️", help="Current state: Deploying = still adding capital, Deployed = fully funded and monitoring drift", width="medium"),
                     "Avg Cost": st.column_config.TextColumn("Avg Cost ℹ️", help="Weighted average cost per unit (calculated when 100% deployed)", width="small"),
                     "Units": st.column_config.TextColumn("Units ℹ️", help="Total shares/units owned", width="small"),
@@ -5564,7 +5581,9 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             if not np.isfinite(act_val):
                                 act_val = 0
                                 
-                            act_w = (act_val / curr_v * 100) if curr_v > 0 else 0
+                            # Calculate as % of PRINCIPAL (not % of deployed capital)
+                            # This shows true portfolio allocation
+                            act_w = (act_val / start_val * 100) if start_val > 0 else 0
                             if not np.isfinite(act_w):
                                 act_w = 0
                                 
@@ -5586,9 +5605,13 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             total_turnover += abs(val_diff)
                             total_current_val += act_val
                             
-                            # Drift color - always apply based on drift magnitude
+                            # Drift display - show "Deploying" status during deployment
                             drift_tolerance = prof.get("drift_tolerance", 5.0)
-                            if abs(drift) >= drift_tolerance:
+                            
+                            # During deployment phase, show special status
+                            if allocated_pct < 99.5:  # Still deploying this asset
+                                drift_display = "⚠️ Deploying"
+                            elif abs(drift) >= drift_tolerance:
                                 drift_display = f"🔴 {drift:+.2f}%"
                             elif abs(drift) >= drift_tolerance * 0.6:  # Warning at 60% of tolerance
                                 drift_display = f"🟡 {drift:+.2f}%"
@@ -5607,7 +5630,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             
                             rows.append({
                                 "Fund Name": fund_name, "Ticker": t, "Target %": f"{tar_w:.2f}%",
-                                "Deployed": f"{min(allocated_pct, 100):.0f}%", "Actual %": f"{act_w:.2f}%",
+                                "Deployed": f"{min(allocated_pct, 100):.0f}%", "Portfolio %": f"{act_w:.2f}%",
                                 "Drift": drift_display, "Status": status_display,
                                 "Avg Cost": avg_cost_display,
                                 "Units": f"{cur_u:.0f}", "Current Price": f"${current_price:.2f}",
@@ -5634,8 +5657,9 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     st.stop()
                 
                 # Calculate overall drift status for TOTAL row
+                # Portfolio % is now based on principal, so max drift uses start_val
                 max_drift = max(abs(float(asset_dict[t].get("target", 0)) - 
-                                   (float(asset_dict[t]["units"]) * float(data[t].iloc[-1]) / curr_v * 100 if curr_v > 0 else 0)) 
+                                   (float(asset_dict[t]["units"]) * float(data[t].iloc[-1]) / start_val * 100 if start_val > 0 else 0)) 
                                for t in v_t) if v_t else 0
                 drift_tolerance = prof.get("drift_tolerance", 5.0)
                 
@@ -5643,8 +5667,13 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 actual_undeployed_cash = start_val - total_deployed
                 actual_undeployed_pct = (actual_undeployed_cash / start_val * 100) if start_val > 0 else 0
                 
+                # Calculate total portfolio percentage (sum of all asset Portfolio %)
+                total_portfolio_pct = (total_current_val / start_val * 100) if start_val > 0 else 0
+                
                 # Determine overall status
-                if max_drift >= drift_tolerance:
+                if not is_fully_deployed:
+                    total_status = "⚠️ Deploying"
+                elif max_drift >= drift_tolerance:
                     total_status = "⚠️ Rebalance Needed"
                 elif max_drift >= drift_tolerance * 0.6:
                     total_status = "🟡 Monitor"
@@ -5654,7 +5683,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 rows.append({
                     "Fund Name": "**TOTAL**", "Ticker": "", "Target %": "**100.00%**",
                     "Deployed": f"**{deployment_pct:.0f}%**" if not is_fully_deployed else "**100%**", 
-                    "Actual %": "**100.00%**", "Drift": "—", "Status": total_status,
+                    "Portfolio %": f"**{total_portfolio_pct:.2f}%**", "Drift": "—", "Status": total_status,
                     "Avg Cost": "", "Units": "", "Current Price": "", "%Daily Change": "",
                     "Amount": f"**${total_current_val:,.0f}**",
                     "Buy/Sell Amt": f"**${total_turnover:,.0f}**", "Buy/Sell Shares": "—"
