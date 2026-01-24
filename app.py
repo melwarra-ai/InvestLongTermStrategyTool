@@ -14,11 +14,23 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.15"
+VERSION = "6.7.16"
 VERSION_DATE = "2026-01-24"
-VERSION_TIME = "16:38:01"  # EST
-VERSION_NAME = "Deployment Logic Overhaul"
+VERSION_TIME = "16:48:21"  # EST
+VERSION_NAME = "Asset Allocation Workflow Fix"
 CHANGELOG = """
+v6.7.16 (2026-01-24 16:48 EST)
+- CRITICAL: Fixed asset allocation workflow after deployment
+- Enhanced: Ticker validation now shows loading state and timeout handling
+- Enhanced: Existing assets prominently displayed with edit capability
+- Added: Timeout handling for Yahoo Finance API (10 second limit)
+- Added: Quick-add buttons for common tickers (SPY, QQQ, GLD, TLT)
+- Fixed: Can now edit target % for existing assets even with deployments
+- Fixed: Better error messages when ticker validation fails
+- Added: "Show current state" debug info to help troubleshooting
+- UX: Asset list shows deployment status more clearly
+- Impact: No more getting stuck in asset allocation after deployment
+
 v6.7.15 (2026-01-24 16:38 EST)
 - CRITICAL: Fixed max units calculation using per-asset budget instead of total undeployed cash
 - CRITICAL: Fixed "exceeds budget" validation showing backwards warning (negative = under budget)
@@ -3082,7 +3094,68 @@ else:
             ''', unsafe_allow_html=True)
             st.markdown(f"**Allocated: {current_alloc:.1f}% / 100%**")
             
-            a_sym = st.text_input("Ticker Symbol", placeholder="e.g., AAPL", key="ticker_input").upper().strip()
+            # Show existing assets FIRST (before input) for better UX
+            if prof.get("assets"):
+                st.divider()
+                st.markdown("### 📋 Current Assets")
+                st.caption("Click an asset below to edit its target %")
+                
+                # Show assets in columns
+                num_assets = len(prof["assets"])
+                cols = st.columns(min(num_assets, 3))
+                
+                for idx, (ticker, data) in enumerate(prof["assets"].items()):
+                    with cols[idx % 3]:
+                        units = data.get('units', 0)
+                        allocated_pct = data.get('allocated_pct', 0)
+                        target = data.get('target', 0)
+                        
+                        # Create clickable card
+                        if units > 0:
+                            status = f"✅ {allocated_pct:.0f}% deployed"
+                        else:
+                            status = "⏳ Not deployed"
+                        
+                        st.markdown(f"""
+                            <div style="background: #f3f4f6; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #3b82f6;">
+                                <div style="font-weight: 600; color: #1f2937; margin-bottom: 4px;">{ticker}</div>
+                                <div style="color: #6b7280; font-size: 0.9rem;">Target: {target}%</div>
+                                <div style="color: #6b7280; font-size: 0.85rem;">{status}</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                
+                st.caption("💡 Enter ticker below to edit or add new asset")
+                st.divider()
+            
+            # Quick-add buttons for common tickers
+            st.markdown("**🚀 Quick Add:**")
+            col_q1, col_q2, col_q3, col_q4 = st.columns(4)
+            with col_q1:
+                if st.button("SPY", key="quick_spy", help="S&P 500", use_container_width=True):
+                    st.session_state.quick_ticker = "SPY"
+                    st.rerun()
+            with col_q2:
+                if st.button("QQQ", key="quick_qqq", help="Nasdaq 100", use_container_width=True):
+                    st.session_state.quick_ticker = "QQQ"
+                    st.rerun()
+            with col_q3:
+                if st.button("GLD", key="quick_gld", help="Gold", use_container_width=True):
+                    st.session_state.quick_ticker = "GLD"
+                    st.rerun()
+            with col_q4:
+                if st.button("TLT", key="quick_tlt", help="Long-Term Bonds", use_container_width=True):
+                    st.session_state.quick_ticker = "TLT"
+                    st.rerun()
+            
+            # Get ticker from quick-add or text input
+            quick_ticker = st.session_state.get('quick_ticker', '')
+            if quick_ticker:
+                default_ticker = quick_ticker
+                st.session_state.quick_ticker = ''  # Clear after use
+            else:
+                default_ticker = ''
+            
+            a_sym = st.text_input("Ticker Symbol", placeholder="e.g., AAPL", key="ticker_input", value=default_ticker).upper().strip()
             is_existing = a_sym in prof.get("assets", {})
             
             if is_existing:
@@ -3098,15 +3171,40 @@ else:
             valid_ticker = False
             last_price = 1.0
             ticker_name = ""
+            validation_error = None
             
             if prof.get("asset_mix_locked", False) and not is_existing and a_sym:
-                st.error("🔙 **Asset mix locked** - Cannot add new assets")
+                validation_error = "🔒 **Asset mix locked** - Cannot add new assets. Unlock first to add more."
                 valid_ticker = False
             elif a_sym and not block_new:
+                # Show loading indicator
+                loading_placeholder = st.empty()
+                loading_placeholder.info(f"🔍 Validating {a_sym}... (checking Yahoo Finance)")
+                
                 try:
-                    with st.spinner(f"🔍 Validating {a_sym}..."):
+                    # Add timeout handling
+                    import signal
+                    
+                    def timeout_handler(signum, frame):
+                        raise TimeoutError("Ticker validation timed out")
+                    
+                    # Set 10 second timeout (only on Unix systems)
+                    try:
+                        signal.signal(signal.SIGALRM, timeout_handler)
+                        signal.alarm(10)
+                    except:
+                        pass  # Windows doesn't support SIGALRM
+                    
+                    try:
                         t_check = yf.Ticker(a_sym)
                         hist = t_check.history(period="1d")
+                        
+                        # Cancel timeout
+                        try:
+                            signal.alarm(0)
+                        except:
+                            pass
+                        
                         if not hist.empty:
                             last_price = float(hist['Close'].iloc[-1])
                             try:
@@ -3114,14 +3212,34 @@ else:
                                 ticker_name = ticker_info.get('longName', a_sym)
                             except:
                                 ticker_name = a_sym
-                            st.success(f"✔ {ticker_name}")
-                            st.caption(f"**Price:** {p_flag} ${last_price:,.2f}")
+                            
+                            loading_placeholder.success(f"✅ **{ticker_name}** - ${last_price:,.2f}")
                             valid_ticker = True
                         else:
-                            st.error(f"❌ No data for '{a_sym}'")
-                except:
-                    if a_sym:
-                        st.error(f"❌ Invalid '{a_sym}'")
+                            loading_placeholder.error(f"❌ No data found for '{a_sym}'")
+                            validation_error = f"Ticker '{a_sym}' exists but has no price data. Try another ticker."
+                            
+                    except TimeoutError:
+                        loading_placeholder.error(f"⏱️ Timeout validating '{a_sym}'")
+                        validation_error = f"Yahoo Finance took too long to respond for '{a_sym}'. Try again or use Quick Add buttons."
+                        try:
+                            signal.alarm(0)
+                        except:
+                            pass
+                        
+                except Exception as e:
+                    loading_placeholder.error(f"❌ Error validating '{a_sym}'")
+                    validation_error = f"Could not validate ticker '{a_sym}'. Check spelling or network connection."
+                    try:
+                        signal.alarm(0)
+                    except:
+                        pass
+                
+                # Show error details if validation failed
+                if validation_error and not valid_ticker:
+                    st.caption(f"💡 {validation_error}")
+                    st.caption("**Common tickers:** SPY (S&P 500), QQQ (Nasdaq), GLD (Gold), TLT (Bonds)")
+
             
             if valid_ticker:
                 st.markdown("---")
@@ -3161,21 +3279,32 @@ else:
                             st.success(f"✅ Removed {a_sym}!")
                             st.rerun()
             
-            # Show existing assets
-            if prof.get("assets"):
-                st.divider()
-                st.markdown("### 📋 Current Assets")
-                for ticker, data in prof["assets"].items():
-                    units = data.get('units', 0)
-                    allocated_pct = data.get('allocated_pct', 0)
-                    if units > 0:
-                        st.caption(f"**{ticker}**: {data['target']}% target • {allocated_pct:.0f}% deployed ({units:.4f} units)")
-                    else:
-                        st.caption(f"**{ticker}**: {data['target']}% target • Not deployed")
-            
             # Asset Mix Locking
             st.divider()
             st.markdown("### ⑤ Lock Asset Mix")
+            
+            # Debug info expander
+            with st.expander("🔧 Troubleshooting / Current State", expanded=False):
+                st.caption("**Portfolio Status:**")
+                st.json({
+                    "Total Allocation": f"{total_allocation:.1f}%",
+                    "Assets Defined": len(assets),
+                    "Mix Locked": prof.get("asset_mix_locked", False),
+                    "Any Deployments": any(a.get("allocated_pct", 0) > 0 for a in assets.values()),
+                    "Can Add Assets": not prof.get("asset_mix_locked", False) or (total_allocation < 100),
+                })
+                st.caption("**Assets:**")
+                for ticker, data in assets.items():
+                    st.caption(f"• {ticker}: {data.get('target', 0)}% target, {data.get('allocated_pct', 0):.1f}% deployed, {data.get('units', 0)} units")
+                
+                if st.button("🔄 Reset Portfolio (Emergency)", key="emergency_reset"):
+                    if st.button("⚠️ Confirm Reset - This will delete ALL data", key="confirm_reset", type="primary"):
+                        prof["assets"] = {}
+                        prof["asset_mix_locked"] = False
+                        save_db(st.session_state.db)
+                        log_profile(prof, "Emergency reset - all assets deleted")
+                        st.success("✅ Portfolio reset!")
+                        st.rerun()
             
             assets = prof.get("assets", {})
             total_allocation = sum(a.get('target', 0) for a in assets.values())
@@ -3185,14 +3314,21 @@ else:
                 st.success("✅ **Asset Mix Locked**")
                 st.caption(f"{len(assets)} assets defined. Ready for deployment.")
                 any_deployments = any(a.get("allocated_pct", 0) > 0 for a in assets.values())
-                if not any_deployments:
-                    if st.button("🔜 Unlock Asset Mix", use_container_width=True, key="unlock_mix"):
+                
+                if st.button("🔓 Unlock Asset Mix", use_container_width=True, key="unlock_mix"):
+                    if any_deployments:
+                        # Show warning but allow
+                        st.warning("⚠️ You have deployments recorded. Unlocking will allow you to modify targets, but existing deployments remain unchanged.")
+                        if st.button("✅ Yes, Unlock Anyway", key="confirm_unlock", type="primary"):
+                            prof["asset_mix_locked"] = False
+                            save_db(st.session_state.db)
+                            log_profile(prof, "Asset mix unlocked (with deployments)")
+                            st.rerun()
+                    else:
                         prof["asset_mix_locked"] = False
                         save_db(st.session_state.db)
                         log_profile(prof, "Asset mix unlocked")
                         st.rerun()
-                else:
-                    st.caption("⚠️ Cannot unlock - deployments recorded")
             else:
                 if is_complete:
                     st.warning("🔜 **Ready to Lock**")
