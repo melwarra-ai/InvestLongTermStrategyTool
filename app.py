@@ -14,11 +14,18 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.27"
+VERSION = "6.7.28"
 VERSION_DATE = "2026-01-25"
-VERSION_TIME = "10:16:56"  # EST
-VERSION_NAME = "Dashboard Message & -100% ROI Fixes"
+VERSION_TIME = "10:30:47"  # EST
+VERSION_NAME = "Quick Add Save Button Fix"
 CHANGELOG = """
+v6.7.28 (2026-01-25 10:30 EST) - QUICK ADD SAVE BUTTON FIX
+- CRITICAL: Fixed Save Asset button not activating after Quick Add
+- Changed: Quick Add now clears all widget states for clean slate
+- Changed: Save button explicitly enabled after successful Quick Add validation
+- Impact: Users no longer need to re-type ticker after Quick Add
+- Impact: One-click workflow now works as intended (click → validate → save)
+
 v6.7.27 (2026-01-25 10:16 EST) - TWO CRITICAL FIXES
 - CRITICAL: Fixed dashboard message showing "deployment in progress" after rebalancing
 - Fixed: -100% ROI bug for profiles with no deployments/current value
@@ -3301,33 +3308,44 @@ else:
             col_q1, col_q2, col_q3, col_q4 = st.columns(4)
             with col_q1:
                 if st.button("SPXL", key="quick_spxl", help="S&P 500 3X", use_container_width=True):
-                    # Set the widget value directly AND session state
+                    # Clear all related widget states for clean slate
+                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    # Set the ticker value
                     st.session_state['ticker_input'] = "SPXL"
-                    st.session_state.quick_ticker_clicked = True
+                    st.session_state['_quick_add_used'] = True
                     st.rerun()
             with col_q2:
                 if st.button("GLD", key="quick_gld", help="Gold", use_container_width=True):
+                    # Clear all related widget states for clean slate
+                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                        if key in st.session_state:
+                            del st.session_state[key]
                     st.session_state['ticker_input'] = "GLD"
-                    st.session_state.quick_ticker_clicked = True
+                    st.session_state['_quick_add_used'] = True
                     st.rerun()
             with col_q3:
                 if st.button("DBMF", key="quick_dbmf", help="Managed Futures", use_container_width=True):
+                    # Clear all related widget states for clean slate
+                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                        if key in st.session_state:
+                            del st.session_state[key]
                     st.session_state['ticker_input'] = "DBMF"
-                    st.session_state.quick_ticker_clicked = True
+                    st.session_state['_quick_add_used'] = True
                     st.rerun()
             with col_q4:
                 if st.button("BIL", key="quick_bil", help="Short-Term Bonds", use_container_width=True):
+                    # Clear all related widget states for clean slate
+                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                        if key in st.session_state:
+                            del st.session_state[key]
                     st.session_state['ticker_input'] = "BIL"
-                    st.session_state.quick_ticker_clicked = True
+                    st.session_state['_quick_add_used'] = True
                     st.rerun()
             
             # Determine default value for text input
-            if st.session_state.get('quick_ticker_clicked', False):
-                # Just clicked quick add - value is already in widget state
-                st.session_state.quick_ticker_clicked = False
-                default_ticker = st.session_state.get('ticker_input', '')
-            else:
-                default_ticker = ''
+            default_ticker = st.session_state.get('ticker_input', '')
             
             a_sym = st.text_input("Ticker Symbol", placeholder="e.g., AAPL", 
                                  key="ticker_input", value=default_ticker).upper().strip()
@@ -3428,7 +3446,20 @@ else:
                 st.markdown("---")
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
+                    # Save button should be enabled if:
+                    # 1. Normal case: a_w > 0 and a_w <= max_available
+                    # 2. Quick Add case: Quick Add was just used and validation passed
+                    quick_add_used = st.session_state.get('_quick_add_used', False)
+                    
                     save_disabled = (a_w <= 0) or (a_w > max_available)
+                    
+                    # If Quick Add was just used and ticker validated successfully,
+                    # enable the button (Quick Add should be frictionless)
+                    if quick_add_used and valid_ticker and a_w > 0:
+                        save_disabled = False
+                        # Clear the flag after checking
+                        st.session_state['_quick_add_used'] = False
+                    
                     if st.button("💾 Save Asset", use_container_width=True, type="primary", key="save_asset", disabled=save_disabled):
                         # Preserve existing units and purchases if updating
                         existing_units = prof.get("assets", {}).get(a_sym, {}).get("units", 0.0)
