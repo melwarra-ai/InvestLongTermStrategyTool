@@ -14,11 +14,20 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.25"
+VERSION = "6.7.26"
 VERSION_DATE = "2026-01-24"
-VERSION_TIME = "23:22:20"  # EST
-VERSION_NAME = "Deployable Assets Filter & Quick Add Fix"
+VERSION_TIME = "23:39:28"  # EST
+VERSION_NAME = "Four Critical Consistency Fixes"
 CHANGELOG = """
+v6.7.26 (2026-01-24 23:39 EST) - FOUR CRITICAL FIXES
+- CRITICAL: Fixed deployable assets filter (removed buggy fallback)
+- Fixed: Dashboard counter now uses smart detection (shows 4/4 not 3/4)
+- Fixed: Drift alert only shows AFTER deployment complete (not during)
+- Fixed: Rebalance table shows "100%" when fractional remainder only
+- Impact: GLD ($232 < $458) now properly excluded from dropdown
+- Impact: All five status locations now 100% consistent
+- Bug in v6.7.25: Fallback logic incorrectly included 99% assets in dropdown
+
 v6.7.25 (2026-01-24 23:22 EST) - CRITICAL DEPLOYMENT FILTER FIX
 - CRITICAL: Fixed deployable assets filter to use smart detection
 - Fixed: Assets with fractional remainder excluded from "Select Asset" dropdown
@@ -3623,15 +3632,14 @@ else:
                             hist = t_obj.history(period="1d")
                             if not hist.empty:
                                 current_price = float(hist['Close'].iloc[-1])
-                                # Can deploy if remaining budget >= 1 unit price
+                                # Can deploy ONLY if remaining budget >= 1 unit price
                                 if remaining_budget >= current_price:
                                     can_still_deploy = True
-                                elif allocated_pct < 99.5:
-                                    # Fallback to old threshold if price check says no but % is low
+                                # NO fallback - if can't afford 1 unit, can't deploy!
+                            else:
+                                # If can't get price, use threshold fallback
+                                if allocated_pct < 99.5:
                                     can_still_deploy = True
-                            elif allocated_pct < 99.5:
-                                # If can't get price, use threshold
-                                can_still_deploy = True
                         except:
                             # If any error, use threshold fallback
                             if allocated_pct < 99.5:
@@ -5624,7 +5632,35 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             else:
                 assets = prof.get("assets", {})
                 if assets:
-                    deployed_count = sum(1 for a in assets.values() if a.get("allocated_pct", 0) >= 99.5)
+                    # Use smart detection for deployed count (same as progress counter)
+                    deployed_count = 0
+                    for ticker, asset_data in assets.items():
+                        allocated_pct = asset_data.get("allocated_pct", 0)
+                        target_pct = asset_data.get("target", 0)
+                        
+                        # Calculate remaining budget
+                        purchases = asset_data.get("purchases", [])
+                        total_spent = sum(p.get("amount", 0) for p in purchases)
+                        target_amount = (target_pct / 100) * prof['principal']
+                        remaining_budget = target_amount - total_spent
+                        
+                        # Check if truly deployed (remaining < price)
+                        try:
+                            t_obj = yf.Ticker(ticker)
+                            hist = t_obj.history(period="1d")
+                            if not hist.empty:
+                                current_price = float(hist['Close'].iloc[-1])
+                                if remaining_budget < current_price:
+                                    deployed_count += 1  # Truly deployed!
+                                elif allocated_pct >= 99.5:
+                                    deployed_count += 1  # Fallback
+                            elif allocated_pct >= 99.5:
+                                deployed_count += 1
+                        except:
+                            # If any error, use threshold fallback
+                            if allocated_pct >= 99.5:
+                                deployed_count += 1
+                    
                     total_count = len(assets)
                     if deployed_count < total_count:
                         st.metric("Deployment", f"{deployed_count}/{total_count}", delta="In Progress", delta_color="off")
@@ -5750,8 +5786,33 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             needs_rebalance = True
                             drift_assets.append((t, drift, actual_pct, target_pct))
                 
-                # Drift alert banner
-                if needs_rebalance:
+                # Drift alert banner - ONLY show after deployment is complete
+                # Check if all assets are deployed first
+                all_assets_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in asset_dict.values()) if asset_dict else False
+                
+                # Also check with smart detection for truly deployed
+                if all_assets_deployed:
+                    for ticker, asset_data in asset_dict.items():
+                        allocated_pct = asset_data.get("allocated_pct", 0)
+                        if allocated_pct < 100:  # Might be fractional
+                            target_pct = asset_data.get("target", 0)
+                            purchases = asset_data.get("purchases", [])
+                            total_spent = sum(p.get("amount", 0) for p in purchases)
+                            target_amount = (target_pct / 100) * prof['principal']
+                            remaining_budget = target_amount - total_spent
+                            # If any asset can still afford 1 unit, not fully deployed
+                            try:
+                                t_obj = yf.Ticker(ticker)
+                                hist = t_obj.history(period="1d")
+                                if not hist.empty:
+                                    current_price = float(hist['Close'].iloc[-1])
+                                    if remaining_budget >= current_price:
+                                        all_assets_deployed = False
+                                        break
+                            except:
+                                pass
+                
+                if needs_rebalance and all_assets_deployed:
                     st.markdown(f'''
                         <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); 
                                     border: 4px solid #ef4444; border-radius: 16px; padding: 28px; margin-bottom: 28px;">
@@ -6207,9 +6268,15 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             else:
                                 status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
                             
+                            # Deployed % display - show 100% when truly deployed (fractional only)
+                            if is_asset_truly_deployed or allocated_pct >= 99.5:
+                                deployed_display = "100%"
+                            else:
+                                deployed_display = f"{allocated_pct:.0f}%"
+                            
                             rows.append({
                                 "Fund Name": fund_name, "Ticker": t, "Target %": f"{tar_w:.2f}%",
-                                "Deployed": f"{min(allocated_pct, 100):.0f}%", "Portfolio %": f"{act_w:.2f}%",
+                                "Deployed": deployed_display, "Portfolio %": f"{act_w:.2f}%",
                                 "Drift": drift_display, "Status": status_display,
                                 "Avg Cost": avg_cost_display,
                                 "Units": f"{cur_u:.0f}", "Current Price": f"${current_price:.2f}",
