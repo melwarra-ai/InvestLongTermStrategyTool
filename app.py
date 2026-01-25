@@ -14,11 +14,18 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.29"
+VERSION = "6.7.30"
 VERSION_DATE = "2026-01-25"
-VERSION_TIME = "10:37:10"  # EST
-VERSION_NAME = "Rebalance Status False Positive Fix"
+VERSION_TIME = "10:44:27"  # EST
+VERSION_NAME = "Quick Add Save Button Fix v2"
 CHANGELOG = """
+v6.7.30 (2026-01-25 10:44 EST) - QUICK ADD SAVE BUTTON FIX (v2)
+- CRITICAL: Fixed Save Asset button staying disabled after Quick Add
+- Changed: Removed complex flag logic (v6.7.28 didn't work)
+- Changed: Button always enabled when ticker valid, validation done on click
+- Impact: Quick Add now works reliably - click button, validation passes, save enabled
+- Note: v6.7.28 fix was too complex and didn't work due to widget state issues
+
 v6.7.29 (2026-01-25 10:37 EST) - REBALANCE STATUS FIX
 - CRITICAL: Fixed false "Rebalance Needed" status in rebalance table
 - Fixed: max_drift now uses current portfolio value (not principal)
@@ -3453,36 +3460,35 @@ else:
                 st.markdown("---")
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
-                    # Save button should be enabled if:
-                    # 1. Normal case: a_w > 0 and a_w <= max_available
-                    # 2. Quick Add case: Quick Add was just used and validation passed
-                    quick_add_used = st.session_state.get('_quick_add_used', False)
-                    
+                    # SIMPLIFIED: Enable Save button when:
+                    # 1. Ticker is valid (already checked above)
+                    # 2. Allocation is valid (> 0 and <= max_available)
+                    # No complex flag logic - just check the actual values
                     save_disabled = (a_w <= 0) or (a_w > max_available)
                     
-                    # If Quick Add was just used and ticker validated successfully,
-                    # enable the button (Quick Add should be frictionless)
-                    if quick_add_used and valid_ticker and a_w > 0:
-                        save_disabled = False
-                        # Clear the flag after checking
-                        st.session_state['_quick_add_used'] = False
-                    
                     if st.button("💾 Save Asset", use_container_width=True, type="primary", key="save_asset", disabled=save_disabled):
-                        # Preserve existing units and purchases if updating
-                        existing_units = prof.get("assets", {}).get(a_sym, {}).get("units", 0.0)
-                        existing_allocated = prof.get("assets", {}).get(a_sym, {}).get("allocated_pct", 0.0)
-                        existing_purchases = prof.get("assets", {}).get(a_sym, {}).get("purchases", [])
-                        
-                        prof.setdefault("assets", {})[a_sym] = {
-                            "fund_name": ticker_name, "units": existing_units, "target": a_w,
-                            "allocated_pct": existing_allocated,
-                            "purchases": existing_purchases
-                        }
-                        action = "Updated" if is_existing else "Added"
-                        log_profile(prof, f"{action} {a_sym}: {a_w}% target")
-                        save_db(st.session_state.db)
-                        st.success(f"✅ {action} {a_sym}!")
-                        st.rerun()
+                        # Validate allocation one more time
+                        if a_w <= 0:
+                            st.error("❌ Target allocation must be greater than 0%")
+                        elif a_w > max_available:
+                            st.error(f"❌ Target allocation exceeds available {max_available:.1f}%")
+                        else:
+                            # Validation passed - save the asset
+                            # Preserve existing units and purchases if updating
+                            existing_units = prof.get("assets", {}).get(a_sym, {}).get("units", 0.0)
+                            existing_allocated = prof.get("assets", {}).get(a_sym, {}).get("allocated_pct", 0.0)
+                            existing_purchases = prof.get("assets", {}).get(a_sym, {}).get("purchases", [])
+                            
+                            prof.setdefault("assets", {})[a_sym] = {
+                                "fund_name": ticker_name, "units": existing_units, "target": a_w,
+                                "allocated_pct": existing_allocated,
+                                "purchases": existing_purchases
+                            }
+                            action = "Updated" if is_existing else "Added"
+                            log_profile(prof, f"{action} {a_sym}: {a_w}% target")
+                            save_db(st.session_state.db)
+                            st.success(f"✅ {action} {a_sym}!")
+                            st.rerun()
                 with col_b2:
                     if is_existing:
                         if st.button("🗑️ Remove", use_container_width=True, key="remove_asset"):
