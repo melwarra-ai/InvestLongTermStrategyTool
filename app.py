@@ -14,11 +14,20 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.21"
+VERSION = "6.7.22"
 VERSION_DATE = "2026-01-24"
-VERSION_TIME = "22:05:12"  # EST
-VERSION_NAME = "Smart Per-Asset Deployment Logic"
+VERSION_TIME = "22:21:33"  # EST
+VERSION_NAME = "UI Responsiveness - Progress Bar & Today Button Fixes"
 CHANGELOG = """
+v6.7.22 (2026-01-24 22:21 EST)
+- CRITICAL: Fixed progress bar to show continuous deployment (not just fully deployed count)
+- Fixed: Today button now properly updates date field by clearing widget cache
+- Enhanced: Progress bar now shows "X/Y assets deployed • Z% capital deployed"
+- Changed: Progress bar color based on capital deployed percentage
+- Impact: Progress updates immediately after each deployment (was stuck at 0/2)
+- Impact: Today button now reliably resets date to current date
+- Note: Profile dropdown already worked correctly (auto-selects new profiles)
+
 v6.7.21 (2026-01-24 22:05 EST)
 - MAJOR: Implemented strict per-asset budget deployment (user's smart logic)
 - Changed: Reverted from flexible to per-asset budget constraints
@@ -3430,29 +3439,25 @@ else:
                 elif undeployed_cash <= 0:
                     is_truly_fully_deployed = True
                 
-                # Count deployed assets
-                if is_truly_fully_deployed:
-                    # Portfolio is truly fully deployed - count all assets as deployed
-                    deployable_assets = {}  # No deployable assets
-                    fully_deployed_count = len(assets)
-                    total_assets = len(assets)
-                else:
-                    # Use 99.5% threshold for normal deployment tracking
-                    deployable_assets = {t: d for t, d in assets.items() if d.get("allocated_pct", 0) < 99.5}
-                    fully_deployed_count = sum(1 for a in assets.values() if a.get("allocated_pct", 0) >= 99.5)
-                    total_assets = len(assets)
+                # Calculate deployment progress
+                # Use TOTAL portfolio deployment percentage for continuous progress bar
+                total_deployed_capital = sum(sum(p.get("amount", 0) for p in a.get("purchases", [])) for a in assets.values())
+                deployment_progress = (total_deployed_capital / prof['principal']) if prof['principal'] > 0 else 0
                 
-                st.markdown(f"**Progress:** {fully_deployed_count}/{total_assets} assets fully deployed")
+                # Count fully deployed assets for status text
+                fully_deployed_count = sum(1 for a in assets.values() if a.get("allocated_pct", 0) >= 99.5)
+                total_assets = len(assets)
+                
+                st.markdown(f"**Progress:** {fully_deployed_count}/{total_assets} assets fully deployed • {deployment_progress*100:.1f}% capital deployed")
                 
                 if total_assets > 0:
-                    deployment_progress = fully_deployed_count / total_assets
                     progress_pct = deployment_progress * 100
-                    if deployment_progress >= 1.0:
-                        bar_color = "#10b981"
-                    elif deployment_progress >= 0.5:
-                        bar_color = "#fbbf24"
+                    if deployment_progress >= 0.995:  # 99.5% or more
+                        bar_color = "#10b981"  # Green
+                    elif deployment_progress >= 0.50:
+                        bar_color = "#fbbf24"  # Yellow
                     else:
-                        bar_color = "#ef4444"
+                        bar_color = "#ef4444"  # Red
                     
                     st.markdown(f'''
                         <div style="margin: 20px 0;">
@@ -3461,6 +3466,14 @@ else:
                             </div>
                         </div>
                     ''', unsafe_allow_html=True)
+                
+                # Determine deployable assets (not yet fully deployed)
+                if is_truly_fully_deployed:
+                    # Portfolio is truly fully deployed - no assets can receive more
+                    deployable_assets = {}
+                else:
+                    # Use 99.5% threshold for normal deployment tracking
+                    deployable_assets = {t: d for t, d in assets.items() if d.get("allocated_pct", 0) < 99.5}
                 
                 if not deployable_assets:
                     if is_truly_fully_deployed and undeployed_cash > 0:
@@ -3598,23 +3611,18 @@ else:
                                     if st.button("📅 Today", key="set_today_btn", use_container_width=True):
                                         # Force update to today's date
                                         st.session_state.deploy_date_value = date.today()
-                                        st.session_state.force_date_update = True
+                                        # Clear the widget key to force complete refresh
+                                        if 'deploy_date_input' in st.session_state:
+                                            del st.session_state['deploy_date_input']
                                         st.rerun()
                                 
                                 with col_date:
-                                    # Initialize session state for deployment date
+                                    # Always use session state value (or today if not set)
                                     if 'deploy_date_value' not in st.session_state:
                                         st.session_state.deploy_date_value = date.today()
                                     
-                                    # Check if we need to force update
-                                    if st.session_state.get('force_date_update', False):
-                                        current_value = date.today()
-                                        st.session_state.force_date_update = False
-                                    else:
-                                        current_value = st.session_state.deploy_date_value
-                                    
                                     deploy_date = st.date_input("Deployment Date", 
-                                                               value=current_value,
+                                                               value=st.session_state.deploy_date_value,
                                                                max_value=date.today(), 
                                                                key="deploy_date_input")
                                     
