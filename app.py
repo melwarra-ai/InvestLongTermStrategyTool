@@ -14,11 +14,20 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.22"
+VERSION = "6.7.23"
 VERSION_DATE = "2026-01-24"
-VERSION_TIME = "22:21:33"  # EST
-VERSION_NAME = "UI Responsiveness - Progress Bar & Today Button Fixes"
+VERSION_TIME = "22:35:55"  # EST
+VERSION_NAME = "Quick Add Fix & Step Progress Tracker"
 CHANGELOG = """
+v6.7.23 (2026-01-24 22:35 EST)
+- Fixed: Quick Add buttons now properly populate ticker field
+- Changed: Quick Add buttons to user's assets (SPXL, GLD, DBMF, BIL)
+- Added: Visual step-by-step progress tracker in sidebar
+- Enhanced: Shows checkmarks for completed steps and hints for next action
+- Fixed: Deploy All Remaining Cash shows ALL assets (not just 3)
+- Impact: Clearer guidance through setup process, Quick Add now works
+- UX: Progress bar shows 0-6 steps complete with color coding
+
 v6.7.22 (2026-01-24 22:21 EST)
 - CRITICAL: Fixed progress bar to show continuous deployment (not just fully deployed count)
 - Fixed: Today button now properly updates date field by clearing widget cache
@@ -2872,6 +2881,77 @@ else:
         
         st.divider()
         
+        # Portfolio Setup Progress Tracker (only show in Portfolio Manager)
+        if view_mode == "Portfolio Manager" and st.session_state.active_profile:
+            try:
+                prof = st.session_state.db["users"][current_user]["profiles"][st.session_state.active_profile]
+                
+                # Check completion status for each step
+                has_profile = True  # If we're here, profile exists
+                has_principal = prof.get('principal', 0) > 0
+                has_benchmarks = len(prof.get('benchmarks', [])) > 0 or prof.get('benchmark') is not None
+                has_assets = len(prof.get('assets', {})) > 0
+                asset_mix_locked = prof.get('asset_mix_locked', False)
+                has_deployments = any(len(a.get('purchases', [])) > 0 for a in prof.get('assets', {}).values())
+                
+                # Calculate total completion
+                steps_complete = sum([has_profile, has_principal, has_benchmarks, has_assets, asset_mix_locked, has_deployments])
+                total_steps = 6
+                
+                # Show compact progress tracker
+                st.markdown("**📋 Setup Progress:**")
+                progress_pct = (steps_complete / total_steps) * 100
+                
+                # Progress bar
+                if progress_pct >= 100:
+                    bar_color = "#10b981"  # Green
+                elif progress_pct >= 50:
+                    bar_color = "#fbbf24"  # Yellow
+                else:
+                    bar_color = "#ef4444"  # Red
+                
+                st.markdown(f'''
+                    <div style="margin: 10px 0;">
+                        <div style="background: #e5e7eb; border-radius: 8px; height: 8px; overflow: hidden;">
+                            <div style="background: {bar_color}; height: 100%; width: {progress_pct}%;"></div>
+                        </div>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">{steps_complete}/{total_steps} steps complete</div>
+                    </div>
+                ''', unsafe_allow_html=True)
+                
+                # Show step checklist
+                steps = [
+                    ("① Profile Created", has_profile, "Profile exists"),
+                    ("② Principal Set", has_principal, "Capital amount defined"),
+                    ("③ Benchmarks Added", has_benchmarks, "Performance tracking configured"),
+                    ("④ Assets Allocated", has_assets, "Investment mix defined"),
+                    ("⑤ Mix Locked", asset_mix_locked, "Ready for deployment"),
+                    ("⑥ Deployed", has_deployments, "Capital invested")
+                ]
+                
+                for step_name, is_complete, tooltip in steps:
+                    if is_complete:
+                        st.markdown(f"✅ {step_name}", help=tooltip)
+                    else:
+                        st.markdown(f"⏳ {step_name}", help=tooltip)
+                        # Show what to do next for first incomplete step
+                        if steps_complete == steps.index((step_name, is_complete, tooltip)):
+                            if not has_principal:
+                                st.caption("👉 Set your principal amount below")
+                            elif not has_benchmarks:
+                                st.caption("👉 Add benchmarks below (optional)")
+                            elif not has_assets:
+                                st.caption("👉 Add assets in ④ Asset Allocation")
+                            elif not asset_mix_locked:
+                                st.caption("👉 Lock mix in ⑤ Lock Asset Mix")
+                            elif not has_deployments:
+                                st.caption("👉 Deploy capital in ⑥ Asset Deployment")
+                        break  # Only show hint for first incomplete
+                
+                st.divider()
+            except:
+                pass  # If any error, just skip progress tracker
+        
         # Profile Creation
         st.markdown("### ① Strategy Setup")
         with st.expander("🆕 Create New Profile", expanded=False):
@@ -3181,24 +3261,33 @@ else:
                 st.caption("💡 Enter ticker below to edit or add new asset")
                 st.divider()
             
-            # Quick-add buttons for common tickers
+            # Quick-add buttons for common tickers (user's specific assets)
             st.markdown("**🚀 Quick Add:**")
             col_q1, col_q2, col_q3, col_q4 = st.columns(4)
             with col_q1:
-                if st.button("SPY", key="quick_spy", help="S&P 500", use_container_width=True):
-                    st.session_state.quick_ticker = "SPY"
+                if st.button("SPXL", key="quick_spxl", help="S&P 500 3X", use_container_width=True):
+                    st.session_state.quick_ticker = "SPXL"
+                    # Also set the widget key directly
+                    if 'ticker_input' in st.session_state:
+                        del st.session_state['ticker_input']
                     st.rerun()
             with col_q2:
-                if st.button("QQQ", key="quick_qqq", help="Nasdaq 100", use_container_width=True):
-                    st.session_state.quick_ticker = "QQQ"
-                    st.rerun()
-            with col_q3:
                 if st.button("GLD", key="quick_gld", help="Gold", use_container_width=True):
                     st.session_state.quick_ticker = "GLD"
+                    if 'ticker_input' in st.session_state:
+                        del st.session_state['ticker_input']
+                    st.rerun()
+            with col_q3:
+                if st.button("DBMF", key="quick_dbmf", help="Managed Futures", use_container_width=True):
+                    st.session_state.quick_ticker = "DBMF"
+                    if 'ticker_input' in st.session_state:
+                        del st.session_state['ticker_input']
                     st.rerun()
             with col_q4:
-                if st.button("TLT", key="quick_tlt", help="Long-Term Bonds", use_container_width=True):
-                    st.session_state.quick_ticker = "TLT"
+                if st.button("BIL", key="quick_bil", help="Short-Term Bonds", use_container_width=True):
+                    st.session_state.quick_ticker = "BIL"
+                    if 'ticker_input' in st.session_state:
+                        del st.session_state['ticker_input']
                     st.rerun()
             
             # Get ticker from quick-add or text input
@@ -4145,7 +4234,8 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 st.markdown("#### 🚀 Deploy Remaining Cash")
                 st.caption(f"You have ${deployable_cash:,.0f} that can be deployed:")
                 
-                for opp in deployment_opportunities[:3]:  # Show top 3
+                # Show ALL deployment opportunities (not just top 3)
+                for opp in deployment_opportunities:
                     st.markdown(f"""
                         <div style="background: #fef3c7; padding: 12px; border-radius: 8px; 
                                     margin: 8px 0; border-left: 4px solid #f59e0b;">
