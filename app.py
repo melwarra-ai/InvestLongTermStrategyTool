@@ -14,11 +14,18 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.28"
+VERSION = "6.7.29"
 VERSION_DATE = "2026-01-25"
-VERSION_TIME = "10:30:47"  # EST
-VERSION_NAME = "Quick Add Save Button Fix"
+VERSION_TIME = "10:37:10"  # EST
+VERSION_NAME = "Rebalance Status False Positive Fix"
 CHANGELOG = """
+v6.7.29 (2026-01-25 10:37 EST) - REBALANCE STATUS FIX
+- CRITICAL: Fixed false "Rebalance Needed" status in rebalance table
+- Fixed: max_drift now uses current portfolio value (not principal)
+- Changed: TOTAL row status now consistent with individual asset drifts
+- Impact: ±0.05% drift with 5.0% tolerance now shows "✅ Balanced" not "⚠️ Rebalance Needed"
+- Impact: Status accurately reflects actual drift vs tolerance
+
 v6.7.28 (2026-01-25 10:30 EST) - QUICK ADD SAVE BUTTON FIX
 - CRITICAL: Fixed Save Asset button not activating after Quick Add
 - Changed: Quick Add now clears all widget states for clean slate
@@ -6395,10 +6402,29 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     st.stop()
                 
                 # Calculate overall drift status for TOTAL row
-                # Portfolio % is now based on principal, so max drift uses start_val
-                max_drift = max(abs(float(asset_dict[t].get("target", 0)) - 
-                                   (float(asset_dict[t]["units"]) * float(data[t].iloc[-1]) / start_val * 100 if start_val > 0 else 0)) 
-                               for t in v_t) if v_t else 0
+                # CRITICAL: Use same drift calculation as individual assets
+                # (based on CURRENT portfolio value, not principal)
+                max_drift = 0
+                if v_t and total_portfolio_current_value > 0:
+                    for t in v_t:
+                        try:
+                            cur_u = float(asset_dict[t].get("units", 0))
+                            tar_w = float(asset_dict[t].get('target', 0))
+                            current_price = float(data[t].iloc[-1])
+                            
+                            # Calculate actual portfolio % (same as individual rows)
+                            act_val = cur_u * current_price
+                            act_w = (act_val / total_portfolio_current_value * 100)
+                            
+                            # Calculate drift (same as individual rows)
+                            drift = abs(act_w - tar_w)
+                            
+                            # Track maximum drift
+                            if np.isfinite(drift) and drift > max_drift:
+                                max_drift = drift
+                        except:
+                            pass
+                
                 drift_tolerance = prof.get("drift_tolerance", 5.0)
                 
                 # Calculate ACTUAL undeployed cash (same as sidebar)
