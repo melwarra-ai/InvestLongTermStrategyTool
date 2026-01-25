@@ -14,11 +14,19 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.26"
-VERSION_DATE = "2026-01-24"
-VERSION_TIME = "23:39:28"  # EST
-VERSION_NAME = "Four Critical Consistency Fixes"
+VERSION = "6.7.27"
+VERSION_DATE = "2026-01-25"
+VERSION_TIME = "10:16:56"  # EST
+VERSION_NAME = "Dashboard Message & -100% ROI Fixes"
 CHANGELOG = """
+v6.7.27 (2026-01-25 10:16 EST) - TWO CRITICAL FIXES
+- CRITICAL: Fixed dashboard message showing "deployment in progress" after rebalancing
+- Fixed: -100% ROI bug for profiles with no deployments/current value
+- Changed: Dashboard uses smart detection for deployment status
+- Changed: Profiles with curr_val = 0 show as 0% not -100%
+- Impact: "Balanced" profiles no longer show confusing deployment message
+- Impact: SAT PROFILE and similar won't show -100% if not deployed
+
 v6.7.26 (2026-01-24 23:39 EST) - FOUR CRITICAL FIXES
 - CRITICAL: Fixed deployable assets filter (removed buggy fallback)
 - Fixed: Dashboard counter now uses smart detection (shows 4/4 not 3/4)
@@ -4950,13 +4958,24 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 start_val = float(p_data.get('principal', 0))
                 start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d').date()
                 
-                if start_val > 0:
+                # CRITICAL: Only include profiles with valid data
+                # Skip if no principal OR no current value (prevents -100% error)
+                if start_val > 0 and curr_val > 0:
                     days_elapsed = (date.today() - start_date).days
                     total_return_pct = ((curr_val / start_val) - 1) * 100
                     performance_data.append({
                         'name': p_name, 'start_date': start_date, 'days_elapsed': days_elapsed,
                         'start_val': start_val, 'curr_val': curr_val,
                         'total_return': curr_val - start_val, 'total_return_pct': total_return_pct
+                    })
+                elif start_val > 0 and curr_val == 0:
+                    # Profile has principal but no deployments yet
+                    # Show as 0% return (not -100%)
+                    days_elapsed = (date.today() - start_date).days
+                    performance_data.append({
+                        'name': f"{p_name} (Not Deployed)", 'start_date': start_date, 'days_elapsed': days_elapsed,
+                        'start_val': start_val, 'curr_val': 0,
+                        'total_return': 0, 'total_return_pct': 0
                     })
             
             if performance_data:
@@ -5606,12 +5625,54 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             st.warning("⚠️ **Asset mix not locked** - Define and lock assets first")
         else:
             assets = prof.get("assets", {})
-            all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in assets.values())
+            
+            # Use SMART DETECTION to check if all deployed
+            all_deployed = True
+            partial = []
+            
+            for ticker, asset_data in assets.items():
+                allocated_pct = asset_data.get("allocated_pct", 0)
+                target_pct = asset_data.get("target", 0)
+                
+                # Check if truly deployed with smart detection
+                is_deployed = False
+                
+                # Calculate remaining budget
+                purchases = asset_data.get("purchases", [])
+                total_spent = sum(p.get("amount", 0) for p in purchases)
+                target_amount = (target_pct / 100) * prof['principal']
+                remaining_budget = target_amount - total_spent
+                
+                # Check if truly deployed (remaining < price)
+                try:
+                    t_obj = yf.Ticker(ticker)
+                    hist = t_obj.history(period="1d")
+                    if not hist.empty:
+                        current_price = float(hist['Close'].iloc[-1])
+                        if remaining_budget < current_price:
+                            is_deployed = True  # Truly deployed (fractional only)
+                        elif allocated_pct >= 99.5:
+                            is_deployed = True  # Fallback
+                    elif allocated_pct >= 99.5:
+                        is_deployed = True
+                except:
+                    # If any error, use threshold fallback
+                    if allocated_pct >= 99.5:
+                        is_deployed = True
+                
+                if not is_deployed:
+                    all_deployed = False
+                    partial.append((ticker, allocated_pct))
+            
+            # Show deployment status message ONLY if not rebalanced yet
+            has_rebalanced = prof.get("last_rebalanced") is not None
+            
             if assets and not all_deployed:
-                partial = [(t, a.get("allocated_pct", 0)) for t, a in assets.items() if a.get("allocated_pct", 0) < 99.5]
                 st.info(f"📊 **Deployment in progress** - {len(partial)} asset(s) not fully deployed")
-            elif assets and all_deployed:
-                st.success("✅ **All assets deployed** - Portfolio drift monitoring active")
+            elif assets and all_deployed and not has_rebalanced:
+                # Only show "all deployed" message if haven't rebalanced yet
+                st.success("✅ **All assets deployed** - Ready to monitor drift")
+            # If rebalanced, don't show any deployment message (status badge shows "Balanced/Active")
         
         # Portfolio Summary
         has_rebalanced = prof.get("last_rebalanced") is not None
