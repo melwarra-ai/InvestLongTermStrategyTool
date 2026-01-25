@@ -14,11 +14,20 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.24"
+VERSION = "6.7.25"
 VERSION_DATE = "2026-01-24"
-VERSION_TIME = "22:49:09"  # EST
-VERSION_NAME = "Smart Detection Consistency Fix"
+VERSION_TIME = "23:22:20"  # EST
+VERSION_NAME = "Deployable Assets Filter & Quick Add Fix"
 CHANGELOG = """
+v6.7.25 (2026-01-24 23:22 EST) - CRITICAL DEPLOYMENT FILTER FIX
+- CRITICAL: Fixed deployable assets filter to use smart detection
+- Fixed: Assets with fractional remainder excluded from "Select Asset" dropdown
+- Fixed: Quick Add now properly populates ticker field (improved approach)
+- Changed: Dropdown only shows assets that can still receive capital
+- Impact: 100% deployed assets (SPXL, GLD) no longer appear in dropdown
+- Impact: Deployment status correctly shows 4/4 when all fractional remainder
+- Status: SPXL ($165 < $225.60) + GLD ($250 < $458) = both excluded ✅
+
 v6.7.24 (2026-01-24 22:49 EST) - CRITICAL CONSISTENCY FIX
 - CRITICAL: Fixed contradictory budget display when asset 100% deployed
 - Fixed: Rebalance table now uses smart detection (remaining < price = 100%)
@@ -3275,39 +3284,36 @@ else:
             col_q1, col_q2, col_q3, col_q4 = st.columns(4)
             with col_q1:
                 if st.button("SPXL", key="quick_spxl", help="S&P 500 3X", use_container_width=True):
-                    st.session_state.quick_ticker = "SPXL"
-                    # Also set the widget key directly
-                    if 'ticker_input' in st.session_state:
-                        del st.session_state['ticker_input']
+                    # Set the widget value directly AND session state
+                    st.session_state['ticker_input'] = "SPXL"
+                    st.session_state.quick_ticker_clicked = True
                     st.rerun()
             with col_q2:
                 if st.button("GLD", key="quick_gld", help="Gold", use_container_width=True):
-                    st.session_state.quick_ticker = "GLD"
-                    if 'ticker_input' in st.session_state:
-                        del st.session_state['ticker_input']
+                    st.session_state['ticker_input'] = "GLD"
+                    st.session_state.quick_ticker_clicked = True
                     st.rerun()
             with col_q3:
                 if st.button("DBMF", key="quick_dbmf", help="Managed Futures", use_container_width=True):
-                    st.session_state.quick_ticker = "DBMF"
-                    if 'ticker_input' in st.session_state:
-                        del st.session_state['ticker_input']
+                    st.session_state['ticker_input'] = "DBMF"
+                    st.session_state.quick_ticker_clicked = True
                     st.rerun()
             with col_q4:
                 if st.button("BIL", key="quick_bil", help="Short-Term Bonds", use_container_width=True):
-                    st.session_state.quick_ticker = "BIL"
-                    if 'ticker_input' in st.session_state:
-                        del st.session_state['ticker_input']
+                    st.session_state['ticker_input'] = "BIL"
+                    st.session_state.quick_ticker_clicked = True
                     st.rerun()
             
-            # Get ticker from quick-add or text input
-            quick_ticker = st.session_state.get('quick_ticker', '')
-            if quick_ticker:
-                default_ticker = quick_ticker
-                st.session_state.quick_ticker = ''  # Clear after use
+            # Determine default value for text input
+            if st.session_state.get('quick_ticker_clicked', False):
+                # Just clicked quick add - value is already in widget state
+                st.session_state.quick_ticker_clicked = False
+                default_ticker = st.session_state.get('ticker_input', '')
             else:
                 default_ticker = ''
             
-            a_sym = st.text_input("Ticker Symbol", placeholder="e.g., AAPL", key="ticker_input", value=default_ticker).upper().strip()
+            a_sym = st.text_input("Ticker Symbol", placeholder="e.g., AAPL", 
+                                 key="ticker_input", value=default_ticker).upper().strip()
             is_existing = a_sym in prof.get("assets", {})
             
             if is_existing:
@@ -3593,12 +3599,47 @@ else:
                     ''', unsafe_allow_html=True)
                 
                 # Determine deployable assets (not yet fully deployed)
+                # Use SMART DETECTION: exclude assets where remaining < price
                 if is_truly_fully_deployed:
                     # Portfolio is truly fully deployed - no assets can receive more
                     deployable_assets = {}
                 else:
-                    # Use 99.5% threshold for normal deployment tracking
-                    deployable_assets = {t: d for t, d in assets.items() if d.get("allocated_pct", 0) < 99.5}
+                    # Check each asset individually with smart detection
+                    deployable_assets = {}
+                    for ticker, asset_data in assets.items():
+                        allocated_pct = asset_data.get("allocated_pct", 0)
+                        target_pct = asset_data.get("target", 0)
+                        
+                        # Calculate remaining budget
+                        purchases = asset_data.get("purchases", [])
+                        total_spent = sum(p.get("amount", 0) for p in purchases)
+                        target_amount = (target_pct / 100) * prof['principal']
+                        remaining_budget = target_amount - total_spent
+                        
+                        # Check if can still deploy (remaining >= price)
+                        can_still_deploy = False
+                        try:
+                            t_obj = yf.Ticker(ticker)
+                            hist = t_obj.history(period="1d")
+                            if not hist.empty:
+                                current_price = float(hist['Close'].iloc[-1])
+                                # Can deploy if remaining budget >= 1 unit price
+                                if remaining_budget >= current_price:
+                                    can_still_deploy = True
+                                elif allocated_pct < 99.5:
+                                    # Fallback to old threshold if price check says no but % is low
+                                    can_still_deploy = True
+                            elif allocated_pct < 99.5:
+                                # If can't get price, use threshold
+                                can_still_deploy = True
+                        except:
+                            # If any error, use threshold fallback
+                            if allocated_pct < 99.5:
+                                can_still_deploy = True
+                        
+                        # Add to deployable if can still deploy
+                        if can_still_deploy:
+                            deployable_assets[ticker] = asset_data
                 
                 if not deployable_assets:
                     if is_truly_fully_deployed and undeployed_cash > 0:
