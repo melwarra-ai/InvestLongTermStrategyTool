@@ -14,11 +14,21 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.20"
+VERSION = "6.7.21"
 VERSION_DATE = "2026-01-24"
-VERSION_TIME = "17:35:32"  # EST
-VERSION_NAME = "Rebalance Table Fix - Portfolio % Calculation"
+VERSION_TIME = "22:05:12"  # EST
+VERSION_NAME = "Smart Per-Asset Deployment Logic"
 CHANGELOG = """
+v6.7.21 (2026-01-24 22:05 EST)
+- MAJOR: Implemented strict per-asset budget deployment (user's smart logic)
+- Changed: Reverted from flexible to per-asset budget constraints
+- Logic: Each asset has dedicated budget envelope (can't borrow from other assets)
+- Enhanced: Smart "100% deployed" detection when remaining < asset price
+- Fixed: Active profile defaults to newly created profile
+- Philosophy: Maintain target allocations during deployment, not after
+- Impact: More intuitive, matches real-world investment approach
+- Example: SPXL budget $50k, remaining $63, price $212 → can't buy 1 → 100% deployed
+
 v6.7.20 (2026-01-24 17:35 EST) - CRITICAL HOTFIX
 - CRITICAL: Fixed Portfolio % in rebalance table showing 144.78% total (impossible!)
 - CRITICAL: Fixed Portfolio % calculation to use CURRENT portfolio value, not principal
@@ -3485,66 +3495,98 @@ else:
                             
                             total_undeployed_cash = prof['principal'] - total_deployed_all
                             
-                            # FLEXIBLE DEPLOYMENT: Use ALL undeployed cash for any asset
-                            # This allows maximizing deployment even if it exceeds per-asset targets
-                            actual_available_budget = total_undeployed_cash
-                            
-                            # Check if deployment would exceed target (for warning only, not blocking)
-                            would_exceed_target = (actual_spent + total_undeployed_cash) > target_budget
-                            excess_amount = (actual_spent + total_undeployed_cash) - target_budget if would_exceed_target else 0
+                            # STRICT PER-ASSET DEPLOYMENT: Each asset has its own budget envelope
+                            # Can only deploy up to the asset's target allocation
+                            # This maintains target allocations throughout deployment
+                            # 100% deployed = when remaining budget can't buy 1 unit of the asset
+                            actual_available_budget = min(remaining_budget, total_undeployed_cash)
                             
                             # Display with consistent rounding
                             display_allocated = min(round(current_allocated), 100)
                             display_remaining = max(round(remaining_pct), 0)
                             
                             st.markdown(f"**{selected_ticker}:** Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
-                            st.caption(f"Deployed: ${actual_spent:,.0f} ({display_allocated}%) • Target Remaining: ${remaining_budget:,.0f}")
+                            st.caption(f"Deployed: ${actual_spent:,.0f} ({display_allocated}%) • Budget Remaining: ${remaining_budget:,.0f}")
                             
-                            # Enhanced budget explanation - FLEXIBLE DEPLOYMENT
+                            # Enhanced budget explanation - PER-ASSET BUDGETS
                             st.markdown("---")
-                            st.markdown("**💰 Flexible Deployment:**")
+                            st.markdown("**💰 Per-Asset Budget Allocation:**")
                             
                             col_b1, col_b2 = st.columns(2)
                             with col_b1:
                                 st.metric(
-                                    label=f"{selected_ticker}'s Target",
+                                    label=f"{selected_ticker}'s Budget",
                                     value=f"${target_budget:,.0f}",
-                                    delta=f"${remaining_budget:,.0f} to target" if remaining_budget > 0 else "✅ Target met"
+                                    delta=f"${remaining_budget:,.0f} remaining"
                                 )
                             with col_b2:
                                 st.metric(
-                                    label="💵 Available to Deploy",
-                                    value=f"${total_undeployed_cash:,.0f}",
-                                    delta="Can use for ANY asset"
+                                    label="💵 Can Deploy Now",
+                                    value=f"${actual_available_budget:,.0f}",
+                                    delta=f"Limited by asset budget"
                                 )
                             
-                            # Show flexible deployment explanation
-                            if would_exceed_target:
+                            # Show budget constraint explanation
+                            if remaining_budget <= 0:
+                                st.success(f"""
+                                    ✅ **{selected_ticker} Target Reached**
+                                    
+                                    You've deployed ${actual_spent:,.0f} to {selected_ticker}.
+                                    This meets or exceeds the {target_pct}% target allocation.
+                                """)
+                            elif total_undeployed_cash < remaining_budget:
                                 st.info(f"""
-                                    💡 **Flexible Deployment Enabled**
+                                    ℹ️ **Portfolio Cash Constraint**
                                     
-                                    You can deploy all ${total_undeployed_cash:,.0f} to {selected_ticker} to maximize deployment!
+                                    {selected_ticker}'s budget has ${remaining_budget:,.0f} remaining,
+                                    but you only have ${total_undeployed_cash:,.0f} total undeployed cash.
                                     
-                                    **Note:** This will bring {selected_ticker} to ${actual_spent + total_undeployed_cash:,.0f} 
-                                    (${excess_amount:,.0f} over the {target_pct}% target).
+                                    **Available to deploy:** ${actual_available_budget:,.0f}
                                     
-                                    ✅ **This is OK!** We prioritize getting your money invested over strict target adherence.
-                                    You can rebalance later when you have fractional remainder only.
+                                    💡 Deploy to all assets to free up more budget.
                                 """)
                             else:
                                 st.success(f"""
-                                    ✅ **Deploy ${total_undeployed_cash:,.0f} to {selected_ticker}**
+                                    ✅ **Ready to Deploy**
                                     
-                                    This will stay within the {target_pct}% target allocation.
+                                    You can deploy up to ${actual_available_budget:,.0f} to {selected_ticker}.
+                                    This stays within the {target_pct}% target allocation.
                                 """)
                             
-                            # Check if already fully deployed (use 99.5% as threshold, matching table)
-                            if current_allocated >= 99.5 or remaining_pct < 0.5:
-                                st.success(f"✅ {selected_ticker} is fully deployed ({min(current_allocated, 100):.0f}%)")
-                                if remaining_pct > 0 and remaining_pct < 0.5:
-                                    st.caption(f"Remaining {remaining_pct:.2f}% is below minimum deployment threshold.")
-                                st.info("Select another asset to continue deploying.")
-                            else:
+                            # Smart "100% deployed" detection per user's logic:
+                            # Asset is 100% deployed when remaining budget can't buy 1 unit
+                            # Get current price to check affordability
+                            is_asset_fully_deployed = False
+                            try:
+                                t_obj = yf.Ticker(selected_ticker)
+                                hist = t_obj.history(period="1d")
+                                if not hist.empty:
+                                    current_price = float(hist['Close'].iloc[-1])
+                                    # Check if remaining budget can afford 1 unit
+                                    if remaining_budget < current_price:
+                                        is_asset_fully_deployed = True
+                                        st.success(f"""
+                                            ✅ **{selected_ticker} is 100% Deployed!**
+                                            
+                                            Deployed: ${actual_spent:,.0f} ({display_allocated}% of target)
+                                            Remaining budget: ${remaining_budget:,.2f}
+                                            Current price: ${current_price:,.2f}/unit
+                                            
+                                            **Remaining budget can't buy 1 unit** (fractional remainder only)
+                                            
+                                            💡 This is normal! You've maximized deployment for this asset.
+                                        """)
+                                        st.info("✅ Select another asset to continue deploying.")
+                            except:
+                                # Fallback to old threshold if price fetch fails
+                                if current_allocated >= 99.5 or remaining_pct < 0.5:
+                                    is_asset_fully_deployed = True
+                                    st.success(f"✅ {selected_ticker} is fully deployed ({min(current_allocated, 100):.0f}%)")
+                                    if remaining_pct > 0 and remaining_pct < 0.5:
+                                        st.caption(f"Remaining {remaining_pct:.2f}% is below minimum deployment threshold.")
+                                    st.info("Select another asset to continue deploying.")
+                            
+                            if not is_asset_fully_deployed:
                                 # Deployment method selection
                                 deploy_method = st.radio("Deployment Method", ["By Percentage", "By Units"], 
                                                         horizontal=True, key="deploy_method_radio")
@@ -3619,13 +3661,11 @@ else:
                                 exceeds_limit = False
                                 
                                 if deploy_method == "By Percentage":
-                                    # FLEXIBLE DEPLOYMENT: Allow deploying more than remaining to use all cash
-                                    # Calculate max % based on total undeployed cash
-                                    max_portfolio_pct_from_cash = (total_undeployed_cash / prof['principal']) * 100
-                                    max_asset_pct_from_cash = (max_portfolio_pct_from_cash / target_pct * 100) if target_pct > 0 else 200
-                                    max_deployable_pct = min(max_asset_pct_from_cash, 200)  # Cap at 200% for safety
+                                    # STRICT PER-ASSET DEPLOYMENT: Cap at remaining % for this asset
+                                    # Calculate max % based on remaining asset budget
+                                    max_deployable_pct = remaining_pct
                                     
-                                    default_pct = min(25.0, remaining_pct) if remaining_pct > 0 else 10.0
+                                    default_pct = min(25.0, remaining_pct) if remaining_pct > 0 else 0.1
                                     
                                     deploy_pct = st.number_input("Deploy % (of asset's target)", 
                                                                 min_value=0.1, 
@@ -3633,14 +3673,14 @@ else:
                                                                 value=max(0.1, default_pct), 
                                                                 step=0.1, 
                                                                 key="deploy_pct_input",
-                                                                help="Can exceed 100% to use remaining cash - flexible deployment enabled!")
+                                                                help="Percentage of this asset's target allocation to deploy")
                                     portfolio_pct = (deploy_pct / 100) * target_pct
                                     deploy_amount = (portfolio_pct / 100) * prof['principal']
                                     
-                                    # Validate against total cash
-                                    if deploy_amount > total_undeployed_cash:
-                                        deploy_amount = total_undeployed_cash
-                                        st.caption(f"⚠️ Capped at ${total_undeployed_cash:,.0f} (all available cash)")
+                                    # Validate against actual available budget (per-asset limit)
+                                    if deploy_amount > actual_available_budget:
+                                        deploy_amount = actual_available_budget
+                                        st.caption(f"⚠️ Capped at ${actual_available_budget:,.0f} (asset budget limit)")
                                     
                                     if preview_price:
                                         # Round to whole units (can't buy fractional shares)
