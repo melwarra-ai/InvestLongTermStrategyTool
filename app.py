@@ -14,11 +14,23 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.32"
-VERSION_DATE = "2026-01-25"
-VERSION_TIME = "20:19:49"  # EST
-VERSION_NAME = "Quick Add Save Button Fix v3 (Remove Disabled)"
+VERSION = "6.7.33"
+VERSION_DATE = "2026-01-26"
+VERSION_TIME = "09:13:48"  # EST
+VERSION_NAME = "Color-Coded Tables UI Enhancement"
 CHANGELOG = """
+v6.7.33 (2026-01-26 09:13 EST) - COLOR-CODED TABLES
+- NEW: Color-coded "Risk Metrics by Account" table
+  - Volatility: Green (low) → Yellow → Red (high)
+  - Max Drawdown: Green (small) → Yellow → Red (large)
+  - Sharpe Ratio: Green (high) → Yellow → Red (low)
+- NEW: Color-coded "Portfolio Comparison Table"
+  - CAGR/ROI: Green (high) → Yellow → Red (low/negative)
+  - Deployed %: Green (100%) → Yellow (75%+) → Orange (partial)
+  - Status: Green (Balanced) → Red (Rebalance) → Blue (Deploying) → Gray (New)
+- Impact: Much easier to spot good/bad performers at a glance
+- Impact: Visual hierarchy helps identify portfolios needing attention
+
 v6.7.32 (2026-01-25 20:19 EST) - QUICK ADD SAVE BUTTON FIX (v3)
 - CRITICAL: Removed disabled logic entirely from Save Asset button
 - Changed: Button now always enabled after ticker validation
@@ -5254,9 +5266,41 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                         })
                                 
                                 if account_risk_data:
-                                    # Create styled dataframe
-                                    df_risk = pd.DataFrame(account_risk_data)[["Account", "Volatility", "Max Drawdown", "Sharpe"]]
-                                    st.dataframe(df_risk, use_container_width=True, hide_index=True)
+                                    # Helper function for color coding
+                                    def get_volatility_color(vol):
+                                        if vol < 15: return '#dcfce7'  # Light green
+                                        elif vol < 25: return '#fef3c7'  # Light yellow
+                                        else: return '#fee2e2'  # Light red
+                                    
+                                    def get_drawdown_color(dd):
+                                        if dd > -15: return '#dcfce7'  # Light green
+                                        elif dd > -25: return '#fef3c7'  # Light yellow
+                                        else: return '#fee2e2'  # Light red
+                                    
+                                    def get_sharpe_color(sharpe):
+                                        if sharpe > 1.5: return '#dcfce7'  # Light green
+                                        elif sharpe > 0.5: return '#fef3c7'  # Light yellow
+                                        else: return '#fee2e2'  # Light red
+                                    
+                                    # Create styled HTML table
+                                    html = '<table style="width:100%; border-collapse: collapse; font-size: 14px;">'
+                                    html += '<thead><tr style="background: #f3f4f6;">'
+                                    html += '<th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">Account</th>'
+                                    html += '<th style="padding: 12px; text-align: right; border-bottom: 2px solid #e5e7eb;">Volatility</th>'
+                                    html += '<th style="padding: 12px; text-align: right; border-bottom: 2px solid #e5e7eb;">Max Drawdown</th>'
+                                    html += '<th style="padding: 12px; text-align: right; border-bottom: 2px solid #e5e7eb;">Sharpe</th>'
+                                    html += '</tr></thead><tbody>'
+                                    
+                                    for row in account_risk_data:
+                                        html += '<tr style="border-bottom: 1px solid #f3f4f6;">'
+                                        html += f'<td style="padding: 10px;">{row["Account"]}</td>'
+                                        html += f'<td style="padding: 10px; text-align: right; background: {get_volatility_color(row["_vol"])}; font-weight: 600;">{row["Volatility"]}</td>'
+                                        html += f'<td style="padding: 10px; text-align: right; background: {get_drawdown_color(row["_dd"])}; font-weight: 600;">{row["Max Drawdown"]}</td>'
+                                        html += f'<td style="padding: 10px; text-align: right; background: {get_sharpe_color(row["_sharpe"])}; font-weight: 600;">{row["Sharpe"]}</td>'
+                                        html += '</tr>'
+                                    
+                                    html += '</tbody></table>'
+                                    st.markdown(html, unsafe_allow_html=True)
                                 else:
                                     st.caption("Insufficient data for per-account risk metrics")
                             
@@ -5618,11 +5662,15 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 if curr_val <= 0 or ct_deployed <= 0:
                     cagr_display = "—"
                     roi_display = "—"
+                    cagr_val = None
+                    roi_val = None
                 elif days_elapsed < 90:
                     # For portfolios < 90 days, show ROI but indicate CAGR is unreliable
                     roi = ((curr_val / ct_deployed) - 1) * 100 if ct_deployed > 0 else 0
                     roi_display = f"{roi:+.1f}%"
                     cagr_display = f"< 90d"
+                    cagr_val = None
+                    roi_val = roi
                 else:
                     # Calculate ROI and CAGR based on deployed capital
                     if ct_is_fully_deployed:
@@ -5634,6 +5682,8 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     
                     cagr_display = f"{cagr:+.1f}%" if ct_is_fully_deployed else f"{cagr:+.1f}%*"
                     roi_display = f"{roi:+.1f}%" if ct_is_fully_deployed else f"{roi:+.1f}%*"
+                    cagr_val = cagr
+                    roi_val = roi
                 
                 needs_rebal, _ = calculate_drift_status(p_data, prices)
                 all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in p_assets.values()) if p_assets else False
@@ -5664,11 +5714,66 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     "ROI": roi_display,
                     "Goal": f"{p_data.get('yearly_goal_pct', 0):.1f}%/yr",
                     "Assets": assets_display,
-                    "Status": status
+                    "Status": status,
+                    "_cagr_val": cagr_val,
+                    "_roi_val": roi_val,
+                    "_deployed_pct": ct_deployment_pct
                 })
             
-            df_comparison = pd.DataFrame(comparison_data)
-            st.dataframe(df_comparison, use_container_width=True, hide_index=True)
+            # Helper functions for color coding
+            def get_performance_color(val):
+                """Color code for CAGR/ROI - green for high, red for low"""
+                if val is None: return '#f9fafb'  # Gray for N/A
+                if val >= 15: return '#dcfce7'  # Light green
+                elif val >= 5: return '#fef3c7'  # Light yellow
+                elif val >= 0: return '#fff'  # White
+                else: return '#fee2e2'  # Light red
+            
+            def get_deployed_color(pct):
+                """Color code for deployed % - green for 100%, yellow for partial"""
+                if pct >= 100: return '#dcfce7'  # Light green
+                elif pct >= 75: return '#fef3c7'  # Light yellow
+                elif pct > 0: return '#fed7aa'  # Light orange
+                else: return '#f9fafb'  # Gray
+            
+            def get_status_color(status):
+                """Color code for status"""
+                if '✅ Balanced' in status or 'Balanced' in status: return '#dcfce7'  # Light green
+                elif '🚨 Rebalance' in status or 'Rebalance' in status: return '#fee2e2'  # Light red
+                elif '📥 Deploying' in status or 'Deploying' in status: return '#dbeafe'  # Light blue
+                else: return '#f9fafb'  # Light gray for New
+            
+            # Create styled HTML table
+            html = '<table style="width:100%; border-collapse: collapse; font-size: 14px;">'
+            html += '<thead><tr style="background: #f3f4f6;">'
+            html += '<th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb;">Profile</th>'
+            html += '<th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb;">Account</th>'
+            html += '<th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb;">Value</th>'
+            html += '<th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb;">Deployed</th>'
+            html += '<th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb;">Age</th>'
+            html += '<th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb;">CAGR</th>'
+            html += '<th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb;">ROI</th>'
+            html += '<th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb;">Goal</th>'
+            html += '<th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb;">Assets</th>'
+            html += '<th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb;">Status</th>'
+            html += '</tr></thead><tbody>'
+            
+            for row in comparison_data:
+                html += '<tr style="border-bottom: 1px solid #f3f4f6;">'
+                html += f'<td style="padding: 10px; font-weight: 600;">{row["Profile"]}</td>'
+                html += f'<td style="padding: 10px;">{row["Account"]}</td>'
+                html += f'<td style="padding: 10px; text-align: right;">{row["Value"]}</td>'
+                html += f'<td style="padding: 10px; text-align: right; background: {get_deployed_color(row["_deployed_pct"])}; font-weight: 600;">{row["Deployed"]}</td>'
+                html += f'<td style="padding: 10px; text-align: center;">{row["Age"]}</td>'
+                html += f'<td style="padding: 10px; text-align: right; background: {get_performance_color(row["_cagr_val"])}; font-weight: 600;">{row["CAGR"]}</td>'
+                html += f'<td style="padding: 10px; text-align: right; background: {get_performance_color(row["_roi_val"])}; font-weight: 600;">{row["ROI"]}</td>'
+                html += f'<td style="padding: 10px; text-align: right;">{row["Goal"]}</td>'
+                html += f'<td style="padding: 10px; text-align: center;">{row["Assets"]}</td>'
+                html += f'<td style="padding: 10px; text-align: center; background: {get_status_color(row["Status"])}; font-weight: 600;">{row["Status"]}</td>'
+                html += '</tr>'
+            
+            html += '</tbody></table>'
+            st.markdown(html, unsafe_allow_html=True)
             
             # Footnotes
             footnotes = []
