@@ -14,11 +14,19 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.30"
+VERSION = "6.7.31"
 VERSION_DATE = "2026-01-25"
-VERSION_TIME = "10:44:27"  # EST
-VERSION_NAME = "Quick Add Save Button Fix v2"
+VERSION_TIME = "10:58:56"  # EST
+VERSION_NAME = "Global Settings Defaults Fix + Growth Goal Setting"
 CHANGELOG = """
+v6.7.31 (2026-01-25 10:58 EST) - GLOBAL SETTINGS FIX + NEW FEATURE
+- CRITICAL: Fixed default drift tolerance not being applied to new profiles
+- NEW: Added "Default Annual Growth Goal (%)" to global settings
+- Changed: Profile creation now uses global defaults for drift tolerance and growth goal
+- Changed: Global settings UI improved with two-column layout and help text
+- Impact: Admin can now set defaults that actually apply to new profiles
+- Impact: All new profiles will use admin-configured defaults instead of hardcoded values
+
 v6.7.30 (2026-01-25 10:44 EST) - QUICK ADD SAVE BUTTON FIX (v2)
 - CRITICAL: Fixed Save Asset button staying disabled after Quick Add
 - Changed: Removed complex flag logic (v6.7.28 didn't work)
@@ -2486,19 +2494,31 @@ def show_system_management_tab(db):
         st.divider()
         
         st.markdown("#### 🎯 Default Settings")
-        default_drift = st.number_input("Default Drift Tolerance (%)", 
-                                       value=settings.get("default_drift_tolerance", 5.0),
-                                       min_value=1.0, max_value=20.0, step=0.5)
+        st.caption("These defaults apply to all newly created profiles")
+        
+        col_def1, col_def2 = st.columns(2)
+        with col_def1:
+            default_drift = st.number_input("Default Drift Tolerance (%)", 
+                                           value=settings.get("default_drift_tolerance", 5.0),
+                                           min_value=1.0, max_value=20.0, step=0.5,
+                                           help="Default drift tolerance for new profiles")
+        with col_def2:
+            default_growth = st.number_input("Default Annual Growth Goal (%)", 
+                                            value=settings.get("default_growth_goal", 10.0),
+                                            min_value=0.0, max_value=50.0, step=0.5,
+                                            help="Default yearly growth goal for new profiles")
         
         allow_registration = st.checkbox("Allow New User Registration",
                                         value=settings.get("allow_registration", True))
         
         if st.button("💾 Save Default Settings"):
             settings["default_drift_tolerance"] = default_drift
+            settings["default_growth_goal"] = default_growth
             settings["allow_registration"] = allow_registration
             db["global_settings"] = settings
             save_db(db)
             st.success("✅ Default settings saved!")
+            st.info(f"New profiles will use: {default_drift}% drift tolerance, {default_growth}% growth goal")
             log_system_event(db, "settings_changed", "Default settings updated", "admin")
     
     # SUB-TAB 2: System Health
@@ -3012,6 +3032,10 @@ else:
         st.markdown("### ① Strategy Setup")
         with st.expander("🆕 Create New Profile", expanded=False):
             with st.form("new_profile_form"):
+                # Get global defaults for pre-filling form
+                global_settings = st.session_state.db.get("global_settings", {})
+                default_growth_goal = global_settings.get("default_growth_goal", 10.0)
+                
                 n_name = st.text_input("Profile Name*", placeholder="e.g., Retirement USD")
                 col1, col2 = st.columns(2)
                 with col1:
@@ -3020,12 +3044,20 @@ else:
                     n_account_type = st.selectbox("Account Type*", ["", "Taxable", "401k", "IRA", "Roth IRA", "TFSA", "RRSP", "529", "HSA", "Other"])
                 n_curr = st.selectbox("Currency*", ["USD", "CAD"])
                 n_p = st.number_input("Principal ($)*", value=10000.0, step=1000.0, min_value=0.0)
-                n_goal = st.number_input("Annual Growth Goal (%)*", value=10.0, step=0.5, min_value=0.0)
+                n_goal = st.number_input("Annual Growth Goal (%)*", 
+                                        value=default_growth_goal,  # Use global default! ✅
+                                        step=0.5, min_value=0.0,
+                                        help=f"Target annual return (default: {default_growth_goal}%)")
                 n_start = st.date_input("Inception Date*", value=date.today() - timedelta(days=365), max_value=date.today())
                 
                 submitted = st.form_submit_button("🚀 Initialize Profile", use_container_width=True)
                 if submitted:
                     user_profiles = get_user_profiles(st.session_state.db, current_user)
+                    
+                    # Get global default settings
+                    global_settings = st.session_state.db.get("global_settings", {})
+                    default_drift = global_settings.get("default_drift_tolerance", 5.0)
+                    
                     if not n_name:
                         st.error("❌ Profile name required")
                     elif not n_bank:
@@ -3040,7 +3072,8 @@ else:
                             "start_date": str(n_start), "bank_name": n_bank, "account_type": n_account_type,
                             "account_name": f"{n_bank} {n_account_type}", "initialization_date": str(n_start),
                             "asset_mix_locked": False, "assets": {}, "rebalance_logs": [],
-                            "drift_tolerance": 5.0, "rebalance_stats": [], "last_rebalanced": None, 
+                            "drift_tolerance": default_drift,  # Use global default! ✅
+                            "rebalance_stats": [], "last_rebalanced": None, 
                             "benchmark": None, "benchmarks": []
                         }
                         save_db(st.session_state.db)
