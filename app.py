@@ -14,11 +14,18 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ===== VERSION INFORMATION =====
-VERSION = "6.7.31"
+VERSION = "6.7.32"
 VERSION_DATE = "2026-01-25"
-VERSION_TIME = "10:58:56"  # EST
-VERSION_NAME = "Global Settings Defaults Fix + Growth Goal Setting"
+VERSION_TIME = "20:19:49"  # EST
+VERSION_NAME = "Quick Add Save Button Fix v3 (Remove Disabled)"
 CHANGELOG = """
+v6.7.32 (2026-01-25 20:19 EST) - QUICK ADD SAVE BUTTON FIX (v3)
+- CRITICAL: Removed disabled logic entirely from Save Asset button
+- Changed: Button now always enabled after ticker validation
+- Changed: Validation done on button click, not before
+- Impact: Quick Add works immediately - no widget state sync issues
+- Note: v6.7.28 and v6.7.30 approaches didn't work due to widget state
+
 v6.7.31 (2026-01-25 10:58 EST) - GLOBAL SETTINGS FIX + NEW FEATURE
 - CRITICAL: Fixed default drift tolerance not being applied to new profiles
 - NEW: Added "Default Annual Growth Goal (%)" to global settings
@@ -3493,14 +3500,13 @@ else:
                 st.markdown("---")
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
-                    # SIMPLIFIED: Enable Save button when:
-                    # 1. Ticker is valid (already checked above)
-                    # 2. Allocation is valid (> 0 and <= max_available)
-                    # No complex flag logic - just check the actual values
-                    save_disabled = (a_w <= 0) or (a_w > max_available)
+                    # CRITICAL FIX: Remove disabled logic entirely!
+                    # Button is ALWAYS enabled once ticker validates.
+                    # We validate allocation when button is clicked.
+                    # This fixes Quick Add issues with widget state synchronization.
                     
-                    if st.button("💾 Save Asset", use_container_width=True, type="primary", key="save_asset", disabled=save_disabled):
-                        # Validate allocation one more time
+                    if st.button("💾 Save Asset", use_container_width=True, type="primary", key="save_asset"):
+                        # Validate allocation when clicked
                         if a_w <= 0:
                             st.error("❌ Target allocation must be greater than 0%")
                         elif a_w > max_available:
