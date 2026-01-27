@@ -26,11 +26,19 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.0.1"
+VERSION = "7.0.2"
 VERSION_DATE = "2026-01-26"
-VERSION_TIME = "22:06:57"  # EST
-VERSION_NAME = "Google Sheets Storage - UnboundLocalError Hotfix"
+VERSION_TIME = "22:31:07"  # EST
+VERSION_NAME = "Google Sheets Storage - Shared Sheet Support"
 CHANGELOG = """
+v7.0.2 (2026-01-26 22:31 EST) - 🔧 CRITICAL FIX: Shared Sheet Support
+- FIXED: Service account can now access shared sheets via URL
+- NEW: Added GOOGLE_SHEETS_URL configuration option
+- NEW: Better error messages for storage quota issues
+- Changed: Now tries to open by URL first, then by name
+- Impact: Works with sheets in user's Drive (no service account storage needed)
+- Note: Add GOOGLE_SHEETS_URL to Streamlit Secrets to use existing shared sheet
+
 v7.0.1 (2026-01-26 22:06 EST) - 🔧 CRITICAL HOTFIX
 - FIXED: UnboundLocalError in load_db() function
 - FIXED: Added global STORAGE_TYPE declaration in load_db()
@@ -752,6 +760,9 @@ DB_FILE = "alphastream_multiuser.json"
 
 # ===== GOOGLE SHEETS CONFIGURATION =====
 GOOGLE_SHEETS_NAME = "AlphaStream_Portfolio_Data"
+# Optional: Specify sheet URL directly (recommended for shared sheets)
+# Set this in Streamlit Secrets as: GOOGLE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit"
+GOOGLE_SHEETS_URL = os.environ.get("GOOGLE_SHEETS_URL", "")
 GOOGLE_SHEETS_SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/drive.file'
@@ -836,12 +847,27 @@ def load_from_google_sheets():
         
         # Open the spreadsheet
         try:
-            spreadsheet = client.open(GOOGLE_SHEETS_NAME)
+            # Try opening by URL first (works for shared sheets)
+            if GOOGLE_SHEETS_URL:
+                try:
+                    spreadsheet = client.open_by_url(GOOGLE_SHEETS_URL)
+                except:
+                    st.error(f"❌ Failed to open sheet by URL: {GOOGLE_SHEETS_URL}")
+                    st.info("💡 Make sure the sheet URL is correct and shared with the service account")
+                    return None
+            else:
+                # Fall back to opening by name (only works for owned sheets)
+                spreadsheet = client.open(GOOGLE_SHEETS_NAME)
         except gspread.exceptions.SpreadsheetNotFound:
             st.warning(f"📊 Google Sheet '{GOOGLE_SHEETS_NAME}' not found. Creating it...")
-            spreadsheet = client.create(GOOGLE_SHEETS_NAME)
-            # Share with yourself (service account email) with edit permissions
-            st.info(f"✅ Created new Google Sheet. Please share it with the service account email.")
+            try:
+                spreadsheet = client.create(GOOGLE_SHEETS_NAME)
+                st.info(f"✅ Created new Google Sheet. Please share it with the service account email.")
+            except Exception as create_error:
+                st.error(f"❌ Failed to create sheet: {create_error}")
+                st.info("💡 **SOLUTION:** Create the sheet manually in YOUR Google Drive and add the URL to Streamlit Secrets")
+                st.code('GOOGLE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit"')
+                return None
         
         # Get or create the main data sheet
         try:
@@ -876,9 +902,18 @@ def save_to_google_sheets(data):
             
             # Open the spreadsheet
             try:
-                spreadsheet = client.open(GOOGLE_SHEETS_NAME)
+                # Try opening by URL first (works for shared sheets)
+                if GOOGLE_SHEETS_URL:
+                    spreadsheet = client.open_by_url(GOOGLE_SHEETS_URL)
+                else:
+                    # Fall back to opening by name
+                    spreadsheet = client.open(GOOGLE_SHEETS_NAME)
             except gspread.exceptions.SpreadsheetNotFound:
-                spreadsheet = client.create(GOOGLE_SHEETS_NAME)
+                if GOOGLE_SHEETS_URL:
+                    st.error(f"❌ Sheet not found at URL: {GOOGLE_SHEETS_URL}")
+                    return False
+                else:
+                    spreadsheet = client.create(GOOGLE_SHEETS_NAME)
             
             # Get or create the main data sheet
             try:
