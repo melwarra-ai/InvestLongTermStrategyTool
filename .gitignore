@@ -1,0 +1,64 @@
+# AlphaStream Portfolio - Git Ignore File
+# v7.0.0
+
+# ===== CRITICAL: NEVER COMMIT THESE =====
+# Google Sheets Credentials (contains private key!)
+credentials.json
+service-account-key.json
+google-sheets-credentials.json
+*-credentials.json
+
+# ===== Database Files =====
+# Local JSON database (ephemeral on Streamlit Cloud)
+alphastream_multiuser.json
+alphastream_wealth.json
+*.json.backup
+
+# Backup directory
+backups/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ===== Virtual Environment =====
+venv/
+env/
+ENV/
+.venv
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ===== Streamlit =====
+.streamlit/secrets.toml
+
+# ===== Logs =====
+*.log
+
+# ===== Environment Variables =====
+.env
+.env.local
