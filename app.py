@@ -26,11 +26,18 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.0.3-debug"
+VERSION = "7.0.4"
 VERSION_DATE = "2026-01-27"
-VERSION_TIME = "09:54:06"  # EST
-VERSION_NAME = "Google Sheets Storage - Diagnostic Build with Debug Logging"
+VERSION_TIME = "10:51:28"  # EST
+VERSION_NAME = "Google Sheets Storage - API 400 Error Fix"
 CHANGELOG = """
+v7.0.4 (2026-01-27 10:51 EST) - 🔧 CRITICAL FIX: Google Sheets Save Error
+- FIXED: Error 400 (Bad Request) when saving to Google Sheets
+- FIXED: Changed worksheet.update() to worksheet.update_acell() for proper API call
+- Changed: Still includes debug logging for verification
+- Impact: Data now saves correctly to Google Sheets! ✅
+- Note: This fixes the "malformed or illegal request" error
+
 v7.0.3-debug (2026-01-27 09:54 EST) - 🔍 DIAGNOSTIC BUILD
 - ADDED: Comprehensive debug logging to save_db() function
 - ADDED: Detailed step-by-step logging in save_to_google_sheets()
@@ -949,8 +956,8 @@ def save_to_google_sheets(data):
             data_json = json.dumps(data, indent=2)
             st.write(f"🔍 DEBUG: JSON size: {len(data_json)} characters")
             
-            st.write("🔍 DEBUG: Updating cell A1...")
-            worksheet.update('A1', data_json)
+            st.write("🔍 DEBUG: Updating cell A1 with update_acell()...")
+            worksheet.update_acell('A1', data_json)
             st.write("✅ DEBUG: Cell A1 updated successfully!")
             
             return True
