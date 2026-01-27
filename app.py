@@ -26,11 +26,18 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.0.2"
-VERSION_DATE = "2026-01-26"
-VERSION_TIME = "22:31:07"  # EST
-VERSION_NAME = "Google Sheets Storage - Shared Sheet Support"
+VERSION = "7.0.3-debug"
+VERSION_DATE = "2026-01-27"
+VERSION_TIME = "09:54:06"  # EST
+VERSION_NAME = "Google Sheets Storage - Diagnostic Build with Debug Logging"
 CHANGELOG = """
+v7.0.3-debug (2026-01-27 09:54 EST) - 🔍 DIAGNOSTIC BUILD
+- ADDED: Comprehensive debug logging to save_db() function
+- ADDED: Detailed step-by-step logging in save_to_google_sheets()
+- ADDED: Visibility into STORAGE_TYPE and GOOGLE_SHEETS_URL values
+- Purpose: Diagnose why data is not being saved to Google Sheets
+- Note: This is a temporary diagnostic version with verbose logging
+
 v7.0.2 (2026-01-26 22:31 EST) - 🔧 CRITICAL FIX: Shared Sheet Support
 - FIXED: Service account can now access shared sheets via URL
 - NEW: Added GOOGLE_SHEETS_URL configuration option
@@ -894,42 +901,65 @@ def save_to_google_sheets(data):
     max_retries = 3
     retry_delay = 1  # seconds
     
+    st.write("🔍 DEBUG: save_to_google_sheets() called")
+    
     for attempt in range(max_retries):
         try:
+            st.write(f"🔍 DEBUG: Attempt {attempt + 1}/{max_retries}")
+            
             client = get_google_sheets_client()
             if not client:
+                st.error("❌ DEBUG: Failed to get Google Sheets client")
                 return False
+            
+            st.write("✅ DEBUG: Got Google Sheets client")
             
             # Open the spreadsheet
             try:
                 # Try opening by URL first (works for shared sheets)
                 if GOOGLE_SHEETS_URL:
+                    st.write(f"🔍 DEBUG: Opening sheet by URL: {GOOGLE_SHEETS_URL[:50]}...")
                     spreadsheet = client.open_by_url(GOOGLE_SHEETS_URL)
+                    st.write("✅ DEBUG: Opened spreadsheet by URL")
                 else:
                     # Fall back to opening by name
+                    st.write(f"🔍 DEBUG: Opening sheet by name: {GOOGLE_SHEETS_NAME}")
                     spreadsheet = client.open(GOOGLE_SHEETS_NAME)
+                    st.write("✅ DEBUG: Opened spreadsheet by name")
             except gspread.exceptions.SpreadsheetNotFound:
                 if GOOGLE_SHEETS_URL:
                     st.error(f"❌ Sheet not found at URL: {GOOGLE_SHEETS_URL}")
                     return False
                 else:
+                    st.write("🔍 DEBUG: Creating new spreadsheet")
                     spreadsheet = client.create(GOOGLE_SHEETS_NAME)
             
             # Get or create the main data sheet
             try:
+                st.write("🔍 DEBUG: Getting 'database' worksheet")
                 worksheet = spreadsheet.worksheet("database")
+                st.write("✅ DEBUG: Got 'database' worksheet")
             except gspread.exceptions.WorksheetNotFound:
+                st.write("🔍 DEBUG: Creating 'database' worksheet")
                 worksheet = spreadsheet.add_worksheet(title="database", rows=100, cols=5)
+                st.write("✅ DEBUG: Created 'database' worksheet")
             
             # Save data to cell A1 as JSON
+            st.write("🔍 DEBUG: Converting data to JSON")
             data_json = json.dumps(data, indent=2)
+            st.write(f"🔍 DEBUG: JSON size: {len(data_json)} characters")
+            
+            st.write("🔍 DEBUG: Updating cell A1...")
             worksheet.update('A1', data_json)
+            st.write("✅ DEBUG: Cell A1 updated successfully!")
             
             return True
             
         except Exception as e:
+            st.error(f"❌ DEBUG: Exception on attempt {attempt + 1}: {type(e).__name__}: {str(e)}")
             if attempt < max_retries - 1:
                 import time
+                st.write(f"🔍 DEBUG: Retrying in {retry_delay * (2 ** attempt)} seconds...")
                 time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
                 continue
             else:
@@ -1190,20 +1220,30 @@ def save_db(data):
     """Save database - supports JSON and Google Sheets"""
     global STORAGE_TYPE  # Ensure we're using the global variable
     
+    # Debug logging
+    st.write(f"🔍 DEBUG: STORAGE_TYPE = '{STORAGE_TYPE}'")
+    st.write(f"🔍 DEBUG: GOOGLE_SHEETS_URL = '{GOOGLE_SHEETS_URL[:50]}...' (truncated)")
+    
     if STORAGE_TYPE == "google_sheets":
+        st.info("📊 Attempting to save to Google Sheets...")
+        
         if not GOOGLE_SHEETS_AVAILABLE:
             st.error("❌ Google Sheets storage selected but libraries not installed!")
             return False
         
         success = save_to_google_sheets(data)
         if not success:
-            st.warning("⚠️ Failed to save to Google Sheets. Data may not persist.")
+            st.error("⚠️ SAVE FAILED: Failed to save to Google Sheets. Data may not persist.")
+        else:
+            st.success("✅ SAVE SUCCESS: Data saved to Google Sheets!")
         return success
     else:
+        st.warning(f"⚠️ Using JSON storage (STORAGE_TYPE = '{STORAGE_TYPE}')")
         # JSON storage (original logic)
         try:
             with open(DB_FILE, "w") as f:
                 json.dump(data, f, indent=2)
+            st.info("💾 Data saved to JSON file")
             return True
         except Exception as e:
             st.error(f"Error saving database: {e}")
