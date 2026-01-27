@@ -26,11 +26,18 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.0.0"
+VERSION = "7.0.1"
 VERSION_DATE = "2026-01-26"
-VERSION_TIME = "20:52:20"  # EST
-VERSION_NAME = "Google Sheets Persistent Storage (MAJOR RELEASE)"
+VERSION_TIME = "22:06:57"  # EST
+VERSION_NAME = "Google Sheets Storage - UnboundLocalError Hotfix"
 CHANGELOG = """
+v7.0.1 (2026-01-26 22:06 EST) - 🔧 CRITICAL HOTFIX
+- FIXED: UnboundLocalError in load_db() function
+- FIXED: Added global STORAGE_TYPE declaration in load_db()
+- FIXED: Added global STORAGE_TYPE declaration in save_db()
+- Impact: App now loads correctly with Google Sheets storage
+- Note: Critical bug fix for v7.0.0 deployment issues
+
 v7.0.0 (2026-01-26 20:52 EST) - 🚀 GOOGLE SHEETS STORAGE (MAJOR RELEASE)
 - MAJOR: Added Google Sheets as persistent storage option
 - MAJOR: Data now survives app redeployments when using Google Sheets
@@ -898,6 +905,8 @@ def save_to_google_sheets(data):
 
 def load_db():
     """Load multi-user database with migration support - supports JSON and Google Sheets"""
+    global STORAGE_TYPE  # Fix: Declare as global to avoid UnboundLocalError
+    
     base_schema = {
         "users": {},
         "global_settings": {
@@ -1144,6 +1153,8 @@ def load_db():
 
 def save_db(data):
     """Save database - supports JSON and Google Sheets"""
+    global STORAGE_TYPE  # Ensure we're using the global variable
+    
     if STORAGE_TYPE == "google_sheets":
         if not GOOGLE_SHEETS_AVAILABLE:
             st.error("❌ Google Sheets storage selected but libraries not installed!")
