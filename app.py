@@ -28,11 +28,18 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.2.4"
+VERSION = "7.2.5"
 VERSION_DATE = "2026-01-31"
-VERSION_TIME = "00:30:00"  # EST
-VERSION_NAME = "Enhanced Analytics - Activity Logs"
+VERSION_TIME = "07:00:00"  # EST
+VERSION_NAME = "Analytics HTML Rendering Fix"
 CHANGELOG = """
+v7.2.5 (2026-01-31 07:00 EST) - 🐛 HTML RENDERING FIX
+- FIXED: HTML escaping issue in activity logs
+- FIXED: Added "user_login" action type mapping
+- IMPROVED: More robust HTML generation
+- IMPROVED: Better handling of special characters in details
+- Note: If you see raw HTML tags, this version fixes it
+
 v7.2.4 (2026-01-31 00:30 EST) - 📊 ENHANCED ANALYTICS
 - NEW: Enhanced Recent Activity with detailed view
 - NEW: Activity log filtering (by user, action type)
@@ -3421,6 +3428,7 @@ def show_analytics_tab(db, analytics):
                     # Action icon and color
                     action_icons = {
                         "login": "🔐",
+                        "user_login": "🔐",  # Added alias
                         "logout": "🚪",
                         "profile_created": "➕",
                         "profile_updated": "✏️",
@@ -3438,6 +3446,7 @@ def show_analytics_tab(db, analytics):
                     
                     action_colors = {
                         "login": "#10b981",
+                        "user_login": "#10b981",  # Added alias
                         "logout": "#64748b",
                         "profile_created": "#3b82f6",
                         "profile_updated": "#f59e0b",
@@ -3457,7 +3466,22 @@ def show_analytics_tab(db, analytics):
                     color = action_colors.get(action, "#64748b")
                     action_display = action.replace("_", " ").title()
                     
-                    st.markdown(f"""
+                    # Build HTML more carefully to avoid escaping issues
+                    details_html = ""
+                    if details:
+                        # Escape any potential HTML in details
+                        details_safe = details.replace("<", "&lt;").replace(">", "&gt;")
+                        details_html = f'<div style="color: #64748b; font-size: 0.9rem; margin-top: 6px; padding: 6px 10px; background: #f8fafc; border-radius: 4px;">{details_safe}</div>'
+                    
+                    ip_html = ""
+                    if ip_address:
+                        ip_html = f'<div style="color: #94a3b8; font-size: 0.8rem; margin-top: 4px;">IP: {ip_address}</div>'
+                    
+                    time_ago_html = ""
+                    if time_ago:
+                        time_ago_html = f'<div style="color: #94a3b8; font-size: 0.75rem; margin-top: 2px;">{time_ago}</div>'
+                    
+                    html_content = f"""
                         <div style="background: white; padding: 14px; border-radius: 8px; 
                                     margin-bottom: 8px; border-left: 4px solid {color};
                                     box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
@@ -3474,8 +3498,8 @@ def show_analytics_tab(db, analytics):
                                             <span style="color: #64748b; font-size: 0.85rem;">User:</span>
                                             <span style="font-weight: 600; color: #1e293b; margin-left: 6px;">@{username}</span>
                                         </div>
-                                        {f'<div style="color: #64748b; font-size: 0.9rem; margin-top: 6px; padding: 6px 10px; background: #f8fafc; border-radius: 4px;">{details}</div>' if details else ''}
-                                        {f'<div style="color: #94a3b8; font-size: 0.8rem; margin-top: 4px;">IP: {ip_address}</div>' if ip_address else ''}
+                                        {details_html}
+                                        {ip_html}
                                     </div>
                                 </div>
                                 <div style="text-align: right; min-width: 120px;">
@@ -3485,11 +3509,13 @@ def show_analytics_tab(db, analytics):
                                     <div style="color: #1e293b; font-size: 0.85rem; font-weight: 500; margin-top: 4px;">
                                         {time_str}
                                     </div>
-                                    {f'<div style="color: #94a3b8; font-size: 0.75rem; margin-top: 2px;">{time_ago}</div>' if time_ago else ''}
+                                    {time_ago_html}
                                 </div>
                             </div>
                         </div>
-                    """, unsafe_allow_html=True)
+                    """
+                    
+                    st.markdown(html_content, unsafe_allow_html=True)
             else:
                 st.info("No activities match the selected filters")
         else:
