@@ -28,11 +28,24 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.2.3"
+VERSION = "7.2.4"
 VERSION_DATE = "2026-01-31"
-VERSION_TIME = "00:15:00"  # EST
-VERSION_NAME = "Reset Database Version Fix"
+VERSION_TIME = "00:30:00"  # EST
+VERSION_NAME = "Enhanced Analytics - Activity Logs"
 CHANGELOG = """
+v7.2.4 (2026-01-31 00:30 EST) - 📊 ENHANCED ANALYTICS
+- NEW: Enhanced Recent Activity with detailed view
+- NEW: Activity log filtering (by user, action type)
+- NEW: Search functionality in activity details
+- NEW: Show 5-100 entries (adjustable)
+- NEW: CSV export for all activity logs
+- NEW: Color-coded action types with icons
+- NEW: Time ago display (e.g., "2h ago")
+- NEW: Activity statistics (unique users, action types)
+- IMPROVED: Better visual design with cards
+- IMPROVED: Shows IP address when available
+- IMPROVED: Numbered entries for reference
+
 v7.2.3 (2026-01-31 00:15 EST) - 🐛 RESET VERSION FIX
 - FIXED: Database reset now properly resets version to 1 (was 84)
 - FIXED: Reset now also resets save_count to 1
@@ -2228,6 +2241,35 @@ def clear_rebalance_recommendation(prof):
     if "pending_rebalance" in prof:
         del prof["pending_rebalance"]
 
+def get_time_ago(dt):
+    """
+    Calculate human-readable time ago from datetime
+    v7.2.4: Added for enhanced activity logs
+    """
+    now = datetime.now()
+    diff = now - dt
+    
+    seconds = diff.total_seconds()
+    
+    if seconds < 60:
+        return "just now"
+    elif seconds < 3600:
+        minutes = int(seconds / 60)
+        return f"{minutes}m ago"
+    elif seconds < 86400:
+        hours = int(seconds / 3600)
+        return f"{hours}h ago"
+    elif seconds < 604800:
+        days = int(seconds / 86400)
+        return f"{days}d ago"
+    elif seconds < 2592000:
+        weeks = int(seconds / 604800)
+        return f"{weeks}w ago"
+    else:
+        months = int(seconds / 2592000)
+        return f"{months}mo ago"
+
+
 def get_user_profiles(db, username):
     """Get profiles for a specific user"""
     if username not in db["users"]:
@@ -3261,39 +3303,195 @@ def show_analytics_tab(db, analytics):
                 else:
                     st.info("No activity types data")
             
-            # Recent activity list
-            st.markdown("#### 🕐 Recent Activity")
-            recent_logs = sorted(activity_logs, key=lambda x: x.get("timestamp", ""), reverse=True)[:10]
+            # Recent activity list - ENHANCED v7.2.4
+            st.markdown("#### 🕐 Recent Activity Details")
             
-            for log in recent_logs:
-                timestamp = log.get("timestamp", "Unknown")
-                username = log.get("username", "Unknown")
-                action = log.get("action", "unknown").replace("_", " ").title()
-                details = log.get("details", "")
-                
-                # Format timestamp
-                try:
-                    dt = datetime.fromisoformat(timestamp)
-                    time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                except:
-                    time_str = timestamp
-                
-                st.markdown(f"""
-                    <div style="background: #f8fafc; padding: 10px; border-radius: 6px; 
-                                margin-bottom: 6px; border-left: 2px solid #cbd5e1;">
-                        <div style="display: flex; justify-content: space-between; align-items: start;">
-                            <div style="flex: 1;">
-                                <span style="font-weight: 600; color: #3b82f6;">@{username}</span>
-                                <span style="color: #64748b; margin: 0 8px;">•</span>
-                                <span style="color: #1e293b;">{action}</span>
-                                {f'<div style="color: #64748b; font-size: 0.85rem; margin-top: 4px;">{details}</div>' if details else ''}
-                            </div>
-                            <div style="color: #94a3b8; font-size: 0.8rem; white-space: nowrap; margin-left: 12px;">
-                                {time_str}
+            # Export button
+            col_title, col_export = st.columns([3, 1])
+            with col_export:
+                if activity_logs:
+                    # Prepare CSV export
+                    import io
+                    csv_buffer = io.StringIO()
+                    csv_buffer.write("Timestamp,Username,Action,Details,IP Address\n")
+                    for log in activity_logs:
+                        timestamp = log.get("timestamp", "")
+                        username = log.get("username", "")
+                        action = log.get("action", "")
+                        details = log.get("details", "").replace(",", ";")  # Escape commas
+                        ip = log.get("ip_address", "")
+                        csv_buffer.write(f'"{timestamp}","{username}","{action}","{details}","{ip}"\n')
+                    
+                    st.download_button(
+                        label="📥 Export CSV",
+                        data=csv_buffer.getvalue(),
+                        file_name=f"activity_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        help="Download all activity logs as CSV"
+                    )
+            
+            # Add filters
+            col_filter1, col_filter2, col_filter3 = st.columns([2, 2, 1])
+            with col_filter1:
+                # User filter
+                all_usernames = sorted(set(log.get("username", "Unknown") for log in activity_logs))
+                selected_user = st.selectbox(
+                    "Filter by User",
+                    ["All Users"] + all_usernames,
+                    key="activity_user_filter"
+                )
+            
+            with col_filter2:
+                # Action type filter
+                all_actions = sorted(set(log.get("action", "unknown") for log in activity_logs))
+                selected_action = st.selectbox(
+                    "Filter by Action",
+                    ["All Actions"] + all_actions,
+                    key="activity_action_filter"
+                )
+            
+            with col_filter3:
+                # Number of entries
+                num_entries = st.number_input(
+                    "Show entries",
+                    min_value=5,
+                    max_value=100,
+                    value=20,
+                    step=5,
+                    key="activity_num_entries"
+                )
+            
+            # Search box
+            search_query = st.text_input(
+                "🔍 Search in details",
+                placeholder="Search for keywords in activity details...",
+                key="activity_search"
+            )
+            
+            # Filter logs
+            filtered_logs = activity_logs
+            if selected_user != "All Users":
+                filtered_logs = [log for log in filtered_logs if log.get("username") == selected_user]
+            if selected_action != "All Actions":
+                filtered_logs = [log for log in filtered_logs if log.get("action") == selected_action]
+            if search_query:
+                search_lower = search_query.lower()
+                filtered_logs = [
+                    log for log in filtered_logs 
+                    if search_lower in log.get("details", "").lower() or 
+                       search_lower in log.get("username", "").lower()
+                ]
+            
+            # Sort by timestamp
+            recent_logs = sorted(filtered_logs, key=lambda x: x.get("timestamp", ""), reverse=True)[:num_entries]
+            
+            # Stats summary
+            col_stat1, col_stat2, col_stat3 = st.columns(3)
+            with col_stat1:
+                st.metric("Showing", f"{len(recent_logs)} of {len(filtered_logs)}")
+            with col_stat2:
+                if recent_logs:
+                    unique_users = len(set(log.get("username") for log in recent_logs))
+                    st.metric("Unique Users", unique_users)
+            with col_stat3:
+                if recent_logs:
+                    unique_actions = len(set(log.get("action") for log in recent_logs))
+                    st.metric("Action Types", unique_actions)
+            
+            st.divider()
+            
+            # Display enhanced activity logs
+            if recent_logs:
+                for idx, log in enumerate(recent_logs, 1):
+                    timestamp = log.get("timestamp", "Unknown")
+                    username = log.get("username", "Unknown")
+                    action = log.get("action", "unknown")
+                    details = log.get("details", "")
+                    ip_address = log.get("ip_address", "")
+                    
+                    # Format timestamp
+                    try:
+                        dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+                        time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        time_ago = get_time_ago(dt)
+                    except:
+                        time_str = timestamp
+                        time_ago = ""
+                    
+                    # Action icon and color
+                    action_icons = {
+                        "login": "🔐",
+                        "logout": "🚪",
+                        "profile_created": "➕",
+                        "profile_updated": "✏️",
+                        "profile_deleted": "🗑️",
+                        "rebalance_executed": "⚖️",
+                        "user_created": "👤",
+                        "user_deleted": "❌",
+                        "settings_changed": "⚙️",
+                        "password_changed": "🔑",
+                        "database_reset": "🔥",
+                        "backup_created": "💾",
+                        "asset_added": "📈",
+                        "asset_removed": "📉"
+                    }
+                    
+                    action_colors = {
+                        "login": "#10b981",
+                        "logout": "#64748b",
+                        "profile_created": "#3b82f6",
+                        "profile_updated": "#f59e0b",
+                        "profile_deleted": "#ef4444",
+                        "rebalance_executed": "#8b5cf6",
+                        "user_created": "#06b6d4",
+                        "user_deleted": "#ef4444",
+                        "settings_changed": "#f59e0b",
+                        "password_changed": "#f59e0b",
+                        "database_reset": "#dc2626",
+                        "backup_created": "#10b981",
+                        "asset_added": "#10b981",
+                        "asset_removed": "#ef4444"
+                    }
+                    
+                    icon = action_icons.get(action, "📝")
+                    color = action_colors.get(action, "#64748b")
+                    action_display = action.replace("_", " ").title()
+                    
+                    st.markdown(f"""
+                        <div style="background: white; padding: 14px; border-radius: 8px; 
+                                    margin-bottom: 8px; border-left: 4px solid {color};
+                                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                                <div style="flex: 1;">
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                                        <span style="font-size: 1.2rem;">{icon}</span>
+                                        <span style="font-weight: 700; color: {color}; font-size: 0.95rem;">
+                                            {action_display}
+                                        </span>
+                                    </div>
+                                    <div style="margin-left: 32px;">
+                                        <div style="margin-bottom: 4px;">
+                                            <span style="color: #64748b; font-size: 0.85rem;">User:</span>
+                                            <span style="font-weight: 600; color: #1e293b; margin-left: 6px;">@{username}</span>
+                                        </div>
+                                        {f'<div style="color: #64748b; font-size: 0.9rem; margin-top: 6px; padding: 6px 10px; background: #f8fafc; border-radius: 4px;">{details}</div>' if details else ''}
+                                        {f'<div style="color: #94a3b8; font-size: 0.8rem; margin-top: 4px;">IP: {ip_address}</div>' if ip_address else ''}
+                                    </div>
+                                </div>
+                                <div style="text-align: right; min-width: 120px;">
+                                    <div style="color: #64748b; font-size: 0.75rem; font-weight: 600;">
+                                        #{idx}
+                                    </div>
+                                    <div style="color: #1e293b; font-size: 0.85rem; font-weight: 500; margin-top: 4px;">
+                                        {time_str}
+                                    </div>
+                                    {f'<div style="color: #94a3b8; font-size: 0.75rem; margin-top: 2px;">{time_ago}</div>' if time_ago else ''}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("No activities match the selected filters")
         else:
             st.info("No activity data yet")
     
