@@ -1754,20 +1754,36 @@ def get_system_health(db):
     """Check system health metrics"""
     health = {"status": "healthy", "checks": []}
     
+    # Database size check (handle both JSON and Google Sheets)
     try:
-        db_size = os.path.getsize(DB_FILE) / (1024 * 1024)
+        if STORAGE_TYPE == "google_sheets":
+            # For Google Sheets, calculate size from JSON serialization
+            import json
+            db_json = json.dumps(db)
+            db_size_chars = len(db_json)
+            db_size_kb = db_size_chars / 1024
+            
+            health["checks"].append({
+                "name": "Database Size",
+                "value": f"{db_size_chars:,} chars ({db_size_kb:.1f} KB)",
+                "status": "error" if db_size_chars > 50000 else ("warning" if db_size_chars > 45000 else "healthy"),
+                "icon": "🔴" if db_size_chars > 50000 else ("🟡" if db_size_chars > 45000 else "🟢")
+            })
+        else:
+            # For JSON file storage
+            db_size = os.path.getsize(DB_FILE) / (1024 * 1024)
+            health["checks"].append({
+                "name": "Database Size",
+                "value": f"{db_size:.2f} MB",
+                "status": "warning" if db_size > 50 else "healthy",
+                "icon": "🟡" if db_size > 50 else "🟢"
+            })
+    except Exception as e:
         health["checks"].append({
             "name": "Database Size",
-            "value": f"{db_size:.2f} MB",
-            "status": "warning" if db_size > 50 else "healthy",
-            "icon": "🟡" if db_size > 50 else "🟢"
-        })
-    except:
-        health["checks"].append({
-            "name": "Database Size",
-            "value": "Unknown",
-            "status": "error",
-            "icon": "🔴"
+            "value": f"Error: {str(e)[:50]}",
+            "status": "warning",  # Changed from "error" to "warning" 
+            "icon": "🟡"
         })
     
     users = db.get("users", {})
