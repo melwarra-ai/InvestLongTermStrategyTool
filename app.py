@@ -1836,6 +1836,116 @@ def create_backup(db):
     except Exception as e:
         return False, f"Backup failed: {str(e)}"
 
+
+def reset_database_to_fresh(admin_password: str, keep_admin: bool = True) -> tuple:
+    """
+    Reset database to fresh state (DANGEROUS!)
+    v7.2.1: Added admin dashboard feature
+    
+    Args:
+        admin_password: Admin password for confirmation
+        keep_admin: If True, keeps admin account (recommended)
+    
+    Returns:
+        (success: bool, message: str, new_db: dict or None)
+    """
+    try:
+        # Load current database
+        current_db = load_db()
+        
+        # Verify admin password
+        admin_user = current_db.get('users', {}).get('admin')
+        if not admin_user:
+            return False, "Admin account not found", None
+        
+        if not verify_password(admin_password, admin_user['password_hash'], admin_user['password_salt']):
+            return False, "Invalid admin password", None
+        
+        # Create fresh database structure
+        fresh_db = {
+            "metadata": {
+                "version": 1,
+                "last_save_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "last_save_by": "admin",
+                "save_count": 1
+            },
+            "users": {},
+            "global_settings": {
+                "allow_registration": True,
+                "require_email_verification": False,
+                "default_drift_tolerance": 5.0,
+                "default_growth_goal": 10.0,
+                "ai_assistant_enabled": True,
+                "ai_assistant_api_key": "",
+                "email_notifications_enabled": False,
+                "smtp_server": "smtp.gmail.com",
+                "smtp_port": 587,
+                "smtp_username": "",
+                "smtp_password": "",
+                "smtp_from_name": "AlphaStream Portfolio"
+            },
+            "system_logs": [],
+            "activity_logs": [],
+            "security_logs": []
+        }
+        
+        # Keep admin account if requested
+        if keep_admin and admin_user:
+            # Reset admin account but keep credentials
+            fresh_db['users']['admin'] = {
+                'email': admin_user['email'],
+                'password_hash': admin_user['password_hash'],
+                'password_salt': admin_user['password_salt'],
+                'display_name': admin_user.get('display_name', 'Administrator'),
+                'role': 'admin',
+                'is_active': True,
+                'created_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'last_login': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'login_attempts': 0,
+                'lockout_until': None,
+                'profiles': {},
+                'settings': {}
+            }
+            
+            # Log the reset
+            fresh_db['system_logs'].append({
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'type': 'database_reset',
+                'message': 'Database reset to fresh state (admin account preserved)',
+                'user_id': 'admin'
+            })
+            
+            fresh_db['activity_logs'].append({
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'username': 'admin',
+                'action': 'database_reset',
+                'details': 'Database reset to fresh state',
+                'ip_address': ''
+            })
+        
+        return True, "Database reset successful", fresh_db
+        
+    except Exception as e:
+        return False, f"Reset failed: {str(e)}", None
+
+
+def create_backup(db):
+    """Create a backup of the database"""
+    try:
+        backup_dir = "backups"
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = os.path.join(backup_dir, f"backup_{timestamp}.json")
+        
+        with open(backup_file, "w") as f:
+            json.dump(db, f, indent=2)
+        
+        log_system_event(db, "backup_created", f"Database backup created: {backup_file}", "admin")
+        return True, f"Backup created: {backup_file}"
+    except Exception as e:
+        return False, f"Backup failed: {str(e)}"
+
 def get_backup_list():
     """Get list of available backups"""
     try:
@@ -3322,32 +3432,190 @@ def show_system_management_tab(db):
         st.markdown("### 💾 Backup & Restore")
         st.caption("Protect your data with regular backups")
         
-        if st.button("📦 Create Backup Now", type="primary", use_container_width=True):
-            with st.spinner("Creating backup..."):
-                success, message = create_backup(db)
-                if success:
-                    st.success(message)
-                else:
-                    st.error(message)
+        st.info("💡 **Tip:** Download a backup before making major changes or resetting the database!")
+        
+        # Immediate download option
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_filename = f"backup_{timestamp}.json"
+        backup_data = json.dumps(db, indent=2)
+        
+        col_backup1, col_backup2 = st.columns([2, 1])
+        with col_backup1:
+            st.download_button(
+                label="📥 Download Database Backup",
+                data=backup_data,
+                file_name=backup_filename,
+                mime="application/json",
+                type="primary",
+                use_container_width=True,
+                help="Downloads current database as JSON file"
+            )
+        with col_backup2:
+            st.metric("Backup Size", f"{len(backup_data):,} chars")
         
         st.divider()
         
-        st.markdown("### 📋 Backup History")
-        backups = get_backup_list()
+        # Show backup info
+        st.markdown("### 📊 Current Database Info")
+        col_info1, col_info2, col_info3 = st.columns(3)
+        with col_info1:
+            st.metric("Total Users", len(db.get('users', {})))
+        with col_info2:
+            total_profiles = sum(len(user.get('profiles', {})) for user in db.get('users', {}).values())
+            st.metric("Total Portfolios", total_profiles)
+        with col_info3:
+            st.metric("Database Version", db.get('metadata', {}).get('version', 0))
         
-        if not backups:
-            st.info("No backups available yet. Create your first backup above!")
-        else:
-            for backup in backups:
-                col1, col2, col3 = st.columns([3, 2, 2])
-                with col1:
-                    st.caption(f"**{backup['filename']}**")
-                with col2:
-                    st.caption(f"📅 {backup['created']}")
-                    st.caption(f"📦 {backup['size']}")
-                with col3:
-                    if st.button("📥 Download", key=f"dl_{backup['filename']}", use_container_width=True):
-                        st.info("Download functionality - file path: " + backup['path'])
+        st.divider()
+        
+        # Restore functionality
+        st.markdown("### 📤 Restore from Backup")
+        st.caption("Upload a previously downloaded backup to restore")
+        
+        uploaded_file = st.file_uploader(
+            "Choose backup file",
+            type=['json'],
+            help="Select a backup JSON file to restore",
+            key="backup_uploader"
+        )
+        
+        if uploaded_file is not None:
+            try:
+                # Read uploaded file
+                backup_content = uploaded_file.read().decode('utf-8')
+                restored_db = json.loads(backup_content)
+                
+                # Show preview
+                st.success(f"✅ Backup file loaded: {uploaded_file.name}")
+                
+                preview_col1, preview_col2, preview_col3 = st.columns(3)
+                with preview_col1:
+                    st.metric("Users in Backup", len(restored_db.get('users', {})))
+                with preview_col2:
+                    backup_profiles = sum(len(u.get('profiles', {})) for u in restored_db.get('users', {}).values())
+                    st.metric("Portfolios in Backup", backup_profiles)
+                with preview_col3:
+                    st.metric("Backup Version", restored_db.get('metadata', {}).get('version', 'Unknown'))
+                
+                st.divider()
+                
+                # Restore confirmation
+                st.warning("⚠️ **WARNING:** Restoring will REPLACE your current database with the backup!")
+                
+                restore_confirm = st.checkbox(
+                    "✅ I understand this will replace all current data",
+                    key="restore_confirm"
+                )
+                
+                if restore_confirm:
+                    admin_password_restore = st.text_input(
+                        "Enter admin password to confirm restore:",
+                        type="password",
+                        key="restore_password"
+                    )
+                    
+                    if admin_password_restore:
+                        col_restore1, col_restore2 = st.columns([3, 1])
+                        with col_restore2:
+                            if st.button("🔄 RESTORE", type="primary", use_container_width=True):
+                                # Verify admin password
+                                admin_user = db.get('users', {}).get('admin')
+                                if admin_user and verify_password(admin_password_restore, admin_user['password_hash'], admin_user['password_salt']):
+                                    # Restore database
+                                    st.session_state.db = restored_db
+                                    if save_db(restored_db):
+                                        st.success("✅ Database restored successfully!")
+                                        st.info("🔄 Reloading application...")
+                                        
+                                        # Clear cache
+                                        if 'admin_dashboard_loaded' in st.session_state:
+                                            del st.session_state['admin_dashboard_loaded']
+                                        
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Failed to save restored database")
+                                else:
+                                    st.error("❌ Invalid admin password")
+                
+            except json.JSONDecodeError:
+                st.error("❌ Invalid backup file format")
+            except Exception as e:
+                st.error(f"❌ Error loading backup: {str(e)}")
+        
+        st.divider()
+        
+        # DANGER ZONE: Database Reset
+        st.markdown("### ⚠️ Danger Zone")
+        st.caption("⚠️ **WARNING:** These actions are irreversible!")
+        
+        with st.expander("🔥 Reset Database to Fresh State", expanded=False):
+            st.error("""
+            **⚠️ EXTREME CAUTION REQUIRED**
+            
+            This will **PERMANENTLY DELETE**:
+            - All user accounts (except admin)
+            - All portfolios
+            - All transactions
+            - All activity logs
+            - All system logs
+            
+            **What will be kept:**
+            - Admin account credentials
+            - Global settings
+            
+            **This action CANNOT be undone!**
+            """)
+            
+            st.warning("💡 **Recommendation:** Create a backup before resetting!")
+            
+            # Confirmation checkboxes
+            col_check1, col_check2 = st.columns(2)
+            with col_check1:
+                confirm_backup = st.checkbox("✅ I have created a backup", key="reset_confirm_backup")
+            with col_check2:
+                confirm_understand = st.checkbox("✅ I understand this is permanent", key="reset_confirm_understand")
+            
+            # Password confirmation
+            admin_password = st.text_input(
+                "Enter your admin password to confirm:",
+                type="password",
+                key="reset_admin_password",
+                help="Required for security verification"
+            )
+            
+            # Final confirmation
+            if confirm_backup and confirm_understand and admin_password:
+                col_reset1, col_reset2 = st.columns([3, 1])
+                with col_reset2:
+                    if st.button("🔥 RESET DATABASE", type="primary", use_container_width=True, key="execute_reset"):
+                        with st.spinner("🔄 Resetting database..."):
+                            success, message, fresh_db = reset_database_to_fresh(admin_password, keep_admin=True)
+                            
+                            if success:
+                                # Save the fresh database
+                                st.session_state.db = fresh_db
+                                save_result = save_db(fresh_db)
+                                
+                                if save_result:
+                                    st.success("✅ Database reset successfully!")
+                                    st.success("✅ Admin account preserved")
+                                    st.success("✅ All other data removed")
+                                    st.info("🔄 Reloading application...")
+                                    
+                                    # Clear session state
+                                    if 'admin_dashboard_loaded' in st.session_state:
+                                        del st.session_state['admin_dashboard_loaded']
+                                    
+                                    # Force reload
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to save reset database")
+                            else:
+                                st.error(f"❌ {message}")
+            elif not (confirm_backup and confirm_understand):
+                st.info("☝️ Please check both confirmations above to proceed")
+            elif not admin_password:
+                st.info("🔑 Enter your admin password to enable reset")
 
 
 def show_security_tab(db):
