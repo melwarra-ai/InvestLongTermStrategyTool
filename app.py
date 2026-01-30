@@ -28,11 +28,20 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.2.1"
+VERSION = "7.2.2"
 VERSION_DATE = "2026-01-30"
-VERSION_TIME = "04:25:00"  # EST
-VERSION_NAME = "Critical Fixes - Size Optimization + Merge Logic"
+VERSION_TIME = "23:50:00"  # EST
+VERSION_NAME = "UI Improvements + Backup Download Fix"
 CHANGELOG = """
+v7.2.2 (2026-01-30 23:50 EST) - 🎨 UI IMPROVEMENTS & BACKUP FIX
+- FIXED: Backup download now works (immediate browser download)
+- NEW: Restore from backup functionality (upload & restore)
+- IMPROVED: Compact button sizes (Download, Restore, Reset)
+- IMPROVED: Better visual layout and spacing
+- CONFIRMED: Reset Database visible in Danger Zone
+- CONFIRMED: All v7.2.1 critical fixes intact
+- Note: Incremental version update as requested
+
 v7.2.1 (2026-01-30 04:25 EST) - 🚨 CRITICAL BUG FIXES
 - CRITICAL: Fixed Google Sheets 50,000 character limit exceeded error
 - CRITICAL: Fixed merge logic to preserve ALL existing users
