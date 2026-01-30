@@ -1458,6 +1458,13 @@ def save_with_conflict_detection(new_data, expected_version, current_user):
                 merged_data = merge_data_changes(current_data, new_data, current_user)
                 new_data = merged_data
                 expected_version = current_version  # Update expected version
+                
+                # CRITICAL (v7.2.1): Re-optimize after merge to prevent 50K limit
+                st.info(f"📊 Optimizing merged data size...")
+                new_data = optimize_database_size(new_data)
+            
+            # ALWAYS optimize before save (even without conflict)
+            new_data = optimize_database_size(new_data)
             
             # No conflict or conflict resolved - proceed with save
             new_data['metadata'] = {
