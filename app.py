@@ -28,11 +28,17 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.2.2"
-VERSION_DATE = "2026-01-30"
-VERSION_TIME = "23:50:00"  # EST
-VERSION_NAME = "UI Improvements + Backup Download Fix"
+VERSION = "7.2.3"
+VERSION_DATE = "2026-01-31"
+VERSION_TIME = "00:15:00"  # EST
+VERSION_NAME = "Reset Database Version Fix"
 CHANGELOG = """
+v7.2.3 (2026-01-31 00:15 EST) - 🐛 RESET VERSION FIX
+- FIXED: Database reset now properly resets version to 1 (was 84)
+- FIXED: Reset now also resets save_count to 1
+- IMPROVED: Reset success message shows version number
+- Note: After reset, DB version will be 1 as expected
+
 v7.2.2 (2026-01-30 23:50 EST) - 🎨 UI IMPROVEMENTS & BACKUP FIX
 - FIXED: Backup download now works (immediate browser download)
 - NEW: Restore from backup functionality (upload & restore)
@@ -1376,8 +1382,14 @@ def optimize_database_size(data):
     return data
 
 
-def save_db(data):
-    """Save database with optimistic locking + size optimization - prevents concurrent session overwrites"""
+def save_db(data, bypass_version_increment=False):
+    """
+    Save database with optimistic locking + size optimization - prevents concurrent session overwrites
+    
+    Args:
+        data: Database dictionary to save
+        bypass_version_increment: If True, uses data's existing version (for reset operations)
+    """
     global STORAGE_TYPE
     
     if STORAGE_TYPE == "google_sheets":
@@ -1400,8 +1412,8 @@ def save_db(data):
             'system'
         )
         
-        # Save with conflict detection
-        success, new_version = save_with_conflict_detection(data, expected_version, current_user)
+        # Save with conflict detection (unless bypassing for reset)
+        success, new_version = save_with_conflict_detection(data, expected_version, current_user, bypass_version_increment)
         
         if success:
             # Update session version
@@ -1427,9 +1439,13 @@ def save_db(data):
             return False
 
 
-def save_with_conflict_detection(new_data, expected_version, current_user):
+def save_with_conflict_detection(new_data, expected_version, current_user, bypass_version_increment=False):
     """
     Save data with optimistic locking
+    
+    Args:
+        bypass_version_increment: If True, preserve new_data's existing version (for reset operations)
+    
     Returns: (success: bool, new_version: int or None)
     """
     max_retries = 3
@@ -1504,18 +1520,32 @@ def save_with_conflict_detection(new_data, expected_version, current_user):
                 st.success(f"✅ Data size: {final_size:,} chars (safe)")
             
             # No conflict or conflict resolved - proceed with save
-            new_data['metadata'] = {
-                'version': current_version + 1,
-                'last_save_timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'last_save_by': current_user,
-                'save_count': current_data.get('metadata', {}).get('save_count', 0) + 1
-            }
+            if bypass_version_increment:
+                # For reset operations: preserve the version in new_data
+                reset_version = new_data.get('metadata', {}).get('version', 1)
+                new_data['metadata'] = {
+                    'version': reset_version,
+                    'last_save_timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'last_save_by': current_user,
+                    'save_count': 1  # Reset save count too
+                }
+            else:
+                # Normal operation: increment version
+                new_data['metadata'] = {
+                    'version': current_version + 1,
+                    'last_save_timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'last_save_by': current_user,
+                    'save_count': current_data.get('metadata', {}).get('save_count', 0) + 1
+                }
             
             # Attempt save
             if save_to_google_sheets(new_data):
-                new_version = current_version + 1
-                st.success(f"✅ Saved successfully! Database version: {current_version} → {new_version}")
-                return True, new_version
+                final_version = new_data['metadata']['version']
+                if bypass_version_increment:
+                    st.success(f"✅ Database reset! Version: {final_version}, Save count: 1")
+                else:
+                    st.success(f"✅ Saved successfully! Database version: {current_version} → {final_version}")
+                return True, final_version
             
             # Save failed - retry
             if attempt < max_retries - 1:
@@ -3601,9 +3631,9 @@ def show_system_management_tab(db):
                             success, message, fresh_db = reset_database_to_fresh(admin_password, keep_admin=True)
                             
                             if success:
-                                # Save the fresh database
+                                # Save the fresh database (bypass version increment to keep version=1)
                                 st.session_state.db = fresh_db
-                                save_result = save_db(fresh_db)
+                                save_result = save_db(fresh_db, bypass_version_increment=True)
                                 
                                 if save_result:
                                     st.success("✅ Database reset successfully!")
