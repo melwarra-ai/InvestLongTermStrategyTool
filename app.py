@@ -1321,16 +1321,17 @@ def optimize_database_size(data):
     """
     Optimize database size to stay under Google Sheets 50K character limit
     Trims logs and removes unnecessary data
+    v7.2.1 HOTFIX: More aggressive trimming to handle large databases
     """
-    # Trim activity logs (keep last 100)
+    # Trim activity logs (keep last 50 only - reduced from 100)
     if 'activity_logs' in data and isinstance(data['activity_logs'], list):
-        if len(data['activity_logs']) > 100:
-            data['activity_logs'] = data['activity_logs'][:100]
+        if len(data['activity_logs']) > 50:
+            data['activity_logs'] = data['activity_logs'][:50]
     
-    # Trim system logs (keep last 50)
+    # Trim system logs (keep last 30 only - reduced from 50)
     if 'system_logs' in data and isinstance(data['system_logs'], list):
-        if len(data['system_logs']) > 50:
-            data['system_logs'] = data['system_logs'][:50]
+        if len(data['system_logs']) > 30:
+            data['system_logs'] = data['system_logs'][:30]
     
     # Optimize user profiles
     for user_id, user_data in data.get('users', {}).items():
@@ -1344,14 +1345,24 @@ def optimize_database_size(data):
                 
                 # Keep if it has assets, logs, or is recently created
                 if has_assets or has_logs or has_date:
-                    # Trim rebalance logs (keep last 20 per profile)
+                    # Trim rebalance logs MORE AGGRESSIVELY (keep last 10 per profile - reduced from 20)
                     if 'rebalance_logs' in profile_data and isinstance(profile_data['rebalance_logs'], list):
-                        if len(profile_data['rebalance_logs']) > 20:
-                            profile_data['rebalance_logs'] = profile_data['rebalance_logs'][:20]
+                        if len(profile_data['rebalance_logs']) > 10:
+                            profile_data['rebalance_logs'] = profile_data['rebalance_logs'][:10]
+                    
+                    # NEW: Trim rebalance_stats if exists
+                    if 'rebalance_stats' in profile_data and isinstance(profile_data['rebalance_stats'], list):
+                        if len(profile_data['rebalance_stats']) > 5:
+                            profile_data['rebalance_stats'] = profile_data['rebalance_stats'][:5]
                     
                     profiles_to_keep[profile_name] = profile_data
             
             user_data['profiles'] = profiles_to_keep
+    
+    # NEW: Trim security logs if they exist
+    if 'security_logs' in data and isinstance(data['security_logs'], list):
+        if len(data['security_logs']) > 20:
+            data['security_logs'] = data['security_logs'][:20]
     
     return data
 
@@ -1462,9 +1473,26 @@ def save_with_conflict_detection(new_data, expected_version, current_user):
                 # CRITICAL (v7.2.1): Re-optimize after merge to prevent 50K limit
                 st.info(f"📊 Optimizing merged data size...")
                 new_data = optimize_database_size(new_data)
+                
+                # Check size after optimization
+                size_check = len(json.dumps(new_data))
+                st.info(f"📏 Optimized data size: {size_check:,} characters")
+                if size_check > 45000:
+                    st.warning(f"⚠️ Data size still large ({size_check:,} chars). May fail.")
             
             # ALWAYS optimize before save (even without conflict)
             new_data = optimize_database_size(new_data)
+            
+            # Final size check
+            final_size = len(json.dumps(new_data))
+            if final_size > 50000:
+                st.error(f"❌ CRITICAL: Data is {final_size:,} characters (limit: 50,000)")
+                st.error(f"❌ Optimization failed. Manual intervention required.")
+                return False, None
+            elif final_size > 45000:
+                st.warning(f"⚠️ Data size: {final_size:,} chars (close to 50K limit)")
+            else:
+                st.success(f"✅ Data size: {final_size:,} chars (safe)")
             
             # No conflict or conflict resolved - proceed with save
             new_data['metadata'] = {
