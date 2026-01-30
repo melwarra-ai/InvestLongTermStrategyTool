@@ -2712,6 +2712,14 @@ def show_admin_overview_tab(db, all_profiles):
         st.markdown("### 👥 User Management")
         st.caption("View and manage all registered users")
         
+        # Add refresh button to reload fresh data
+        col1, col2 = st.columns([3, 1])
+        with col2:
+            if st.button("🔄 Refresh Users", key="refresh_users_list"):
+                st.session_state.db = load_db()
+                st.success("✅ User list refreshed!")
+                st.rerun()
+        
         users = db.get("users", {})
         non_admin_users = {k: v for k, v in users.items() if v.get("role") != "admin"}
         
@@ -5317,6 +5325,11 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
 
     # ===== MAIN CONTENT AREA =====
     if view_mode == "Admin Dashboard" and is_admin_user and not impersonating_user:
+        # Auto-refresh data to show latest users (v7.2.1 fix)
+        if 'admin_dashboard_loaded' not in st.session_state:
+            st.session_state.db = load_db()
+            st.session_state.admin_dashboard_loaded = True
+        
         show_admin_dashboard(st.session_state.db, actual_user)
     
     elif view_mode == "Global Dashboard":
