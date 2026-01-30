@@ -2716,11 +2716,16 @@ def show_admin_overview_tab(db, all_profiles):
         col1, col2 = st.columns([3, 1])
         with col2:
             if st.button("🔄 Refresh Users", key="refresh_users_list"):
+                # Clear cache flags to force fresh load
+                if 'admin_dashboard_loaded' in st.session_state:
+                    del st.session_state['admin_dashboard_loaded']
+                # Force reload from Google Sheets
                 st.session_state.db = load_db()
                 st.success("✅ User list refreshed!")
                 st.rerun()
         
-        users = db.get("users", {})
+        # IMPORTANT: Get users from session state (freshest data)
+        users = st.session_state.db.get("users", {})
         non_admin_users = {k: v for k, v in users.items() if v.get("role") != "admin"}
         
         if not non_admin_users:
