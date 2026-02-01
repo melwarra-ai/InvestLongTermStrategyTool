@@ -28,12 +28,20 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.2.5"
-VERSION_DATE = "2026-01-31"
-VERSION_TIME = "07:00:00"  # EST
-VERSION_NAME = "Analytics HTML Rendering Fix"
+VERSION = "7.2.6"
+VERSION_DATE = "2026-02-01"
+VERSION_TIME = "19:30:00"  # EST
+VERSION_NAME = "Native Components Fix"
 CHANGELOG = """
-v7.2.5 (2026-01-31 07:00 EST) - 🐛 HTML RENDERING FIX
+v7.2.6 (2026-02-01 19:30 EST) - 🔧 NATIVE COMPONENTS FIX
+- FIXED: HTML rendering issue by using Streamlit native components
+- CHANGED: Activity logs now use st.container() and st.columns()
+- REMOVED: Raw HTML that was being escaped by Streamlit
+- IMPROVED: Cleaner, more reliable rendering
+- IMPROVED: Added color emojis for better visual distinction
+- NOTE: No more raw HTML tags showing!
+
+v7.2.5 (2026-01-31 07:00 EST) - 🐛 HTML RENDERING FIX (FAILED)
 - FIXED: HTML escaping issue in activity logs
 - FIXED: Added "user_login" action type mapping
 - IMPROVED: More robust HTML generation
@@ -3407,7 +3415,7 @@ def show_analytics_tab(db, analytics):
             
             st.divider()
             
-            # Display enhanced activity logs
+            # Display enhanced activity logs - USING NATIVE STREAMLIT COMPONENTS
             if recent_logs:
                 for idx, log in enumerate(recent_logs, 1):
                     timestamp = log.get("timestamp", "Unknown")
@@ -3425,97 +3433,50 @@ def show_analytics_tab(db, analytics):
                         time_str = timestamp
                         time_ago = ""
                     
-                    # Action icon and color
+                    # Action icon and color mapping
                     action_icons = {
-                        "login": "🔐",
-                        "user_login": "🔐",  # Added alias
-                        "logout": "🚪",
-                        "profile_created": "➕",
-                        "profile_updated": "✏️",
-                        "profile_deleted": "🗑️",
-                        "rebalance_executed": "⚖️",
-                        "user_created": "👤",
-                        "user_deleted": "❌",
-                        "settings_changed": "⚙️",
-                        "password_changed": "🔑",
-                        "database_reset": "🔥",
-                        "backup_created": "💾",
-                        "asset_added": "📈",
-                        "asset_removed": "📉"
+                        "login": "🔐", "user_login": "🔐", "user_registered": "📝",
+                        "logout": "🚪", "profile_created": "➕", "profile_updated": "✏️",
+                        "profile_deleted": "🗑️", "rebalance_executed": "⚖️",
+                        "user_created": "👤", "user_deleted": "❌",
+                        "settings_changed": "⚙️", "password_changed": "🔑",
+                        "database_reset": "🔥", "backup_created": "💾",
+                        "asset_added": "📈", "asset_removed": "📉"
                     }
                     
                     action_colors = {
-                        "login": "#10b981",
-                        "user_login": "#10b981",  # Added alias
-                        "logout": "#64748b",
-                        "profile_created": "#3b82f6",
-                        "profile_updated": "#f59e0b",
-                        "profile_deleted": "#ef4444",
-                        "rebalance_executed": "#8b5cf6",
-                        "user_created": "#06b6d4",
-                        "user_deleted": "#ef4444",
-                        "settings_changed": "#f59e0b",
-                        "password_changed": "#f59e0b",
-                        "database_reset": "#dc2626",
-                        "backup_created": "#10b981",
-                        "asset_added": "#10b981",
-                        "asset_removed": "#ef4444"
+                        "login": "🟢", "user_login": "🟢", "user_registered": "🔵",
+                        "logout": "⚪", "profile_created": "🔵", "profile_updated": "🟠",
+                        "profile_deleted": "🔴", "rebalance_executed": "🟣",
+                        "user_created": "🔵", "user_deleted": "🔴",
+                        "settings_changed": "🟠", "password_changed": "🟠",
+                        "database_reset": "🔴", "backup_created": "🟢",
+                        "asset_added": "🟢", "asset_removed": "🔴"
                     }
                     
                     icon = action_icons.get(action, "📝")
-                    color = action_colors.get(action, "#64748b")
+                    color_emoji = action_colors.get(action, "⚪")
                     action_display = action.replace("_", " ").title()
                     
-                    # Build HTML more carefully to avoid escaping issues
-                    details_html = ""
-                    if details:
-                        # Escape any potential HTML in details
-                        details_safe = details.replace("<", "&lt;").replace(">", "&gt;")
-                        details_html = f'<div style="color: #64748b; font-size: 0.9rem; margin-top: 6px; padding: 6px 10px; background: #f8fafc; border-radius: 4px;">{details_safe}</div>'
-                    
-                    ip_html = ""
-                    if ip_address:
-                        ip_html = f'<div style="color: #94a3b8; font-size: 0.8rem; margin-top: 4px;">IP: {ip_address}</div>'
-                    
-                    time_ago_html = ""
-                    if time_ago:
-                        time_ago_html = f'<div style="color: #94a3b8; font-size: 0.75rem; margin-top: 2px;">{time_ago}</div>'
-                    
-                    html_content = f"""
-                        <div style="background: white; padding: 14px; border-radius: 8px; 
-                                    margin-bottom: 8px; border-left: 4px solid {color};
-                                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                                <div style="flex: 1;">
-                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                                        <span style="font-size: 1.2rem;">{icon}</span>
-                                        <span style="font-weight: 700; color: {color}; font-size: 0.95rem;">
-                                            {action_display}
-                                        </span>
-                                    </div>
-                                    <div style="margin-left: 32px;">
-                                        <div style="margin-bottom: 4px;">
-                                            <span style="color: #64748b; font-size: 0.85rem;">User:</span>
-                                            <span style="font-weight: 600; color: #1e293b; margin-left: 6px;">@{username}</span>
-                                        </div>
-                                        {details_html}
-                                        {ip_html}
-                                    </div>
-                                </div>
-                                <div style="text-align: right; min-width: 120px;">
-                                    <div style="color: #64748b; font-size: 0.75rem; font-weight: 600;">
-                                        #{idx}
-                                    </div>
-                                    <div style="color: #1e293b; font-size: 0.85rem; font-weight: 500; margin-top: 4px;">
-                                        {time_str}
-                                    </div>
-                                    {time_ago_html}
-                                </div>
-                            </div>
-                        </div>
-                    """
-                    
-                    st.markdown(html_content, unsafe_allow_html=True)
+                    # Use Streamlit's native container and columns
+                    with st.container():
+                        # Header row
+                        col_main, col_meta = st.columns([3, 1])
+                        
+                        with col_main:
+                            st.markdown(f"**{icon} {color_emoji} {action_display}** • @{username}")
+                            if details:
+                                st.caption(f"ℹ️ {details}")
+                            if ip_address:
+                                st.caption(f"🌐 IP: {ip_address}")
+                        
+                        with col_meta:
+                            st.caption(f"**#{idx}**")
+                            st.caption(f"{time_str}")
+                            if time_ago:
+                                st.caption(f"_{time_ago}_")
+                        
+                        st.divider()
             else:
                 st.info("No activities match the selected filters")
         else:
