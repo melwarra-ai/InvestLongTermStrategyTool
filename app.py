@@ -28,11 +28,22 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.3.0"
+VERSION = "7.3.1"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "00:00:00"  # EST
-VERSION_NAME = "Feature Visibility Restored"
+VERSION_TIME = "00:30:00"  # EST
+VERSION_NAME = "AI Package Fixed"
 CHANGELOG = """
+v7.3.1 (2026-02-02 00:30 EST) - 📦 AI PACKAGE FIXED
+- FIXED: Added anthropic package to requirements.txt
+- FIXED: AI Assistant will now work on Streamlit Cloud
+- UPDATED: requirements.txt now includes anthropic>=0.18.0
+- NOTE: Redeploy app for AI Assistant to work properly!
+
+**After deploying this version:**
+1. Streamlit Cloud will automatically install anthropic package
+2. AI Assistant feature will work without errors
+3. No manual pip install needed!
+
 v7.3.0 (2026-02-02 00:00 EST) - ⚙️ FEATURE VISIBILITY RESTORED
 - ADDED: AI Assistant configuration in Admin Dashboard → Settings
 - IMPROVED: Clear UI for enabling/disabling AI Assistant
