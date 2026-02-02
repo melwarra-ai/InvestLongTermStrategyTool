@@ -28,11 +28,25 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.2.6"
+VERSION = "7.2.8"
 VERSION_DATE = "2026-02-01"
-VERSION_TIME = "19:30:00"  # EST
-VERSION_NAME = "Native Components Fix"
+VERSION_TIME = "22:00:00"  # EST
+VERSION_NAME = "Welcome Page Logic Fix"
 CHANGELOG = """
+v7.2.8 (2026-02-01 22:00 EST) - 🎯 WELCOME PAGE LOGIC FIX
+- FIXED: Welcome page now displays FIRST, before dashboard title
+- IMPROVED: Logic prioritizes showing welcome page for new users
+- IMPROVED: Dashboard title only shows when user has configured portfolios
+- ENHANCED: Cleaner flow between welcome and dashboard states
+- NOTE: Welcome page now truly shows for users with no portfolios
+
+v7.2.7 (2026-02-01 21:00 EST) - 🎉 WELCOME EXPERIENCE ENHANCED
+- IMPROVED: Welcome page now shows for users with empty portfolios
+- IMPROVED: Welcome page displays even if profile exists but has no assets
+- FIXED: New users now see onboarding guide instead of blank page
+- ENHANCED: Better first-time user experience
+- NOTE: Makes the app more user-friendly for new accounts
+
 v7.2.6 (2026-02-01 19:30 EST) - 🔧 NATIVE COMPONENTS FIX
 - FIXED: HTML rendering issue by using Streamlit native components
 - CHANGED: Activity logs now use st.container() and st.columns()
@@ -5855,31 +5869,37 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 </div>
             """, unsafe_allow_html=True)
         
-        st.title("🏠 Global Portfolio Dashboard")
-        
-        description_box(
-            "Portfolio Command Center",
-            f"Welcome back, {user_data.get('display_name', current_user)}! Monitor all your investment strategies at a glance."
-        )
-        
+        # Get user profiles
         profiles = get_user_profiles(st.session_state.db, current_user)
         
-        if not profiles:
+        # Check if user has any meaningful portfolios configured
+        has_configured_portfolios = False
+        if profiles:
+            for prof_name, prof_data in profiles.items():
+                assets = prof_data.get("assets", {})
+                # Consider portfolio configured if it has at least one asset with units
+                if any(asset.get("units", 0) > 0 for asset in assets.values()):
+                    has_configured_portfolios = True
+                    break
+        
+        # Show welcome page for new users or users with no configured portfolios
+        if not profiles or not has_configured_portfolios:
             # ===== FIRST-TIME USER WELCOME EXPERIENCE =====
             
             # Hero Section
-            st.markdown("""
+            user_display_name = user_data.get('display_name', current_user)
+            st.markdown(f"""
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                             color: white; padding: 60px 40px; border-radius: 20px; text-align: center; 
                             margin-bottom: 40px; box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);">
                     <h1 style="font-size: 3rem; margin: 0 0 20px 0; font-weight: 700; color: white;">
-                        🎉 Welcome to Your Portfolio Command Center!
+                        🎉 Welcome, {user_display_name}!
                     </h1>
-                    <p style="font-size: 1.3rem; margin: 0 0 30px 0; opacity: 0.95; color: white;">
-                        Institutional-grade portfolio management, simplified for you
+                    <p style="font-size: 1.4rem; margin: 0 0 15px 0; opacity: 0.95; color: white; font-weight: 500;">
+                        Your Portfolio Command Center Awaits
                     </p>
                     <p style="font-size: 1.1rem; margin: 0; opacity: 0.9; color: white;">
-                        Let's get started by creating your first investment strategy →
+                        Institutional-grade portfolio management, simplified for you 📊
                     </p>
                 </div>
             """, unsafe_allow_html=True)
@@ -5935,6 +5955,54 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         <p style="color: rgba(255,255,255,0.9); text-align: center; margin: 0; font-size: 0.95rem;">
                             Record your purchases and start tracking performance automatically
                         </p>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            st.divider()
+            
+            # What You Can Do Section
+            st.markdown("## 🎯 What You Can Do")
+            st.caption("Transform how you manage your investments")
+            
+            stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
+            
+            with stat_col1:
+                st.markdown("""
+                    <div style="background: white; padding: 30px 20px; border-radius: 12px; text-align: center;
+                                border: 2px solid #667eea; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);">
+                        <div style="font-size: 3rem; margin-bottom: 10px;">♾️</div>
+                        <div style="font-size: 2rem; font-weight: 700; color: #667eea; margin-bottom: 5px;">Unlimited</div>
+                        <div style="color: #64748b; font-size: 0.95rem;">Portfolios</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with stat_col2:
+                st.markdown("""
+                    <div style="background: white; padding: 30px 20px; border-radius: 12px; text-align: center;
+                                border: 2px solid #10b981; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);">
+                        <div style="font-size: 3rem; margin-bottom: 10px;">⚡</div>
+                        <div style="font-size: 2rem; font-weight: 700; color: #10b981; margin-bottom: 5px;">Real-Time</div>
+                        <div style="color: #64748b; font-size: 0.95rem;">Market Data</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with stat_col3:
+                st.markdown("""
+                    <div style="background: white; padding: 30px 20px; border-radius: 12px; text-align: center;
+                                border: 2px solid #f59e0b; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.1);">
+                        <div style="font-size: 3rem; margin-bottom: 10px;">🎯</div>
+                        <div style="font-size: 2rem; font-weight: 700; color: #f59e0b; margin-bottom: 5px;">Auto</div>
+                        <div style="color: #64748b; font-size: 0.95rem;">Drift Alerts</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with stat_col4:
+                st.markdown("""
+                    <div style="background: white; padding: 30px 20px; border-radius: 12px; text-align: center;
+                                border: 2px solid #8b5cf6; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.1);">
+                        <div style="font-size: 3rem; margin-bottom: 10px;">📊</div>
+                        <div style="font-size: 2rem; font-weight: 700; color: #8b5cf6; margin-bottom: 5px;">Deep</div>
+                        <div style="color: #64748b; font-size: 0.95rem;">Analytics</div>
                     </div>
                 """, unsafe_allow_html=True)
             
@@ -6013,21 +6081,29 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             
             st.divider()
             
-            # Call to Action
-            st.markdown("""
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                            color: white; padding: 40px; border-radius: 15px; text-align: center;
-                            margin-top: 40px; box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);">
-                    <h2 style="margin: 0 0 15px 0; font-size: 2rem; color: white;">Ready to Take Control?</h2>
-                    <p style="margin: 0 0 25px 0; font-size: 1.1rem; opacity: 0.95; color: white;">
-                        Start by creating your first investment profile in the sidebar
-                    </p>
-                    <div style="background: white; display: inline-block; padding: 15px 40px; 
-                                border-radius: 25px; font-weight: 600; color: #667eea; font-size: 1.1rem;">
-                        📁 Look for "Create New Profile" →
+            # Call to Action with Interactive Button
+            col_cta1, col_cta2, col_cta3 = st.columns([1, 2, 1])
+            with col_cta2:
+                st.markdown("""
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                color: white; padding: 40px; border-radius: 15px; text-align: center;
+                                margin-top: 20px; margin-bottom: 20px; box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);">
+                        <h2 style="margin: 0 0 15px 0; font-size: 2rem; color: white;">Ready to Take Control?</h2>
+                        <p style="margin: 0 0 25px 0; font-size: 1.1rem; opacity: 0.95; color: white;">
+                            Create your first investment profile and start building your wealth strategy
+                        </p>
                     </div>
-                </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+                
+                # Big CTA Button
+                if st.button("🚀 Create My First Portfolio", 
+                           use_container_width=True, 
+                           type="primary",
+                           key="welcome_create_profile"):
+                    st.session_state.create_profile_expanded = True
+                    st.rerun()
+                
+                st.caption("👆 Click here to get started in seconds!")
             
             # Tips Section
             st.markdown("")
@@ -6053,6 +6129,14 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     Compare against SPY (S&P 500) or VTI (Total Market) to measure your strategy's performance.
                 """)
         else:
+            # ===== DASHBOARD FOR USERS WITH CONFIGURED PORTFOLIOS =====
+            st.title("🏠 Global Portfolio Dashboard")
+            
+            description_box(
+                "Portfolio Command Center",
+                f"Welcome back, {user_data.get('display_name', current_user)}! Monitor all your investment strategies at a glance."
+            )
+            
             # Fetch all prices
             all_tickers = set()
             for p in profiles.values():
