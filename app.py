@@ -28,11 +28,23 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.4.0"
+VERSION = "7.4.1"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "04:00:00"  # EST
-VERSION_NAME = "Single Source of Truth"
+VERSION_TIME = "04:30:00"  # EST
+VERSION_NAME = "Self-Contained Status Check"
 CHANGELOG = """
+v7.4.1 (2026-02-02 04:30 EST) - 🔧 SELF-CONTAINED STATUS CHECK
+- FIXED: check_deployment_status() now fetches its own prices
+- FIXED: No longer requires prices parameter (self-contained)
+- FIXED: Works in Portfolio Manager context (was getting NameError)
+- IMPROVED: Function is truly independent and can be called from anywhere
+- NOTE: Each view no longer needs to fetch prices before calling the function
+
+**What Changed:**
+- Before: check_deployment_status(profile, prices) ← needed prices from caller
+- After: check_deployment_status(profile) ← fetches prices itself
+- Result: Function works everywhere without dependencies! ✅
+
 v7.4.0 (2026-02-02 04:00 EST) - 🎯 SINGLE SOURCE OF TRUTH (Major Architecture Fix!)
 - FIXED: Created centralized check_deployment_status() function
 - FIXED: Portfolio Manager, Global Dashboard, and Action Items now use SAME logic
@@ -2338,7 +2350,7 @@ def check_recently_rebalanced(last_rebalanced_str):
     except:
         return False
 
-def check_deployment_status(profile_data, prices):
+def check_deployment_status(profile_data):
     """
     SINGLE SOURCE OF TRUTH for deployment status.
     
@@ -2355,6 +2367,27 @@ def check_deployment_status(profile_data, prices):
     principal_amt = profile_data.get('principal', 0)
     total_assets = len(assets)
     deployed_count = 0
+    
+    # Fetch current prices for assets in this portfolio
+    import yfinance as yf
+    import pandas as pd
+    
+    prices = {}
+    try:
+        tickers = list(assets.keys())
+        raw_px = yf.download(tickers, period="1d", progress=False)['Close']
+        if len(tickers) == 1:
+            if not raw_px.empty:
+                prices = {tickers[0]: float(raw_px.iloc[-1])}
+        else:
+            for k, v in raw_px.iloc[-1].to_dict().items():
+                try:
+                    if pd.notna(v):
+                        prices[k] = float(v)
+                except:
+                    pass
+    except:
+        pass
     
     for ticker, asset_data in assets.items():
         allocated_pct = asset_data.get("allocated_pct", 0)
@@ -5106,7 +5139,7 @@ else:
                 undeployed_cash = principal_amt - total_deployed_capital
                 
                 # Use centralized deployment status check (SINGLE SOURCE OF TRUTH)
-                is_truly_fully_deployed, fully_deployed_count, total_assets = check_deployment_status(prof, prices)
+                is_truly_fully_deployed, fully_deployed_count, total_assets = check_deployment_status(prof)
                 
                 # Calculate deployment progress for progress bar
                 deployment_progress = (total_deployed_capital / prof['principal']) if prof['principal'] > 0 else 0
@@ -6370,7 +6403,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 needs_rebal, drift_details = calculate_drift_status(p_data, prices)
                 
                 # Use centralized deployment status check (SINGLE SOURCE OF TRUTH)
-                all_deployed, deployed_count, total_assets = check_deployment_status(p_data, prices)
+                all_deployed, deployed_count, total_assets = check_deployment_status(p_data)
                 
                 if needs_rebal:
                     drift_count = len(drift_details)
@@ -6491,7 +6524,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 p_flag = "🇺🇸" if p_data.get("currency") == "USD" else "🇨🇦"
                 
                 # Use centralized deployment status check (SINGLE SOURCE OF TRUTH)
-                all_deployed, deployed_count, total_assets = check_deployment_status(p_data, prices)
+                all_deployed, deployed_count, total_assets = check_deployment_status(p_data)
                 
                 # Status and tile class (with pulse animation for rebalance)
                 if recently_rebalanced or (has_rebalanced and not needs_rebal):
