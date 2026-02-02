@@ -28,11 +28,26 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.2.9"
-VERSION_DATE = "2026-02-01"
-VERSION_TIME = "23:00:00"  # EST
-VERSION_NAME = "Welcome Button Fixed"
+VERSION = "7.3.0"
+VERSION_DATE = "2026-02-02"
+VERSION_TIME = "00:00:00"  # EST
+VERSION_NAME = "Feature Visibility Restored"
 CHANGELOG = """
+v7.3.0 (2026-02-02 00:00 EST) - ⚙️ FEATURE VISIBILITY RESTORED
+- ADDED: AI Assistant configuration in Admin Dashboard → Settings
+- IMPROVED: Clear UI for enabling/disabling AI Assistant
+- IMPROVED: Email notifications easier to find and configure
+- ENHANCED: Both features now have admin controls in Settings tab
+- FIXED: Made feature availability more transparent
+- NOTE: Admins can now easily enable AI Assistant and Email Notifications!
+
+**How to Enable Features:**
+1. Go to Admin Dashboard → System Management → Global Settings
+2. Enable "Email Notifications" and/or "AI Assistant"
+3. Configure SMTP settings (for email) or API key (for AI)
+4. Save settings
+5. Features will appear in user sidebars!
+
 v7.2.9 (2026-02-01 23:00 EST) - 🔧 WELCOME BUTTON FIXED
 - FIXED: "Create My First Portfolio" button now works!
 - IMPROVED: Button navigates to Portfolio Manager page
@@ -3567,6 +3582,41 @@ def show_system_management_tab(db):
         
         st.divider()
         
+        st.markdown("#### 🤖 AI Assistant Configuration")
+        ai_enabled = st.checkbox("Enable AI Assistant", 
+                                 value=settings.get("ai_assistant_enabled", False),
+                                 key="ai_enabled_setting",
+                                 help="Enable AI-powered chatbot in sidebar for all users")
+        
+        if ai_enabled:
+            ai_api_key = st.text_input("Anthropic API Key", 
+                                       value=settings.get("ai_assistant_api_key", ""),
+                                       type="password",
+                                       help="Your Anthropic API key for Claude")
+            
+            st.caption("🔑 Get your API key from: https://console.anthropic.com/")
+            
+            if st.button("💾 Save AI Settings"):
+                settings["ai_assistant_enabled"] = ai_enabled
+                settings["ai_assistant_api_key"] = ai_api_key
+                db["global_settings"] = settings
+                save_db(db)
+                st.success("✅ AI Assistant settings saved! Users can now see the AI chatbot in the sidebar.")
+                log_system_event(db, "settings_changed", "AI Assistant settings updated", "admin")
+                st.rerun()
+        else:
+            # Clear AI key if disabled
+            if st.button("💾 Save AI Settings"):
+                settings["ai_assistant_enabled"] = False
+                settings["ai_assistant_api_key"] = ""
+                db["global_settings"] = settings
+                save_db(db)
+                st.success("✅ AI Assistant disabled")
+                log_system_event(db, "settings_changed", "AI Assistant disabled", "admin")
+                st.rerun()
+        
+        st.divider()
+        
         st.markdown("#### 🎯 Default Settings")
         st.caption("These defaults apply to all newly created profiles")
         
@@ -5764,8 +5814,10 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
         
         # Notification Preferences (only show if email is enabled globally)
         global_settings = st.session_state.db.get("global_settings", {})
-        if global_settings.get("email_notifications_enabled", False):
-            with st.expander("🔝 Notification Preferences", expanded=False):
+        email_enabled_globally = global_settings.get("email_notifications_enabled", False)
+        
+        if email_enabled_globally:
+            with st.expander("📧 Notification Preferences", expanded=False):
                 user_settings = user_data.get("settings", {})
                 current_email = user_data.get("email", "")
                 
