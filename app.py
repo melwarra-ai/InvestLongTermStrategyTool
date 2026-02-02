@@ -28,11 +28,39 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.4.3"
+VERSION = "7.5.0"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "15:30:00"  # EST
-VERSION_NAME = "Status Badge Alignment"
+VERSION_TIME = "16:00:00"  # EST
+VERSION_NAME = "Refresh Button Implementation"
 CHANGELOG = """
+v7.5.0 (2026-02-02 16:00 EST) - 🔄 REFRESH BUTTON IMPLEMENTATION
+- ADDED: Refresh button at Portfolio Manager header (top right)
+- ADDED: Refresh button at Global Dashboard header
+- ADDED: Refresh button at Rebalance Analysis section
+- FEATURE: 5-second cooldown to prevent spam
+- FEATURE: Loading spinner during refresh
+- FEATURE: Success message after completion
+- FEATURE: Shows "X seconds ago" during cooldown
+- UX: Disabled state with helpful tooltips
+- UX: Clears cached data for fresh price fetch
+
+**Where Refresh Buttons Are:**
+1. Portfolio Manager (top right) - Main refresh for portfolio view
+2. Global Dashboard (top right) - Refreshes all portfolios
+3. Rebalance Analysis (section header) - Quick update before rebalancing
+
+**How It Works:**
+- Click 🔄 Refresh
+- Fetches latest market prices
+- Updates all calculations
+- Shows success message
+- 5s cooldown before next refresh
+
+**User Control:**
+- Manual refresh when needed
+- No constant auto-refresh (saves API calls)
+- Perfect for checking prices before decisions
+
 v7.4.3 (2026-02-02 15:30 EST) - 🎯 STATUS BADGE ALIGNMENT
 - FIXED: Global Dashboard now shows "⚙️ Setup" for portfolios with 0 assets
 - FIXED: Empty portfolios return is_fully_deployed = False (not True)
@@ -6369,7 +6397,39 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 """)
         else:
             # ===== DASHBOARD FOR USERS WITH CONFIGURED PORTFOLIOS =====
-            st.title("🏠 Global Portfolio Dashboard")
+            
+            # Dashboard Header with Refresh Button
+            col_title, col_refresh = st.columns([5, 1])
+            with col_title:
+                st.title("🏠 Global Portfolio Dashboard")
+            with col_refresh:
+                # Check if recently refreshed
+                last_refresh = st.session_state.get("last_refresh_global", None)
+                can_refresh = True
+                
+                if last_refresh:
+                    from datetime import datetime
+                    seconds_ago = (datetime.now() - last_refresh).total_seconds()
+                    if seconds_ago < 5:
+                        can_refresh = False
+                        st.caption(f"🕐 {int(seconds_ago)}s ago")
+                
+                if st.button("🔄 Refresh", 
+                             key="refresh_global_dashboard",
+                             disabled=not can_refresh,
+                             help="Update all portfolios with latest prices",
+                             use_container_width=True,
+                             type="secondary"):
+                    with st.spinner("📊 Fetching latest data for all portfolios..."):
+                        # Clear cached data
+                        if hasattr(st, 'cache_data'):
+                            st.cache_data.clear()
+                        st.session_state["last_refresh_global"] = datetime.now()
+                        import time
+                        time.sleep(0.3)
+                    st.success("✅ All portfolios updated!")
+                    time.sleep(0.5)
+                    st.rerun()
             
             description_box(
                 "Portfolio Command Center",
@@ -7370,8 +7430,41 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
         prof = user_profiles[st.session_state.active_profile]
         p_flag = "🇺🇸" if prof.get("currency") == "USD" else "🇨🇦"
         
-        st.title(f"{p_flag} {st.session_state.active_profile}")
-        st.caption(f"Portfolio Manager • Inception: {prof.get('start_date', 'N/A')} • Drift Tolerance: {prof.get('drift_tolerance', 5.0)}%")
+        # Portfolio Header with Refresh Button
+        col_title, col_refresh = st.columns([5, 1])
+        with col_title:
+            st.title(f"{p_flag} {st.session_state.active_profile}")
+            st.caption(f"Portfolio Manager • Inception: {prof.get('start_date', 'N/A')} • Drift Tolerance: {prof.get('drift_tolerance', 5.0)}%")
+        with col_refresh:
+            # Check if recently refreshed (prevent spam)
+            last_refresh_key = f"last_refresh_{st.session_state.active_profile}"
+            last_refresh = st.session_state.get(last_refresh_key, None)
+            can_refresh = True
+            
+            if last_refresh:
+                from datetime import datetime
+                seconds_ago = (datetime.now() - last_refresh).total_seconds()
+                if seconds_ago < 5:
+                    can_refresh = False
+                    st.caption(f"🕐 {int(seconds_ago)}s ago")
+            
+            if st.button("🔄 Refresh", 
+                         key=f"refresh_portfolio_{st.session_state.active_profile}",
+                         disabled=not can_refresh,
+                         help="Update with latest market prices",
+                         use_container_width=True,
+                         type="secondary"):
+                with st.spinner("📊 Fetching latest data..."):
+                    # Clear cached data to force fresh fetch
+                    if hasattr(st, 'cache_data'):
+                        st.cache_data.clear()
+                    # Store refresh time
+                    st.session_state[last_refresh_key] = datetime.now()
+                    import time
+                    time.sleep(0.3)  # Brief pause for better UX
+                st.success("✅ Updated!")
+                time.sleep(0.5)
+                st.rerun()
         
         # Deployment status banner
         if not prof.get("asset_mix_locked", False):
@@ -7877,9 +7970,37 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 
                 st.divider()
                 
-                # Holdings Table
-                st.markdown("### ⚖️ Rebalance Analysis")
-                st.caption("Review asset allocation drift and required trades to restore target percentages")
+                # Rebalance Analysis with Refresh
+                col_rebal_title, col_rebal_refresh = st.columns([5, 1])
+                with col_rebal_title:
+                    st.markdown("### ⚖️ Rebalance Analysis")
+                    st.caption("Review asset allocation drift and required trades to restore target percentages")
+                with col_rebal_refresh:
+                    # Refresh button for rebalance section
+                    last_refresh_rebal = st.session_state.get(f"last_refresh_rebal_{st.session_state.active_profile}", None)
+                    can_refresh_rebal = True
+                    
+                    if last_refresh_rebal:
+                        from datetime import datetime
+                        seconds_ago = (datetime.now() - last_refresh_rebal).total_seconds()
+                        if seconds_ago < 5:
+                            can_refresh_rebal = False
+                    
+                    if st.button("🔄 Update", 
+                                 key=f"refresh_rebalance_{st.session_state.active_profile}",
+                                 disabled=not can_refresh_rebal,
+                                 help="Refresh prices before rebalancing",
+                                 use_container_width=True,
+                                 type="secondary"):
+                        with st.spinner("Updating prices..."):
+                            if hasattr(st, 'cache_data'):
+                                st.cache_data.clear()
+                            st.session_state[f"last_refresh_rebal_{st.session_state.active_profile}"] = datetime.now()
+                            import time
+                            time.sleep(0.3)
+                        st.success("✅ Prices updated!")
+                        time.sleep(0.5)
+                        st.rerun()
                 
                 with st.expander("ℹ️ Understanding the rebalance table", expanded=False):
                     st.markdown("""
