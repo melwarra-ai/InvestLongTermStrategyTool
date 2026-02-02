@@ -28,11 +28,42 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.5.1"
+VERSION = "7.6.0"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "16:30:00"  # EST
-VERSION_NAME = "Admin Dashboard Status Alignment"
+VERSION_TIME = "17:00:00"  # EST
+VERSION_NAME = "Goal Progress Tracker - Fixed"
 CHANGELOG = """
+v7.6.0 (2026-02-02 17:00 EST) - 🎯 GOAL PROGRESS TRACKER FIXED!
+- FIXED: Year-End Target now shows correct value (principal × 1.191)
+- FIXED: Progress bar shows % of annual goal achieved (not confusing 128%)
+- FIXED: Delta shows how far ahead/behind pro-rated target
+- IMPROVED: Clear display: Current vs Year-End Target
+- ADDED: Annualized projection at current pace
+- ENHANCED: Better status badges (Exceeding, On Track, Behind)
+- ENHANCED: Color-coded delta (green ahead, red behind)
+
+**What Changed (Your Example):**
+OLD (v7.5.1):
+- Current: $73,252
+- Target: $72,910 (19.1%/yr)  ← Wrong! Lower than current
+- Progress: 128% of goal path  ← Confusing!
+
+NEW (v7.6.0):
+- Current: $73,252
+- Year-End Target: $85,394 (19.1%)  ← Correct! Shows year-end goal
+- Progress: 11% done (visual bar)      ← Clear!
+- Status: Ahead by $428                ← Precise delta
+- Projection: On pace for 26.4% annual ← Future outlook
+
+**The Math:**
+Principal: $71,699
+Goal: 19.1% = $13,695 growth
+Year-End Target: $71,699 + $13,695 = $85,394
+Current: $73,252
+Progress: ($73,252 - $71,699) / $13,695 = 11.3%
+Pro-rated (1 month): Should be at $72,824
+Delta: $73,252 - $72,824 = +$428 ahead! 🎯
+
 v7.5.1 (2026-02-02 16:30 EST) - 🎯 ADMIN DASHBOARD STATUS ALIGNMENT
 - FIXED: Admin Dashboard Portfolio Comparison Table now uses centralized status check
 - FIXED: Status in table matches Global Dashboard and Portfolio Manager
@@ -7013,70 +7044,110 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 
                 st.markdown("")
                 
-                # === NEW FEATURE 3: Goal Progress Tracker ===
+                # === GOAL PROGRESS TRACKER (Option 2: Compact but Correct) ===
                 st.markdown("#### 🎯 Goal Progress Tracker")
                 st.caption("Track progress toward your investment goals")
                 
                 for p_name, p_data in profiles.items():
                     p_assets = p_data.get("assets", {})
-                    curr_val = float(sum(p_assets[t]["units"] * prices.get(t, 0) for t in p_assets))
-                    start_val = float(p_data.get('principal', 0))
+                    current_value = float(sum(p_assets[t]["units"] * prices.get(t, 0) for t in p_assets))
+                    principal = float(p_data.get('principal', 0))
                     goal_pct = float(p_data.get('yearly_goal_pct', 10))
                     
                     start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d').date()
-                    years_elapsed = max((date.today() - start_date).days / 365.25, 0.01)
+                    days_elapsed = (date.today() - start_date).days
                     
-                    # Calculate target value based on goal rate
-                    target_now = start_val * ((1 + goal_pct/100) ** years_elapsed)
-                    
-                    # Project when they'll hit 2x their principal at goal rate
-                    goal_target = start_val * 2  # 2x goal
-                    if curr_val > start_val and start_val > 0:
-                        actual_cagr = ((curr_val / start_val) ** (1 / years_elapsed) - 1)
-                        if actual_cagr > 0:
-                            years_to_2x = np.log(2) / np.log(1 + actual_cagr)
-                            projected_date = start_date + timedelta(days=int(years_to_2x * 365.25))
-                        else:
-                            projected_date = None
-                            years_to_2x = None
+                    # Calculate year-end target (what you want by Dec 31 of current year)
+                    # For multi-year portfolios, calculate the current year's target
+                    current_year_start = date(date.today().year, 1, 1)
+                    if start_date >= current_year_start:
+                        # Portfolio started this year - use principal as baseline
+                        year_start_value = principal
                     else:
-                        projected_date = None
-                        years_to_2x = None
+                        # Portfolio started in previous year(s) - compound to year start
+                        years_to_year_start = (current_year_start - start_date).days / 365.25
+                        year_start_value = principal * ((1 + goal_pct/100) ** years_to_year_start)
                     
-                    # Progress percentage (how much of the WAY to target_now)
-                    progress_pct = min(((curr_val - start_val) / (target_now - start_val)) * 100, 150) if target_now > start_val else 100
+                    year_end_target = year_start_value * (1 + goal_pct/100)
                     
-                    # Status
-                    if curr_val >= target_now:
+                    # Calculate pro-rated target (where you should be TODAY based on time elapsed this year)
+                    days_in_year = 366 if date.today().year % 4 == 0 else 365
+                    days_this_year = (date.today() - current_year_start).days
+                    time_fraction = days_this_year / days_in_year
+                    
+                    expected_growth = year_start_value * (goal_pct/100) * time_fraction
+                    pro_rated_target = year_start_value + expected_growth
+                    
+                    # Calculate actual performance
+                    actual_growth = current_value - principal
+                    delta = current_value - pro_rated_target
+                    
+                    # Calculate progress toward year-end goal (what % of annual goal achieved)
+                    total_needed_growth = year_end_target - year_start_value
+                    if total_needed_growth > 0:
+                        progress_pct = min(((current_value - year_start_value) / total_needed_growth) * 100, 150)
+                    else:
+                        progress_pct = 100 if current_value >= year_end_target else 0
+                    
+                    # Calculate annualized projection (if current pace continues)
+                    if days_elapsed > 0 and current_value > principal:
+                        ytd_return_pct = ((current_value / principal) - 1) * 100
+                        annualized_projection = ((1 + ytd_return_pct/100) ** (365.25/days_elapsed) - 1) * 100
+                    else:
+                        annualized_projection = 0
+                    
+                    # Determine status and colors
+                    if delta >= total_needed_growth * 0.05:  # More than 5% ahead
+                        status_color = "#10b981"
+                        status_text = "🚀 Exceeding Goal"
+                        bar_color = "#10b981"
+                    elif delta >= 0:  # On track or slightly ahead
                         status_color = "#10b981"
                         status_text = "🎯 On Track"
                         bar_color = "#10b981"
-                    elif curr_val >= start_val:
+                    elif delta >= -total_needed_growth * 0.05:  # Within 5% behind
                         status_color = "#f59e0b"
-                        status_text = "📈 Behind Goal"
+                        status_text = "⚠️ Slightly Behind"
                         bar_color = "#f59e0b"
-                    else:
+                    else:  # More than 5% behind
                         status_color = "#ef4444"
-                        status_text = "📉 Below Start"
+                        status_text = "🔴 Below Target"
                         bar_color = "#ef4444"
+                    
+                    # Format delta display
+                    delta_display = f"Ahead by ${abs(delta):,.0f}" if delta >= 0 else f"Behind by ${abs(delta):,.0f}"
+                    delta_color = "#10b981" if delta >= 0 else "#ef4444"
+                    
+                    # Calculate months/days for display
+                    if days_elapsed < 30:
+                        time_display = f"{days_elapsed} of {days_in_year} days"
+                    elif days_elapsed < 365:
+                        months_elapsed = days_elapsed // 30
+                        time_display = f"{months_elapsed} of 12 months"
+                    else:
+                        years_elapsed = days_elapsed / 365.25
+                        time_display = f"{years_elapsed:.1f} years"
                     
                     st.markdown(f'''
                         <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                                 <span style="font-weight: 600; font-size: 1rem;">{p_name}</span>
-                                <span style="background: {status_color}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;">{status_text}</span>
+                                <span style="background: {status_color}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">{status_text}</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">
-                                <span>Current: <strong>${curr_val:,.0f}</strong></span>
-                                <span>Target: <strong>${target_now:,.0f}</strong> ({goal_pct}%/yr)</span>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 10px;">
+                                <span style="color: #1e293b;">Current: <strong style="font-size: 1.1rem;">${current_value:,.0f}</strong></span>
+                                <span style="color: #1e293b;">Year-End Target: <strong style="font-size: 1.1rem;">${year_end_target:,.0f}</strong> <span style="color: #64748b; font-size: 0.8rem;">({goal_pct}%)</span></span>
                             </div>
-                            <div style="background: #e2e8f0; border-radius: 10px; height: 12px; overflow: hidden;">
-                                <div style="background: {bar_color}; height: 100%; width: {min(progress_pct, 100)}%; border-radius: 10px;"></div>
+                            <div style="background: #e2e8f0; border-radius: 10px; height: 12px; overflow: hidden; margin-bottom: 8px;">
+                                <div style="background: {bar_color}; height: 100%; width: {min(progress_pct, 100)}%; border-radius: 10px; transition: width 0.3s;"></div>
                             </div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; margin-top: 6px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #64748b;">
                                 <span>Started: {start_date.strftime('%b %Y')}</span>
-                                <span>{progress_pct:.0f}% of goal path</span>
-                                <span>{"📅 2x by " + projected_date.strftime('%b %Y') if projected_date and projected_date > date.today() else "—"}</span>
+                                <span style="color: {delta_color}; font-weight: 600;">{delta_display}</span>
+                                <span>{time_display}</span>
+                            </div>
+                            <div style="margin-top: 8px; padding: 8px; background: #f8fafc; border-radius: 8px; font-size: 0.8rem; color: #475569; text-align: center;">
+                                📊 On pace for <strong style="color: {"#10b981" if annualized_projection >= goal_pct else "#ef4444"};">{annualized_projection:.1f}%</strong> annual return
                             </div>
                         </div>
                     ''', unsafe_allow_html=True)
