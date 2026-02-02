@@ -28,11 +28,31 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.4.2"
+VERSION = "7.4.3"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "15:00:00"  # EST
-VERSION_NAME = "Show All Profiles"
+VERSION_TIME = "15:30:00"  # EST
+VERSION_NAME = "Status Badge Alignment"
 CHANGELOG = """
+v7.4.3 (2026-02-02 15:30 EST) - 🎯 STATUS BADGE ALIGNMENT
+- FIXED: Global Dashboard now shows "⚙️ Setup" for portfolios with 0 assets
+- FIXED: Empty portfolios return is_fully_deployed = False (not True)
+- ADDED: Setup status badge in Global Dashboard (gray badge)
+- ALIGNED: Portfolio Manager and Global Dashboard now show same status
+- NOTE: "Test2" with 0 assets now shows "⚙️ Setup" on both views!
+
+**Status Badge Hierarchy:**
+1. 🚨 REBALANCE - Drift exceeds tolerance (priority 1)
+2. ✅ Balanced - Recently rebalanced and no drift (priority 2)
+3. ⚙️ Setup - No assets defined yet (NEW!)
+4. 📥 Deploying (X/Y) - Has assets, partial deployment
+5. ✅ Deployed - All assets fully deployed
+6. ⚪ New - Fallback status
+
+**Your "Test2" Profile:**
+- Assets: 0
+- Old status: "✅ Deployed" ❌
+- New status: "⚙️ Setup" ✅
+
 v7.4.2 (2026-02-02 15:00 EST) - 👁️ SHOW ALL PROFILES
 - FIXED: Global Dashboard now shows ALL profiles, regardless of deployment status
 - FIXED: Profiles in "Setup" status (no deployments yet) now visible on dashboard
@@ -2374,7 +2394,8 @@ def check_deployment_status(profile_data):
     """
     assets = profile_data.get("assets", {})
     if not assets:
-        return True, 0, 0
+        # No assets = Setup status, not deployed
+        return False, 0, 0
     
     principal_amt = profile_data.get('principal', 0)
     total_assets = len(assets)
@@ -6539,6 +6560,10 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 elif needs_rebal:
                     tile_class = "profile-tile-warning"
                     status_badge = '<span class="drift-badge">🚨 REBALANCE</span>'
+                elif len(p_assets) == 0:
+                    # No assets defined yet - Setup status
+                    tile_class = "profile-tile"
+                    status_badge = '<span style="background: #64748b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚙️ Setup</span>'
                 elif not all_deployed and len(p_assets) > 0:
                     tile_class = "profile-tile"
                     # deployed_count already comes from centralized function above
