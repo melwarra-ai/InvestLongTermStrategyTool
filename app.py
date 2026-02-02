@@ -28,11 +28,23 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.3.2"
+VERSION = "7.3.3"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "01:00:00"  # EST
-VERSION_NAME = "Dashboard Status Fixed"
+VERSION_TIME = "01:30:00"  # EST
+VERSION_NAME = "Action Items Fixed"
 CHANGELOG = """
+v7.3.3 (2026-02-02 01:30 EST) - ✅ ACTION ITEMS FIXED
+- FIXED: Action Items Dashboard now uses smart fractional detection
+- FIXED: No more false "GLD needs 1% more" alerts
+- FIXED: Portfolios with only fractional remainders show "ALL CLEAR"
+- ENHANCED: Consistent status logic across entire application
+- NOTE: Action Items, Global Dashboard, and Portfolio Manager all synchronized!
+
+**What This Fixes:**
+- Action Items Dashboard was using old simple 99.5% check
+- Now uses same smart fractional logic as everywhere else
+- Your TFSA with $285 fractional will show "✅ ALL CLEAR" not "📥 IN PROGRESS"
+
 v7.3.2 (2026-02-02 01:00 EST) - ✅ DASHBOARD STATUS FIXED
 - FIXED: Global Dashboard now correctly shows "✅ Deployed" status
 - FIXED: Status uses smart fractional detection like Portfolio Manager
@@ -6280,8 +6292,59 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             for p_name, p_data in profiles.items():
                 p_assets = p_data.get("assets", {})
                 needs_rebal, drift_details = calculate_drift_status(p_data, prices)
-                all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in p_assets.values()) if p_assets else False
-                deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 99.5)
+                
+                # SMART DEPLOYMENT CHECK (same logic as Global Dashboard cards)
+                principal_amt = p_data.get('principal', 0)
+                total_deployed_capital = 0
+                for ticker, asset_data in p_assets.items():
+                    purchases = asset_data.get("purchases", [])
+                    total_deployed_capital += sum(p.get("amount", 0) for p in purchases)
+                
+                undeployed_cash = principal_amt - total_deployed_capital
+                
+                # Check if can afford cheapest asset (smart fractional detection)
+                cheapest_asset_price = None
+                for ticker in p_assets.keys():
+                    try:
+                        ticker_obj = yf.Ticker(ticker)
+                        hist = ticker_obj.history(period="1d")
+                        if not hist.empty:
+                            price = float(hist['Close'].iloc[-1])
+                            if cheapest_asset_price is None or price < cheapest_asset_price:
+                                cheapest_asset_price = price
+                    except:
+                        pass
+                
+                # Determine if truly fully deployed
+                all_deployed = False
+                if undeployed_cash <= 0:
+                    all_deployed = True
+                elif undeployed_cash > 0 and cheapest_asset_price is not None:
+                    all_deployed = undeployed_cash < cheapest_asset_price
+                
+                # Count truly deployed assets (with fractional detection)
+                deployed_count = 0
+                for ticker, asset_data in p_assets.items():
+                    allocated_pct = asset_data.get("allocated_pct", 0)
+                    if allocated_pct >= 99.5:
+                        deployed_count += 1
+                    else:
+                        # Check if remaining budget can buy at least 1 share
+                        target_pct = asset_data.get("target", 0)
+                        target_amount = (target_pct / 100) * principal_amt
+                        deployed_amount = asset_data.get("allocated_amt", 0)
+                        remaining_budget = target_amount - deployed_amount
+                        
+                        try:
+                            ticker_obj = yf.Ticker(ticker)
+                            hist = ticker_obj.history(period="1d")
+                            if not hist.empty:
+                                current_price = float(hist['Close'].iloc[-1])
+                                if remaining_budget < current_price:
+                                    deployed_count += 1
+                        except:
+                            pass
+                
                 total_assets = len(p_assets)
                 
                 if needs_rebal:
