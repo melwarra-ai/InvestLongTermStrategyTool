@@ -28,11 +28,36 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.6.0"
+VERSION = "7.6.1"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "17:00:00"  # EST
-VERSION_NAME = "Goal Progress Tracker - Fixed"
+VERSION_TIME = "17:30:00"  # EST
+VERSION_NAME = "Goal Tracker - Add Year Start Value"
 CHANGELOG = """
+v7.6.1 (2026-02-02 17:30 EST) - 📊 GOAL TRACKER - YEAR START VALUE ADDED
+- ADDED: Year Start Value now displayed alongside Current and Year-End Target
+- IMPROVED: Three-column layout for clear progression view
+- ENHANCED: Shows complete journey: Start → Current → Target
+- VISUAL: Grid layout with labels for each metric
+
+**New Display (3 Columns):**
+┌─────────────────────────────────────────────────────────────┐
+│ Year Start        Current           Year-End Target         │
+│ $71,699          $73,252            $85,394                 │
+│                                     (19.1% goal)            │
+└─────────────────────────────────────────────────────────────┘
+
+**Why This Helps:**
+- See starting point (Year Start: $71,699)
+- See where you are now (Current: $73,252)  
+- See where you're going (Year-End Target: $85,394)
+- Understand complete annual journey at a glance
+
+**For Multi-Year Portfolios:**
+Year Start Value = Compounded value at start of current year
+Example: Started 2024 with $50k, grew to $65k by Jan 1 2026
+- Year Start (2026): $65,000
+- Not the original $50,000 principal
+
 v7.6.0 (2026-02-02 17:00 EST) - 🎯 GOAL PROGRESS TRACKER FIXED!
 - FIXED: Year-End Target now shows correct value (principal × 1.191)
 - FIXED: Progress bar shows % of annual goal achieved (not confusing 128%)
@@ -7134,9 +7159,20 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                 <span style="font-weight: 600; font-size: 1rem;">{p_name}</span>
                                 <span style="background: {status_color}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">{status_text}</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 10px;">
-                                <span style="color: #1e293b;">Current: <strong style="font-size: 1.1rem;">${current_value:,.0f}</strong></span>
-                                <span style="color: #1e293b;">Year-End Target: <strong style="font-size: 1.1rem;">${year_end_target:,.0f}</strong> <span style="color: #64748b; font-size: 0.8rem;">({goal_pct}%)</span></span>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; font-size: 0.85rem;">
+                                <div style="text-align: left;">
+                                    <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Year Start</div>
+                                    <div style="color: #1e293b; font-weight: 600; font-size: 1rem;">${year_start_value:,.0f}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Current</div>
+                                    <div style="color: #1e293b; font-weight: 700; font-size: 1.15rem;">${current_value:,.0f}</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="color: #64748b; font-size: 0.75rem; margin-bottom: 4px;">Year-End Target</div>
+                                    <div style="color: #1e293b; font-weight: 600; font-size: 1rem;">${year_end_target:,.0f}</div>
+                                    <div style="color: #64748b; font-size: 0.7rem;">({goal_pct}% goal)</div>
+                                </div>
                             </div>
                             <div style="background: #e2e8f0; border-radius: 10px; height: 12px; overflow: hidden; margin-bottom: 8px;">
                                 <div style="background: {bar_color}; height: 100%; width: {min(progress_pct, 100)}%; border-radius: 10px; transition: width 0.3s;"></div>
