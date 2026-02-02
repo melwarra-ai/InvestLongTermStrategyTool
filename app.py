@@ -28,11 +28,18 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.2.8"
+VERSION = "7.2.9"
 VERSION_DATE = "2026-02-01"
-VERSION_TIME = "22:00:00"  # EST
-VERSION_NAME = "Welcome Page Logic Fix"
+VERSION_TIME = "23:00:00"  # EST
+VERSION_NAME = "Welcome Button Fixed"
 CHANGELOG = """
+v7.2.9 (2026-02-01 23:00 EST) - 🔧 WELCOME BUTTON FIXED
+- FIXED: "Create My First Portfolio" button now works!
+- IMPROVED: Button navigates to Portfolio Manager page
+- IMPROVED: Auto-expands "Create New Profile" section
+- ENHANCED: Seamless flow from welcome page to profile creation
+- NOTE: Click the button and you'll be taken right to the form!
+
 v7.2.8 (2026-02-01 22:00 EST) - 🎯 WELCOME PAGE LOGIC FIX
 - FIXED: Welcome page now displays FIRST, before dashboard title
 - IMPROVED: Logic prioritizes showing welcome page for new users
@@ -4294,7 +4301,14 @@ else:
         
         # Profile Creation
         st.markdown("### ① Strategy Setup")
-        with st.expander("🆕 Create New Profile", expanded=False):
+        
+        # Check if we should auto-expand (from welcome page button)
+        should_expand = st.session_state.get("auto_expand_create_profile", False)
+        if should_expand:
+            # Clear the flag after using it
+            st.session_state.auto_expand_create_profile = False
+        
+        with st.expander("🆕 Create New Profile", expanded=should_expand):
             with st.form("new_profile_form"):
                 # Get global defaults for pre-filling form
                 global_settings = st.session_state.db.get("global_settings", {})
@@ -6100,7 +6114,9 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                            use_container_width=True, 
                            type="primary",
                            key="welcome_create_profile"):
-                    st.session_state.create_profile_expanded = True
+                    # Navigate to Portfolio Manager and auto-expand create profile section
+                    st.session_state.current_page = "Portfolio Manager"
+                    st.session_state.auto_expand_create_profile = True
                     st.rerun()
                 
                 st.caption("👆 Click here to get started in seconds!")
