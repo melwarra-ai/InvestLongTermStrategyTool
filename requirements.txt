@@ -1,5 +1,5 @@
 # AlphaStream Portfolio App - Requirements
-# v7.0.0 - Google Sheets Integration
+# v7.3.0 - AI Assistant & Email Notifications
 
 # Core dependencies
 streamlit>=1.28.0
@@ -8,9 +8,13 @@ pandas>=2.0.0
 numpy>=1.24.0
 plotly>=5.14.0
 
+# AI Assistant (for chatbot feature)
+anthropic>=0.18.0
+
 # Google Sheets integration (optional - only needed if using Google Sheets storage)
 gspread>=5.12.0
 google-auth>=2.23.0
 
+# Note: Email functionality uses Python's built-in smtplib and email.mime modules
 # Note: If using JSON storage (default), Google Sheets dependencies are not required
 # To use Google Sheets storage, set STORAGE_TYPE environment variable to "google_sheets"
