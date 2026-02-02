@@ -28,11 +28,28 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.3.4"
+VERSION = "7.3.5"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "02:00:00"  # EST
-VERSION_NAME = "Smart Deployment Detection"
+VERSION_TIME = "02:30:00"  # EST
+VERSION_NAME = "Deployment Logic Simplified"
 CHANGELOG = """
+v7.3.5 (2026-02-02 02:30 EST) - 🔧 DEPLOYMENT LOGIC SIMPLIFIED
+- FIXED: Simplified deployment check to use total undeployed cash
+- IMPROVED: Now checks if cash can buy shares in ANY under-allocated asset
+- FIXED: Handles edge case where GLD is 99% deployed with $215 remaining
+- ENHANCED: More robust logic that actually works in production
+- NOTE: If allocated_pct < 100% AND undeployed_cash >= price → Not deployed
+
+**What This Really Fixes:**
+Your case:
+- GLD: 99% deployed (not 100%!)
+- GLD remaining: ~$215
+- GLD price: $445/share
+- $215 < $445 → Can't buy
+- All other assets: 100% deployed
+- Result: all_deployed = True ✅
+- Status: "✅ Deployed" (finally!)
+
 v7.3.4 (2026-02-02 02:00 EST) - 🎯 SMART DEPLOYMENT DETECTION
 - FIXED: Now checks if assets have ROOM in target allocation, not just if cash exists
 - IMPROVED: Properly detects when portfolio is fully deployed despite having cash
@@ -6332,39 +6349,29 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         pass
                 
                 # Determine if truly fully deployed
-                # Check if there's ANY asset that:
-                # 1. Has remaining target allocation (not at 100% deployed of target)
-                # 2. Can afford at least 1 share with remaining budget
+                # Strategy: Check if the TOTAL undeployed cash can buy at least 1 share
+                # of ANY asset that's not yet at 100% of its target
                 
-                has_deployable_opportunities = False
+                all_deployed = True  # Assume deployed unless we find an opportunity
+                
                 if undeployed_cash > 0:
+                    # Check each asset to see if it needs more AND we can afford it
                     for ticker, asset_data in p_assets.items():
                         allocated_pct = asset_data.get("allocated_pct", 0)
                         
-                        # Skip if this asset is already at/over target
-                        if allocated_pct >= 99.5:
-                            continue
-                        
-                        # Check if remaining budget for THIS asset can buy at least 1 share
-                        target_pct = asset_data.get("target", 0)
-                        target_amount = (target_pct / 100) * principal_amt
-                        deployed_amount = asset_data.get("allocated_amt", 0)
-                        remaining_budget = target_amount - deployed_amount
-                        
-                        if remaining_budget > 0:
+                        # Only check assets that haven't reached 100% of target
+                        if allocated_pct < 100:
                             try:
                                 ticker_obj = yf.Ticker(ticker)
                                 hist = ticker_obj.history(period="1d")
                                 if not hist.empty:
                                     current_price = float(hist['Close'].iloc[-1])
-                                    # Can buy at least 1 share?
-                                    if remaining_budget >= current_price:
-                                        has_deployable_opportunities = True
+                                    # Can the total undeployed cash buy at least 1 share?
+                                    if undeployed_cash >= current_price:
+                                        all_deployed = False
                                         break
                             except:
                                 pass
-                
-                all_deployed = not has_deployable_opportunities
                 
                 # Count truly deployed assets (with fractional detection)
                 deployed_count = 0
@@ -6535,39 +6542,29 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         pass
                 
                 # Determine if truly fully deployed
-                # Check if there's ANY asset that:
-                # 1. Has remaining target allocation (not at 100% deployed of target)
-                # 2. Can afford at least 1 share with remaining budget
+                # Strategy: Check if the TOTAL undeployed cash can buy at least 1 share
+                # of ANY asset that's not yet at 100% of its target
                 
-                has_deployable_opportunities = False
+                all_deployed = True  # Assume deployed unless we find an opportunity
+                
                 if undeployed_cash > 0:
+                    # Check each asset to see if it needs more AND we can afford it
                     for ticker, asset_data in p_assets.items():
                         allocated_pct = asset_data.get("allocated_pct", 0)
                         
-                        # Skip if this asset is already at/over target
-                        if allocated_pct >= 99.5:
-                            continue
-                        
-                        # Check if remaining budget for THIS asset can buy at least 1 share
-                        target_pct = asset_data.get("target", 0)
-                        target_amount = (target_pct / 100) * principal_amt
-                        deployed_amount = asset_data.get("allocated_amt", 0)
-                        remaining_budget = target_amount - deployed_amount
-                        
-                        if remaining_budget > 0:
+                        # Only check assets that haven't reached 100% of target
+                        if allocated_pct < 100:
                             try:
                                 ticker_obj = yf.Ticker(ticker)
                                 hist = ticker_obj.history(period="1d")
                                 if not hist.empty:
                                     current_price = float(hist['Close'].iloc[-1])
-                                    # Can buy at least 1 share?
-                                    if remaining_budget >= current_price:
-                                        has_deployable_opportunities = True
+                                    # Can the total undeployed cash buy at least 1 share?
+                                    if undeployed_cash >= current_price:
+                                        all_deployed = False
                                         break
                             except:
                                 pass
-                
-                all_deployed = not has_deployable_opportunities
                 
                 # Status and tile class (with pulse animation for rebalance)
                 if recently_rebalanced or (has_rebalanced and not needs_rebal):
