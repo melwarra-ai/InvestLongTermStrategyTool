@@ -28,11 +28,36 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.5.0"
+VERSION = "7.5.1"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "16:00:00"  # EST
-VERSION_NAME = "Refresh Button Implementation"
+VERSION_TIME = "16:30:00"  # EST
+VERSION_NAME = "Admin Dashboard Status Alignment"
 CHANGELOG = """
+v7.5.1 (2026-02-02 16:30 EST) - 🎯 ADMIN DASHBOARD STATUS ALIGNMENT
+- FIXED: Admin Dashboard Portfolio Comparison Table now uses centralized status check
+- FIXED: Status in table matches Global Dashboard and Portfolio Manager
+- REMOVED: Duplicate/outdated status calculation logic
+- ALIGNED: All three views (Global, Admin, Portfolio) show identical status
+- ADDED: "⚙️ Setup" status for portfolios with 0 assets in Admin table
+
+**What This Fixes:**
+Your Issue:
+- Global Dashboard: "✅ Deployed"
+- Admin Table: "📥 Deploying (3/4)" ← WRONG!
+- Result: Confusing inconsistency
+
+After v7.5.1:
+- Global Dashboard: "✅ Deployed"
+- Admin Table: "✅ Deployed" ← CORRECT!
+- Portfolio Manager: "✅ Deployed"
+- Result: Perfect alignment! ✅
+
+**Now Using ONE Function Everywhere:**
+- Portfolio Manager → check_deployment_status()
+- Global Dashboard → check_deployment_status()
+- Admin Dashboard → check_deployment_status()
+- Action Items → check_deployment_status()
+
 v7.5.0 (2026-02-02 16:00 EST) - 🔄 REFRESH BUTTON IMPLEMENTATION
 - ADDED: Refresh button at Portfolio Manager header (top right)
 - ADDED: Refresh button at Global Dashboard header
@@ -7281,8 +7306,6 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 else:
                     age_display = f"{years:.1f}yr"
                 
-                total_assets = len(p_assets)
-                
                 # Handle $0 portfolios or 0 assets
                 if curr_val <= 0 or ct_deployed <= 0:
                     cagr_display = "—"
@@ -7311,15 +7334,19 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     roi_val = roi
                 
                 needs_rebal, _ = calculate_drift_status(p_data, prices)
-                all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in p_assets.values()) if p_assets else False
-                deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 99.5)
                 
+                # Use centralized deployment status check (SINGLE SOURCE OF TRUTH)
+                all_deployed, deployed_count, total_assets = check_deployment_status(p_data)
+                
+                # Status determination (same priority as Global Dashboard)
                 if needs_rebal:
                     status = "🚨 Rebalance"
+                elif len(p_assets) == 0:
+                    status = "⚙️ Setup"
                 elif not all_deployed and total_assets > 0:
                     status = f"📥 Deploying ({deployed_count}/{total_assets})"
                 elif all_deployed:
-                    status = "✅ Balanced"
+                    status = "✅ Deployed"
                 else:
                     status = "⚪ New"
                 
