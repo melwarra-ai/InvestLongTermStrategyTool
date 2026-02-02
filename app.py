@@ -28,11 +28,32 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.3.5"
+VERSION = "7.3.6"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "02:30:00"  # EST
-VERSION_NAME = "Deployment Logic Simplified"
+VERSION_TIME = "03:00:00"  # EST
+VERSION_NAME = "Per-Asset Budget Check"
 CHANGELOG = """
+v7.3.6 (2026-02-02 03:00 EST) - ✅ PER-ASSET BUDGET CHECK (FINAL FIX!)
+- FIXED: Now checks remaining budget PER ASSET, not total cash
+- FIXED: Treats assets as 100% deployed when remaining budget < share price
+- IMPROVED: Exactly implements the logic: "if can't buy 1 share, it's fractional"
+- ENHANCED: GLD at 99% with $215 remaining vs $445/share = Fully Deployed ✅
+- NOTE: This is the correct implementation of your described logic!
+
+**The Right Logic:**
+For GLD specifically:
+- Target: 30% = $21,510
+- Deployed: 99% = $21,295
+- Remaining budget: $215
+- GLD price: $445/share
+- Can buy 1 share? $215 < $445 = NO
+- Status: Fully Deployed ✅ (fractional remainder)
+
+**Result:**
+- Action Items: "✅ ALL CLEAR"
+- Portfolio Card: "✅ Deployed"
+- No more false "GLD needs 1% more" alerts!
+
 v7.3.5 (2026-02-02 02:30 EST) - 🔧 DEPLOYMENT LOGIC SIMPLIFIED
 - FIXED: Simplified deployment check to use total undeployed cash
 - IMPROVED: Now checks if cash can buy shares in ANY under-allocated asset
@@ -6349,29 +6370,39 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         pass
                 
                 # Determine if truly fully deployed
-                # Strategy: Check if the TOTAL undeployed cash can buy at least 1 share
-                # of ANY asset that's not yet at 100% of its target
+                # RULE: Even if an asset shows < 100% deployed, if the remaining budget
+                # can't buy 1 share, treat it as fully deployed (fractional remainder)
                 
-                all_deployed = True  # Assume deployed unless we find an opportunity
+                all_deployed = True  # Assume deployed unless we find a real opportunity
                 
                 if undeployed_cash > 0:
-                    # Check each asset to see if it needs more AND we can afford it
                     for ticker, asset_data in p_assets.items():
                         allocated_pct = asset_data.get("allocated_pct", 0)
                         
-                        # Only check assets that haven't reached 100% of target
+                        # Only check assets that show < 100% deployed
                         if allocated_pct < 100:
-                            try:
-                                ticker_obj = yf.Ticker(ticker)
-                                hist = ticker_obj.history(period="1d")
-                                if not hist.empty:
-                                    current_price = float(hist['Close'].iloc[-1])
-                                    # Can the total undeployed cash buy at least 1 share?
-                                    if undeployed_cash >= current_price:
-                                        all_deployed = False
-                                        break
-                            except:
-                                pass
+                            # Calculate how much this asset still needs
+                            target_pct = asset_data.get("target", 0)
+                            target_amount = (target_pct / 100) * principal_amt
+                            deployed_amount = asset_data.get("allocated_amt", 0)
+                            remaining_budget_for_asset = target_amount - deployed_amount
+                            
+                            if remaining_budget_for_asset > 0:
+                                try:
+                                    ticker_obj = yf.Ticker(ticker)
+                                    hist = ticker_obj.history(period="1d")
+                                    if not hist.empty:
+                                        current_price = float(hist['Close'].iloc[-1])
+                                        # Can the remaining budget for THIS ASSET buy at least 1 share?
+                                        if remaining_budget_for_asset >= current_price:
+                                            # Yes! This asset can still be deployed
+                                            all_deployed = False
+                                            break
+                                        # If remaining_budget < price, it's fractional - skip to next asset
+                                except:
+                                    # If price fetch fails, be conservative and assume not deployed
+                                    all_deployed = False
+                                    break
                 
                 # Count truly deployed assets (with fractional detection)
                 deployed_count = 0
@@ -6542,29 +6573,39 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         pass
                 
                 # Determine if truly fully deployed
-                # Strategy: Check if the TOTAL undeployed cash can buy at least 1 share
-                # of ANY asset that's not yet at 100% of its target
+                # RULE: Even if an asset shows < 100% deployed, if the remaining budget
+                # can't buy 1 share, treat it as fully deployed (fractional remainder)
                 
-                all_deployed = True  # Assume deployed unless we find an opportunity
+                all_deployed = True  # Assume deployed unless we find a real opportunity
                 
                 if undeployed_cash > 0:
-                    # Check each asset to see if it needs more AND we can afford it
                     for ticker, asset_data in p_assets.items():
                         allocated_pct = asset_data.get("allocated_pct", 0)
                         
-                        # Only check assets that haven't reached 100% of target
+                        # Only check assets that show < 100% deployed
                         if allocated_pct < 100:
-                            try:
-                                ticker_obj = yf.Ticker(ticker)
-                                hist = ticker_obj.history(period="1d")
-                                if not hist.empty:
-                                    current_price = float(hist['Close'].iloc[-1])
-                                    # Can the total undeployed cash buy at least 1 share?
-                                    if undeployed_cash >= current_price:
-                                        all_deployed = False
-                                        break
-                            except:
-                                pass
+                            # Calculate how much this asset still needs
+                            target_pct = asset_data.get("target", 0)
+                            target_amount = (target_pct / 100) * principal_amt
+                            deployed_amount = asset_data.get("allocated_amt", 0)
+                            remaining_budget_for_asset = target_amount - deployed_amount
+                            
+                            if remaining_budget_for_asset > 0:
+                                try:
+                                    ticker_obj = yf.Ticker(ticker)
+                                    hist = ticker_obj.history(period="1d")
+                                    if not hist.empty:
+                                        current_price = float(hist['Close'].iloc[-1])
+                                        # Can the remaining budget for THIS ASSET buy at least 1 share?
+                                        if remaining_budget_for_asset >= current_price:
+                                            # Yes! This asset can still be deployed
+                                            all_deployed = False
+                                            break
+                                        # If remaining_budget < price, it's fractional - skip to next asset
+                                except:
+                                    # If price fetch fails, be conservative and assume not deployed
+                                    all_deployed = False
+                                    break
                 
                 # Status and tile class (with pulse animation for rebalance)
                 if recently_rebalanced or (has_rebalanced and not needs_rebal):
