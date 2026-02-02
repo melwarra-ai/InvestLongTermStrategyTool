@@ -28,11 +28,23 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.4.1"
+VERSION = "7.4.2"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "04:30:00"  # EST
-VERSION_NAME = "Self-Contained Status Check"
+VERSION_TIME = "15:00:00"  # EST
+VERSION_NAME = "Show All Profiles"
 CHANGELOG = """
+v7.4.2 (2026-02-02 15:00 EST) - 👁️ SHOW ALL PROFILES
+- FIXED: Global Dashboard now shows ALL profiles, regardless of deployment status
+- FIXED: Profiles in "Setup" status (no deployments yet) now visible on dashboard
+- CHANGED: Welcome page only shown for brand new users with ZERO profiles
+- IMPROVED: You can now see your "Test" profile even before deploying assets
+- NOTE: Dashboard shows profiles in any state: Setup, Deploying, or Deployed!
+
+**What Changed:**
+- Old: Dashboard hidden until at least 1 asset has units deployed
+- New: Dashboard shown as soon as ANY profile is created
+- Result: "Test" profile with 1 asset but 0 units now shows on dashboard! ✅
+
 v7.4.1 (2026-02-02 04:30 EST) - 🔧 SELF-CONTAINED STATUS CHECK
 - FIXED: check_deployment_status() now fetches its own prices
 - FIXED: No longer requires prices parameter (self-contained)
@@ -6082,18 +6094,12 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
         # Get user profiles
         profiles = get_user_profiles(st.session_state.db, current_user)
         
-        # Check if user has any meaningful portfolios configured
-        has_configured_portfolios = False
-        if profiles:
-            for prof_name, prof_data in profiles.items():
-                assets = prof_data.get("assets", {})
-                # Consider portfolio configured if it has at least one asset with units
-                if any(asset.get("units", 0) > 0 for asset in assets.values()):
-                    has_configured_portfolios = True
-                    break
+        # Check if user has created any profiles (even if not deployed)
+        # Show dashboard if ANY profile exists, regardless of deployment status
+        has_any_profiles = len(profiles) > 0
         
-        # Show welcome page for new users or users with no configured portfolios
-        if not profiles or not has_configured_portfolios:
+        # Show welcome page ONLY for brand new users with zero profiles
+        if not has_any_profiles:
             # ===== FIRST-TIME USER WELCOME EXPERIENCE =====
             
             # Hero Section
