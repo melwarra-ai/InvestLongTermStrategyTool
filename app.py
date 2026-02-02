@@ -28,11 +28,23 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.3.1"
+VERSION = "7.3.2"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "00:30:00"  # EST
-VERSION_NAME = "AI Package Fixed"
+VERSION_TIME = "01:00:00"  # EST
+VERSION_NAME = "Dashboard Status Fixed"
 CHANGELOG = """
+v7.3.2 (2026-02-02 01:00 EST) - ✅ DASHBOARD STATUS FIXED
+- FIXED: Global Dashboard now correctly shows "✅ Deployed" status
+- FIXED: Status uses smart fractional detection like Portfolio Manager
+- IMPROVED: Accurate deployed count (X/Y assets) accounting for fractional remainders
+- ENHANCED: Portfolio with $285 fractional remainder now shows "Deployed" not "Deploying"
+- NOTE: Global Dashboard and Portfolio Manager status now perfectly synchronized!
+
+**What Changed:**
+- Old logic: Simple check if allocated_pct >= 99.5%
+- New logic: Smart check if undeployed cash < cheapest asset price (fractional)
+- Result: Portfolios with only fractional remainders show "✅ Deployed" ✨
+
 v7.3.1 (2026-02-02 00:30 EST) - 📦 AI PACKAGE FIXED
 - FIXED: Added anthropic package to requirements.txt
 - FIXED: AI Assistant will now work on Streamlit Cloud
@@ -6389,7 +6401,39 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     cagr = ((curr_v / p_deployed) ** (1 / years_elapsed) - 1) * 100 if p_deployed > 0 else 0
                 
                 p_flag = "🇺🇸" if p_data.get("currency") == "USD" else "🇨🇦"
-                all_deployed = all(a.get("allocated_pct", 0) >= 99.5 for a in p_assets.values()) if p_assets else False
+                
+                # SMART DEPLOYMENT STATUS CHECK (v7.3.2 fix)
+                # Don't just check if allocated_pct >= 99.5%, check if truly fully deployed
+                # A portfolio is fully deployed if undeployed cash < cheapest asset price (fractional remainder)
+                
+                principal_amt = p_data.get('principal', 0)
+                total_deployed_capital = 0
+                for ticker, asset_data in p_assets.items():
+                    purchases = asset_data.get("purchases", [])
+                    total_deployed_capital += sum(p.get("amount", 0) for p in purchases)
+                
+                undeployed_cash = principal_amt - total_deployed_capital
+                
+                # Check if can afford cheapest asset (smart fractional detection)
+                cheapest_asset_price = None
+                for ticker in p_assets.keys():
+                    try:
+                        ticker_obj = yf.Ticker(ticker)
+                        hist = ticker_obj.history(period="1d")
+                        if not hist.empty:
+                            price = float(hist['Close'].iloc[-1])
+                            if cheapest_asset_price is None or price < cheapest_asset_price:
+                                cheapest_asset_price = price
+                    except:
+                        pass
+                
+                # Determine if truly fully deployed
+                all_deployed = False
+                if undeployed_cash <= 0:
+                    all_deployed = True
+                elif undeployed_cash > 0 and cheapest_asset_price is not None:
+                    # If remaining cash is less than cheapest share, it's fractional remainder
+                    all_deployed = undeployed_cash < cheapest_asset_price
                 
                 # Status and tile class (with pulse animation for rebalance)
                 if recently_rebalanced or (has_rebalanced and not needs_rebal):
@@ -6400,7 +6444,33 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     status_badge = '<span class="drift-badge">🚨 REBALANCE</span>'
                 elif not all_deployed and len(p_assets) > 0:
                     tile_class = "profile-tile"
-                    deployed_count = sum(1 for a in p_assets.values() if a.get("allocated_pct", 0) >= 99.5)
+                    # Count assets that are truly deployed (use smart detection per asset)
+                    deployed_count = 0
+                    for ticker, asset_data in p_assets.items():
+                        allocated_pct = asset_data.get("allocated_pct", 0)
+                        target_pct = asset_data.get("target", 0)
+                        
+                        if allocated_pct >= 99.5:
+                            # Asset is at or near target
+                            deployed_count += 1
+                        else:
+                            # Check if remaining budget can buy at least 1 share
+                            target_amount = (target_pct / 100) * principal_amt
+                            deployed_amount = asset_data.get("allocated_amt", 0)
+                            remaining_budget = target_amount - deployed_amount
+                            
+                            # Get current price
+                            try:
+                                ticker_obj = yf.Ticker(ticker)
+                                hist = ticker_obj.history(period="1d")
+                                if not hist.empty:
+                                    current_price = float(hist['Close'].iloc[-1])
+                                    # If can't afford 1 share, consider it deployed (fractional)
+                                    if remaining_budget < current_price:
+                                        deployed_count += 1
+                            except:
+                                pass
+                    
                     status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">📥 Deploying ({deployed_count}/{len(p_assets)})</span>'
                 elif all_deployed:
                     tile_class = "profile-tile-optimized"
