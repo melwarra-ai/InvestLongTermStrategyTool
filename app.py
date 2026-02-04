@@ -28,11 +28,73 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.6.5"
+VERSION = "7.7.0"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "20:30:00"  # EST
-VERSION_NAME = "Canadian Benchmark Fix"
+VERSION_TIME = "21:00:00"  # EST
+VERSION_NAME = "Deploy All with Actual Prices"
 CHANGELOG = """
+v7.7.0 (2026-02-02 21:00 EST) - 💰 DEPLOY ALL WITH ACTUAL PRICES
+- MAJOR: Deploy All Remaining Cash now allows actual price input
+- ADDED: Expandable sections for each asset in deployment plan
+- ADDED: Side-by-side comparison: Estimated vs Actual
+- ADDED: Real-time cost calculation with actual prices
+- ADDED: Price difference indicators (up/down vs estimate)
+- ADDED: Summary showing total estimated vs actual costs
+- ADDED: Validation prevents over-spending
+- IMPROVED: Actual prices used for average cost calculation
+- IMPROVED: Clear visual feedback throughout process
+
+**How It Works:**
+
+1. **Show Deployment Plan:**
+   - App calculates units based on available cash
+   - Shows estimated price from yfinance
+   - Displays total estimated cost
+
+2. **User Inputs Actual Prices:**
+   - Each asset has editable "Price Paid per Unit" field
+   - Defaults to estimated price (can override)
+   - Shows price difference vs estimate
+   - Calculates actual total in real-time
+
+3. **Summary Section:**
+   - Estimated total cost
+   - Actual total cost
+   - Difference highlighted
+   - Remaining cash after deployment
+
+4. **Deploy with Actual Prices:**
+   - Uses actual prices for purchase records
+   - Correctly calculates average cost per asset
+   - Updates allocated % based on actual spend
+   - Logs actual prices paid
+
+**Example:**
+
+Available Cash: $10,000
+
+SPXL:
+  Estimated: 40 shares × $120.45 = $4,818.00
+  Actual: 40 shares × $121.00 = $4,840.00 📈 +$0.55
+  
+BIL:
+  Estimated: 48 shares × $105.30 = $5,054.40
+  Actual: 48 shares × $104.95 = $5,037.60 📉 -$0.35
+
+Summary:
+  Estimated Total: $9,872.40
+  Actual Total: $9,877.60 (+$5.20)
+  Remaining: $122.40
+
+✅ Confirm & Deploy All → Records actual prices!
+
+**Benefits:**
+- ✅ Accurate average cost tracking
+- ✅ No manual price entry errors
+- ✅ Real-time validation
+- ✅ Clear before/after comparison
+- ✅ Prevents over-spending
+
 v7.6.5 (2026-02-02 20:30 EST) - 🇨🇦 CANADIAN BENCHMARK FIX
 - FIXED: Canadian benchmarks now display correctly on performance chart
 - ADDED: .TO suffix for Toronto Stock Exchange tickers
@@ -6168,59 +6230,169 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             
             # Show deployment opportunities if available (and NOT truly fractional)
             if deployment_opportunities and not is_truly_fractional:
-                st.markdown("#### 🚀 Deploy Remaining Cash")
-                st.caption(f"You have ${deployable_cash:,.0f} that can be deployed:")
+                st.markdown("### 🚀 Deploy All Remaining Cash")
+                st.caption(f"Deploy ${deployable_cash:,.0f} across your portfolio with actual broker prices")
                 
-                # Show ALL deployment opportunities (not just top 3)
-                for opp in deployment_opportunities:
-                    st.markdown(f"""
-                        <div style="background: #fef3c7; padding: 12px; border-radius: 8px; 
-                                    margin: 8px 0; border-left: 4px solid #f59e0b;">
-                            <div style="font-weight: 600; color: #92400e; margin-bottom: 4px;">
-                                {opp['ticker']} - {opp['fund_name']}
-                            </div>
-                            <div style="color: #78350f; font-size: 0.9rem;">
-                                Buy {opp['shares']} shares × ${opp['price']:.2f} = ${opp['amount']:,.0f}
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
+                # Initialize session state for actual prices if not exists
+                if "deploy_all_actual_prices" not in st.session_state:
+                    st.session_state.deploy_all_actual_prices = {}
                 
-                # Add Deploy All button
-                if st.button("🚀 Deploy All Remaining Cash", type="primary", use_container_width=True, 
-                           key="deploy_all_remaining"):
-                    # Execute all deployments
-                    for opp in deployment_opportunities:
-                        ticker = opp['ticker']
-                        shares = opp['shares']
-                        price = opp['price']
-                        amount = opp['amount']
-                        
-                        asset_data = assets[ticker]
-                        target_pct = asset_data.get("target", 0)
-                        target_amount = (target_pct / 100) * principal_amt
-                        
-                        # Add purchase
-                        purchase = {
-                            "date": str(date.today()),
-                            "deploy_pct": (amount / target_amount) * 100,
-                            "amount": amount,
-                            "price": price,
-                            "quantity": shares
-                        }
-                        asset_data.setdefault("purchases", []).append(purchase)
-                        asset_data["units"] = asset_data.get("units", 0) + shares
-                        
-                        # Update allocated percentage
-                        purchases = asset_data.get("purchases", [])
-                        total_spent = sum(p.get("amount", 0) for p in purchases)
-                        asset_data["allocated_pct"] = min(100.0, (total_spent / target_amount) * 100)
-                        
-                        log_profile(prof, f"Auto-deployed {shares:,} units of {ticker} (${amount:,.2f} @ ${price:.2f})")
+                # Show deployment opportunities with editable prices
+                st.markdown("#### Estimated Deployment Plan")
+                st.caption("Review estimated units and update with actual broker prices before deploying")
+                
+                total_estimated_cost = 0
+                total_actual_cost = 0
+                
+                for idx, opp in enumerate(deployment_opportunities):
+                    ticker = opp['ticker']
+                    estimated_price = opp['price']
+                    estimated_shares = opp['shares']
+                    estimated_amount = opp['amount']
                     
-                    save_db(st.session_state.db)
-                    st.success(f"✅ Deployed ${deployable_cash:,.0f} across {len(deployment_opportunities)} assets!")
-                    st.balloons()
-                    st.rerun()
+                    # Initialize actual price to estimated price if not set
+                    price_key = f"{ticker}_{date.today()}"
+                    if price_key not in st.session_state.deploy_all_actual_prices:
+                        st.session_state.deploy_all_actual_prices[price_key] = estimated_price
+                    
+                    total_estimated_cost += estimated_amount
+                    
+                    # Create expandable section for each asset
+                    with st.expander(f"**{ticker}** - {opp['fund_name']}", expanded=True):
+                        col1, col2, col3 = st.columns([2, 2, 2])
+                        
+                        with col1:
+                            st.markdown("#### Estimated")
+                            st.metric("Units", f"{estimated_shares:,}", help="Whole shares to buy")
+                            st.metric("Price/Unit", f"${estimated_price:.2f}", help="Current market price")
+                            st.metric("Total Cost", f"${estimated_amount:,.2f}", help="Estimated total")
+                        
+                        with col2:
+                            st.markdown("#### Actual Broker Price")
+                            actual_price = st.number_input(
+                                "Price Paid per Unit",
+                                min_value=0.01,
+                                value=float(st.session_state.deploy_all_actual_prices[price_key]),
+                                step=0.01,
+                                format="%.2f",
+                                key=f"actual_price_deploy_all_{ticker}_{idx}",
+                                help="Enter the exact price you paid at your broker"
+                            )
+                            st.session_state.deploy_all_actual_prices[price_key] = actual_price
+                            
+                            # Calculate actual cost
+                            actual_cost = estimated_shares * actual_price
+                            total_actual_cost += actual_cost
+                            
+                            # Show price difference
+                            price_diff = actual_price - estimated_price
+                            price_diff_pct = (price_diff / estimated_price) * 100 if estimated_price > 0 else 0
+                            
+                            if abs(price_diff) > 0.01:
+                                diff_color = "#ef4444" if price_diff > 0 else "#10b981"
+                                diff_icon = "📈" if price_diff > 0 else "📉"
+                                st.caption(f"{diff_icon} {price_diff:+.2f} ({price_diff_pct:+.1f}%) vs estimated")
+                            else:
+                                st.caption("✅ Matches estimate")
+                        
+                        with col3:
+                            st.markdown("#### Final Deployment")
+                            st.metric("Units", f"{estimated_shares:,}", help="Shares to deploy")
+                            st.metric("Actual Price", f"${actual_price:.2f}", help="Your broker price")
+                            st.metric("Actual Total", f"${actual_cost:,.2f}", 
+                                     delta=f"{actual_cost - estimated_amount:+,.2f}" if abs(actual_cost - estimated_amount) > 0.01 else None,
+                                     help="Total you'll actually pay")
+                
+                # Summary section
+                st.markdown("---")
+                col_summary1, col_summary2, col_summary3 = st.columns(3)
+                
+                with col_summary1:
+                    st.markdown("### 📊 Summary")
+                    st.metric("Assets to Deploy", len(deployment_opportunities))
+                    st.metric("Available Cash", f"${deployable_cash:,.0f}")
+                
+                with col_summary2:
+                    st.markdown("### 💰 Estimated")
+                    st.metric("Total Cost", f"${total_estimated_cost:,.2f}")
+                    st.metric("Remaining", f"${deployable_cash - total_estimated_cost:,.2f}")
+                
+                with col_summary3:
+                    st.markdown("### ✅ Actual")
+                    st.metric("Total Cost", f"${total_actual_cost:,.2f}",
+                             delta=f"{total_actual_cost - total_estimated_cost:+,.2f}" if abs(total_actual_cost - total_estimated_cost) > 0.01 else None)
+                    st.metric("Remaining", f"${deployable_cash - total_actual_cost:,.2f}")
+                
+                # Validation and warnings
+                if total_actual_cost > deployable_cash:
+                    st.error(f"⚠️ Actual cost (${total_actual_cost:,.2f}) exceeds available cash (${deployable_cash:,.2f}) by ${total_actual_cost - deployable_cash:,.2f}. Reduce units or adjust prices.")
+                    can_deploy = False
+                elif total_actual_cost < deployable_cash - 100:
+                    st.info(f"💡 You'll have ${deployable_cash - total_actual_cost:,.2f} left after deployment. This is normal for fractional remainders.")
+                    can_deploy = True
+                else:
+                    can_deploy = True
+                
+                # Deploy button with confirmation
+                st.markdown("---")
+                col_cancel, col_deploy = st.columns([1, 2])
+                
+                with col_cancel:
+                    if st.button("❌ Cancel", use_container_width=True, key="cancel_deploy_all"):
+                        st.session_state.deploy_all_actual_prices = {}
+                        st.info("Deployment cancelled")
+                        st.rerun()
+                
+                with col_deploy:
+                    if st.button("✅ Confirm & Deploy All", 
+                                 type="primary", 
+                                 use_container_width=True, 
+                                 disabled=not can_deploy,
+                                 key="deploy_all_remaining"):
+                        # Execute all deployments with actual prices
+                        deployed_assets = []
+                        total_deployed = 0
+                        
+                        for opp in deployment_opportunities:
+                            ticker = opp['ticker']
+                            shares = opp['shares']
+                            price_key = f"{ticker}_{date.today()}"
+                            actual_price = st.session_state.deploy_all_actual_prices.get(price_key, opp['price'])
+                            actual_amount = shares * actual_price
+                            
+                            asset_data = assets[ticker]
+                            target_pct = asset_data.get("target", 0)
+                            target_amount = (target_pct / 100) * principal_amt
+                            
+                            # Add purchase with actual price
+                            purchase = {
+                                "date": str(date.today()),
+                                "deploy_pct": (actual_amount / target_amount) * 100,
+                                "amount": actual_amount,
+                                "price": actual_price,
+                                "units": shares  # Use "units" for consistency
+                            }
+                            asset_data.setdefault("purchases", []).append(purchase)
+                            asset_data["units"] = asset_data.get("units", 0) + shares
+                            
+                            # Update allocated percentage based on actual spend
+                            purchases = asset_data.get("purchases", [])
+                            total_spent = sum(p.get("amount", 0) for p in purchases)
+                            asset_data["allocated_pct"] = min(100.0, (total_spent / target_amount) * 100)
+                            
+                            deployed_assets.append(ticker)
+                            total_deployed += actual_amount
+                            
+                            log_profile(prof, f"Auto-deployed {shares:,} units of {ticker} @ ${actual_price:.2f} (${actual_amount:,.2f} actual cost)")
+                        
+                        save_db(st.session_state.db)
+                        
+                        # Clear actual prices from session state
+                        st.session_state.deploy_all_actual_prices = {}
+                        
+                        st.success(f"✅ Successfully deployed ${total_deployed:,.2f} across {len(deployed_assets)} assets!")
+                        st.balloons()
+                        st.rerun()
             
             # Activity Log
             st.divider()
