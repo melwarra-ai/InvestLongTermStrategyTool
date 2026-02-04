@@ -28,11 +28,61 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.7.0"
+VERSION = "7.7.1"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "21:00:00"  # EST
-VERSION_NAME = "Deploy All with Actual Prices"
+VERSION_TIME = "21:30:00"  # EST
+VERSION_NAME = "Default Units to Max"
 CHANGELOG = """
+v7.7.1 (2026-02-02 21:30 EST) - 🔢 DEFAULT UNITS TO MAX
+- IMPROVED: "Number of Units" now defaults to maximum available
+- CHANGED: Default changed from 1 unit to max whole units
+- ADDED: Help text explains default behavior
+- BENEFIT: Users can deploy full budget with one click
+- BENEFIT: Still can manually reduce if needed
+
+**What Changed:**
+
+Before (v7.7.0):
+```
+💡 Max whole units for available budget: 100
+Number of Units: [1] ← Default to 1, user must type 100
+```
+
+After (v7.7.1):
+```
+💡 Max whole units for available budget: 100
+Number of Units: [100] ← Defaults to max! User can reduce if needed
+```
+
+**Example Scenario:**
+
+Available Budget: $12,045
+Asset Price: $120.45
+Max Units: 100
+
+Before: User sees [1], must manually type 100
+After: User sees [100], can click Deploy or reduce to 50
+
+**Benefits:**
+- ✅ One-click full deployment (most common use case)
+- ✅ Maximizes capital deployment by default
+- ✅ Still allows partial deployment (user can change)
+- ✅ Faster workflow for users
+- ✅ Better UX - defaults to what most users want
+
+**Use Cases:**
+
+Full Deployment (90% of users):
+  1. Select asset
+  2. See: "Number of Units: [100]" ✅ Already set!
+  3. Click Deploy
+  
+Partial Deployment (10% of users):
+  1. Select asset
+  2. See: "Number of Units: [100]"
+  3. Change to: [50] (deploy half)
+  4. Click Deploy
+
 v7.7.0 (2026-02-02 21:00 EST) - 💰 DEPLOY ALL WITH ACTUAL PRICES
 - MAJOR: Deploy All Remaining Cash now allows actual price input
 - ADDED: Expandable sections for each asset in deployment plan
@@ -5819,10 +5869,11 @@ else:
                                         else:
                                             st.caption(f"💡 Max whole units for available budget: {max_units:,} (${actual_available_budget:,.0f} / ${preview_price:.2f})")
                                             
-                                            # Default to 1 unit or max_units, whichever is smaller
-                                            default_units = min(1, max_units)
+                                            # Default to max_units (user can override to deploy less)
+                                            default_units = max_units
                                             deploy_units = st.number_input("Number of Units", min_value=1, max_value=max_units,
-                                                                          value=default_units, step=1, key="deploy_units_input")
+                                                                          value=default_units, step=1, key="deploy_units_input",
+                                                                          help=f"Defaults to max ({max_units:,} units). You can deploy fewer if needed.")
                                             
                                             deploy_amount = deploy_units * preview_price
                                             estimated_units = deploy_units
