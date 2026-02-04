@@ -28,11 +28,40 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.6.1"
+VERSION = "7.6.2"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "17:30:00"  # EST
-VERSION_NAME = "Goal Tracker - Add Year Start Value"
+VERSION_TIME = "19:00:00"  # EST
+VERSION_NAME = "UX Enhancements"
 CHANGELOG = """
+v7.6.2 (2026-02-02 19:00 EST) - ✨ UX ENHANCEMENTS
+- IMPROVED: Actual Price Paid now defaults to estimated price during deployment
+- IMPROVED: Larger, more visible text in Record Asset Deployment section
+- ADDED: Canadian benchmark options (XIU, XIC, ZCN, VCN)
+- ENHANCED: Deployment section headers now use larger fonts (#### markdown)
+- ENHANCED: Better visibility for deployment method selection
+- ENHANCED: Clearer labels throughout asset deployment workflow
+
+**Enhancement 1: Price Pre-fill**
+- "Actual Price Paid" now defaults to preview price
+- Aligns with value shown in "Deployment Preview"
+- Users can still override with actual broker price
+- Reduces data entry errors
+
+**Enhancement 2: Bigger Text**
+- Section title: "Deploy Capital Into Assets" (larger)
+- Asset info: Uses #### heading (larger)
+- Method selection: "Choose Deployment Method" (larger)
+- Date selection: "Select Purchase Date" (larger)
+- Better readability for all users
+
+**Enhancement 3: Canadian Benchmarks**
+- 🇨🇦 TSX 60 (XIU) - Top 60 large cap
+- 🇨🇦 TSX Composite (XIC) - Broad market
+- 🇨🇦 TSX Capped Comp (ZCN) - Capped weights
+- 🇨🇦 FTSE Canada (VCN) - All cap
+- US benchmarks still available (SPY, QQQ, etc.)
+- Flag emojis for easy identification
+
 v7.6.1 (2026-02-02 17:30 EST) - 📊 GOAL TRACKER - YEAR START VALUE ADDED
 - ADDED: Year Start Value now displayed alongside Current and Year-End Target
 - IMPROVED: Three-column layout for clear progression view
@@ -4908,19 +4937,31 @@ else:
             
             # Benchmark Selection
             st.markdown("### ③ Benchmark Comparison")
-            st.caption("Compare against market benchmarks")
+            st.caption("Compare against market benchmarks (US & Canadian)")
             with st.expander("ℹ️ Why use a benchmark?", expanded=False):
                 st.markdown("""
                 **Benchmarks** help evaluate performance.
                 - Chart shows 100% investment in each benchmark
                 - **Outperforming** = your strategy adds value
                 - Select multiple to compare different indices
+                
+                **🇺🇸 US Markets:** SPY, QQQ, VTI, IWM, DIA, BND  
+                **🇨🇦 Canadian Markets:** XIU, XIC, ZCN, VCN
                 """)
             
             benchmark_options = {
-                "S&P 500 (SPY)": "SPY", "NASDAQ-100 (QQQ)": "QQQ",
-                "Total Market (VTI)": "VTI", "Russell 2000 (IWM)": "IWM", 
-                "Dow Jones (DIA)": "DIA", "Bonds (BND)": "BND"
+                # US Benchmarks
+                "🇺🇸 S&P 500 (SPY)": "SPY",
+                "🇺🇸 NASDAQ-100 (QQQ)": "QQQ",
+                "🇺🇸 Total Market (VTI)": "VTI",
+                "🇺🇸 Russell 2000 (IWM)": "IWM",
+                "🇺🇸 Dow Jones (DIA)": "DIA",
+                "🇺🇸 US Bonds (BND)": "BND",
+                # Canadian Benchmarks
+                "🇨🇦 TSX 60 (XIU)": "XIU",
+                "🇨🇦 TSX Composite (XIC)": "XIC",
+                "🇨🇦 TSX Capped Comp (ZCN)": "ZCN",
+                "🇨🇦 FTSE Canada (VCN)": "VCN"
             }
             current_benchmarks = prof.get('benchmarks', [])
             # Migration: convert old single benchmark to list
@@ -5354,7 +5395,8 @@ else:
                         st.success("✅ **All assets 100% deployed!**")
                 else:
                     with st.expander("➢ Record Asset Deployment", expanded=False):
-                        st.markdown("**Deploy capital into a specific asset**")
+                        st.markdown("### Deploy Capital Into Assets")
+                        st.markdown("**Record your actual purchases from your broker**")
                         
                         selected_ticker = st.selectbox("Select Asset", options=list(deployable_assets.keys()),
                             format_func=lambda t: f"{t} - {deployable_assets[t].get('fund_name', t)}", key="deploy_asset_selector")
@@ -5390,8 +5432,8 @@ else:
                             display_allocated = min(round(current_allocated), 100)
                             display_remaining = max(round(remaining_pct), 0)
                             
-                            st.markdown(f"**{selected_ticker}:** Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
-                            st.caption(f"Deployed: ${actual_spent:,.0f} ({display_allocated}%) • Budget Remaining: ${remaining_budget:,.0f}")
+                            st.markdown(f"#### {selected_ticker}: Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
+                            st.markdown(f"**Deployed:** ${actual_spent:,.0f} ({display_allocated}%) • **Budget Remaining:** ${remaining_budget:,.0f}")
                             
                             # CRITICAL: Check smart "100% deployed" FIRST (before showing budget display)
                             # Asset is 100% deployed when remaining budget can't buy 1 unit
@@ -5473,10 +5515,13 @@ else:
                             
                             if not is_asset_fully_deployed:
                                 # Deployment method selection
-                                deploy_method = st.radio("Deployment Method", ["By Percentage", "By Units"], 
-                                                        horizontal=True, key="deploy_method_radio")
+                                st.markdown("#### Choose Deployment Method")
+                                deploy_method = st.radio("", ["By Percentage", "By Units"], 
+                                                        horizontal=True, key="deploy_method_radio",
+                                                        label_visibility="collapsed")
                                 
                                 # Date selection with Today button
+                                st.markdown("#### Select Purchase Date")
                                 col_date, col_today = st.columns([3, 1])
                                 with col_today:
                                     st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
@@ -5648,16 +5693,17 @@ else:
                                     # Actual price input - user enters what they actually paid
                                     st.markdown("---")
                                     st.markdown("**💰 Enter Actual Purchase Details:**")
-                                    st.caption("After buying at your broker, enter the actual price you paid")
+                                    st.caption("After buying at your broker, enter the actual price you paid (pre-filled with estimated price)")
                                     
+                                    # Enhancement 1: Default to preview_price to align with Deployment Preview
                                     actual_price = st.number_input(
                                         f"Actual Price Paid (per unit)",
                                         min_value=0.01,
-                                        value=float(preview_price),
+                                        value=float(preview_price),  # Already defaults to preview_price ✅
                                         step=0.01,
                                         format="%.2f",
                                         key="actual_deploy_price",
-                                        help="Enter the exact price you paid at your broker"
+                                        help="Defaults to estimated price. Update with your actual broker price if different."
                                     )
                                     
                                     # Recalculate with actual price
