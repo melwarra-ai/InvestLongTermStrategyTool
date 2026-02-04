@@ -28,11 +28,43 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.6.3"
+VERSION = "7.6.4"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "19:30:00"  # EST
-VERSION_NAME = "Price Pre-fill Fix"
+VERSION_TIME = "20:00:00"  # EST
+VERSION_NAME = "Larger Text Throughout Deployment"
 CHANGELOG = """
+v7.6.4 (2026-02-02 20:00 EST) - 📝 LARGER TEXT IMPROVEMENTS
+- IMPROVED: Asset target line now uses ### heading (larger)
+- IMPROVED: Deployed/Budget info now 1.1rem font size (larger)
+- IMPROVED: Price display now 1.2rem with custom styling (prominent)
+- IMPROVED: Budget allocation header now ### (larger)
+- IMPROVED: Deployment Preview header now 1.2rem (larger)
+- IMPROVED: All preview items now 1.05rem (easier to read)
+- IMPROVED: Units highlighted at 1.15rem (most important)
+- IMPROVED: "Enter Actual Purchase Details" now ### (larger)
+
+**Before (v7.6.3):**
+```
+#### SPXL: Target $100,000 (100.0% of portfolio)
+**Deployed:** $0 (0%) • **Budget Remaining:** $100,000
+```
+
+**After (v7.6.4):**
+```
+### SPXL: Target $100,000 (100.0% of portfolio)
+[1.1rem font] Deployed: $0 (0%) • Budget Remaining: $100,000
+```
+
+**Text Size Hierarchy:**
+- Asset name: ### (h3 heading - largest)
+- Deployed info: 1.1rem (11% larger than normal)
+- Price display: 1.2rem in blue box (20% larger, prominent)
+- Preview header: 1.2rem (20% larger)
+- Preview items: 1.05rem (5% larger)
+- Units value: 1.15rem (15% larger, highlighted)
+
+**All text more visible and easier to read!** ✅
+
 v7.6.3 (2026-02-02 19:30 EST) - 🔧 PRICE PRE-FILL FIX
 - FIXED: Actual Price Paid now properly pre-fills with estimated price
 - FIXED: Widget key now includes date and units to force refresh
@@ -5457,8 +5489,9 @@ else:
                             display_allocated = min(round(current_allocated), 100)
                             display_remaining = max(round(remaining_pct), 0)
                             
-                            st.markdown(f"#### {selected_ticker}: Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
-                            st.markdown(f"**Deployed:** ${actual_spent:,.0f} ({display_allocated}%) • **Budget Remaining:** ${remaining_budget:,.0f}")
+                            # Make text bigger and more prominent
+                            st.markdown(f"### {selected_ticker}: Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
+                            st.markdown(f"<div style='font-size: 1.1rem; margin-bottom: 12px;'><strong>Deployed:</strong> ${actual_spent:,.0f} ({display_allocated}%) • <strong>Budget Remaining:</strong> ${remaining_budget:,.0f}</div>", unsafe_allow_html=True)
                             
                             # CRITICAL: Check smart "100% deployed" FIRST (before showing budget display)
                             # Asset is 100% deployed when remaining budget can't buy 1 unit
@@ -5495,7 +5528,7 @@ else:
                             else:
                                 # Asset still has deployable budget - show budget display
                                 st.markdown("---")
-                                st.markdown("**💰 Per-Asset Budget Allocation:**")
+                                st.markdown("### 💰 Per-Asset Budget Allocation")
                                 
                                 col_b1, col_b2 = st.columns(2)
                                 with col_b1:
@@ -5597,10 +5630,16 @@ else:
                                 except:
                                     pass
                                 
-                                # Show price info
+                                # Show price info - make it bigger and more visible
                                 if preview_price:
                                     p_flag = "🇺🇸" if prof.get("currency") == "USD" else "🇨🇦"
-                                    st.info(f"📈 **Price on {preview_price_date}:** {p_flag} ${preview_price:,.2f}")
+                                    st.markdown(f"""
+                                    <div style="background: #e0f2fe; border-left: 4px solid #0284c7; padding: 16px; border-radius: 8px; margin: 12px 0;">
+                                        <div style="font-size: 1.2rem; font-weight: 600; color: #0c4a6e;">
+                                            📈 Price on {preview_price_date}: {p_flag} ${preview_price:,.2f}
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
                                     if preview_price_date != deploy_date:
                                         st.caption(f"ℹ️ Using {preview_price_date} price (closest trading day)")
                                 
@@ -5706,18 +5745,18 @@ else:
                                     new_total_spent = actual_spent + deploy_amount
                                     
                                     st.markdown(f'''
-                                        <div class="buying-guide">
-                                            <div style="margin-bottom: 8px;"><strong>📊 Deployment Preview:</strong></div>
-                                            <div>• <strong>Units:</strong> <span class="buying-guide-highlight">{int(estimated_units):,} units</span></div>
-                                            <div>• <strong>Estimated Cost:</strong> ${deploy_amount:,.2f} (based on ${preview_price:,.2f}/unit)</div>
-                                            <div>• <strong>Asset Target Budget:</strong> ${target_budget:,.2f} ({target_pct}% of ${prof['principal']:,.0f})</div>
-                                            <div>• <strong>Already Spent:</strong> ${actual_spent:,.2f} ({current_allocated:.1f}%)</div>
+                                        <div class="buying-guide" style="font-size: 1.05rem;">
+                                            <div style="margin-bottom: 10px; font-size: 1.2rem;"><strong>📊 Deployment Preview:</strong></div>
+                                            <div style="margin-bottom: 6px;">• <strong>Units:</strong> <span class="buying-guide-highlight" style="font-size: 1.15rem;">{int(estimated_units):,} units</span></div>
+                                            <div style="margin-bottom: 6px;">• <strong>Estimated Cost:</strong> ${deploy_amount:,.2f} (based on ${preview_price:,.2f}/unit)</div>
+                                            <div style="margin-bottom: 6px;">• <strong>Asset Target Budget:</strong> ${target_budget:,.2f} ({target_pct}% of ${prof['principal']:,.0f})</div>
+                                            <div style="margin-bottom: 6px;">• <strong>Already Spent:</strong> ${actual_spent:,.2f} ({current_allocated:.1f}%)</div>
                                         </div>
                                     ''', unsafe_allow_html=True)
                                     
                                     # Actual price input - user enters what they actually paid
                                     st.markdown("---")
-                                    st.markdown("**💰 Enter Actual Purchase Details:**")
+                                    st.markdown("### 💰 Enter Actual Purchase Details")
                                     st.caption("After buying at your broker, enter the actual price you paid (pre-filled with estimated price)")
                                     
                                     # Enhancement 1: Default to preview_price to align with Deployment Preview
