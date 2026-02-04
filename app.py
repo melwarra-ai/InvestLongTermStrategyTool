@@ -28,11 +28,36 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.6.2"
+VERSION = "7.6.3"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "19:00:00"  # EST
-VERSION_NAME = "UX Enhancements"
+VERSION_TIME = "19:30:00"  # EST
+VERSION_NAME = "Price Pre-fill Fix"
 CHANGELOG = """
+v7.6.3 (2026-02-02 19:30 EST) - 🔧 PRICE PRE-FILL FIX
+- FIXED: Actual Price Paid now properly pre-fills with estimated price
+- FIXED: Widget key now includes date and units to force refresh
+- IMPROVED: Price field updates immediately when date or units change
+
+**What Was Wrong (v7.6.2):**
+- Streamlit was caching the widget state with static key
+- Price field wouldn't update when changing date/units
+- Users saw blank or old value instead of preview price
+
+**What's Fixed (v7.6.3):**
+- Dynamic key: "actual_deploy_price_{ticker}_{date}_{units}"
+- Widget refreshes when any input changes
+- Always shows current preview price
+- User can still override with actual broker price
+
+**Test It:**
+1. Select asset and date
+2. Choose units (e.g., 10 units)
+3. See preview: "10 units @ $120.45"
+4. Scroll down to "Actual Price Paid"
+5. Should show: $120.45 (pre-filled!) ✅
+6. Change units to 20
+7. Price updates to new preview price ✅
+
 v7.6.2 (2026-02-02 19:00 EST) - ✨ UX ENHANCEMENTS
 - IMPROVED: Actual Price Paid now defaults to estimated price during deployment
 - IMPROVED: Larger, more visible text in Record Asset Deployment section
@@ -5696,13 +5721,16 @@ else:
                                     st.caption("After buying at your broker, enter the actual price you paid (pre-filled with estimated price)")
                                     
                                     # Enhancement 1: Default to preview_price to align with Deployment Preview
+                                    # Use dynamic key to ensure widget refreshes when date/units change
+                                    price_key = f"actual_deploy_price_{selected_ticker}_{deploy_date}_{int(estimated_units)}"
+                                    
                                     actual_price = st.number_input(
                                         f"Actual Price Paid (per unit)",
                                         min_value=0.01,
-                                        value=float(preview_price),  # Already defaults to preview_price ✅
+                                        value=float(preview_price),
                                         step=0.01,
                                         format="%.2f",
-                                        key="actual_deploy_price",
+                                        key=price_key,
                                         help="Defaults to estimated price. Update with your actual broker price if different."
                                     )
                                     
