@@ -28,11 +28,52 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.6.4"
+VERSION = "7.6.5"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "20:00:00"  # EST
-VERSION_NAME = "Larger Text Throughout Deployment"
+VERSION_TIME = "20:30:00"  # EST
+VERSION_NAME = "Canadian Benchmark Fix"
 CHANGELOG = """
+v7.6.5 (2026-02-02 20:30 EST) - 🇨🇦 CANADIAN BENCHMARK FIX
+- FIXED: Canadian benchmarks now display correctly on performance chart
+- ADDED: .TO suffix for Toronto Stock Exchange tickers
+- IMPROVED: Error messages show if benchmark fails to load
+- FIXED: XIU, XIC, ZCN, VCN now work properly
+
+**What Was Wrong (v7.6.4):**
+- Canadian tickers (XIU, XIC, ZCN, VCN) weren't showing on chart
+- yfinance needs ".TO" suffix for Toronto Stock Exchange
+- Silent error handling hid the problem
+- Users saw empty chart with no explanation
+
+**What's Fixed (v7.6.5):**
+```python
+# Before
+yf.download("XIU", ...)  # ❌ Fails silently
+
+# After  
+yf.download("XIU.TO", ...)  # ✅ Works!
+```
+
+**Automatic Suffix Mapping:**
+- XIU → XIU.TO (iShares S&P/TSX 60)
+- XIC → XIC.TO (iShares Core TSX Composite)
+- ZCN → ZCN.TO (BMO TSX Capped Composite)
+- VCN → VCN.TO (Vanguard FTSE Canada)
+
+**Error Handling:**
+- Shows warning if benchmark fails to load
+- Displays specific error message
+- Doesn't crash the entire chart
+- Other benchmarks still display
+
+**Test It:**
+1. Go to Benchmark Comparison
+2. Select: 🇨🇦 TSX 60 (XIU)
+3. Save benchmarks
+4. Check Performance vs Goal Path chart
+5. Should see XIU dotted line! ✅
+6. Hover shows: "XIU (+X.X%)"
+
 v7.6.4 (2026-02-02 20:00 EST) - 📝 LARGER TEXT IMPROVEMENTS
 - IMPROVED: Asset target line now uses ### heading (larger)
 - IMPROVED: Deployed/Budget info now 1.1rem font size (larger)
@@ -8056,7 +8097,12 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     if not benchmark_ticker:
                         continue
                     try:
-                        benchmark_raw = yf.download(benchmark_ticker, start=prof["start_date"], auto_adjust=True, progress=False)
+                        # Canadian tickers need .TO suffix for Toronto Stock Exchange
+                        ticker_to_fetch = benchmark_ticker
+                        if benchmark_ticker in ['XIU', 'XIC', 'ZCN', 'VCN']:
+                            ticker_to_fetch = f"{benchmark_ticker}.TO"
+                        
+                        benchmark_raw = yf.download(ticker_to_fetch, start=prof["start_date"], auto_adjust=True, progress=False)
                         if not benchmark_raw.empty:
                             benchmark_data = benchmark_raw['Close']
                             if isinstance(benchmark_data, pd.DataFrame):
@@ -8076,7 +8122,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                 customdata = [[
                                     f"${val:,.0f}",
                                     f"{ret:+.1f}%",
-                                    benchmark_ticker
+                                    benchmark_ticker  # Show original ticker (without .TO)
                                 ] for val, ret in zip(benchmark_normalized, bench_daily_returns)]
                                 
                                 color = benchmark_colors[idx % len(benchmark_colors)]
@@ -8098,7 +8144,9 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                     "return": bench_return,
                                     "final_value": bench_final_value
                                 })
-                    except:
+                    except Exception as e:
+                        # Log error for debugging but don't crash
+                        st.warning(f"⚠️ Could not load benchmark {benchmark_ticker}: {str(e)}")
                         pass
                 
                 # Actual portfolio - normalize to start at principal for fair comparison
