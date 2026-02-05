@@ -28,11 +28,55 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.7.1"
+VERSION = "7.7.2"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "21:30:00"  # EST
-VERSION_NAME = "Default Units to Max"
+VERSION_TIME = "22:00:00"  # EST
+VERSION_NAME = "7 UX Enhancements"
 CHANGELOG = """
+v7.7.2 (2026-02-02 22:00 EST) - ✨ 7 UX ENHANCEMENTS
+- ENH 1: Asset allocation shows "target allocated" instead of price
+- ENH 2: "Today" button properly updates Deployment Date field
+- ENH 3: "Deploy All" only shows when all assets are 100% deployed
+- ENH 4: Deploy All text size matches sidebar (smaller, consistent)
+- ENH 5: Target % disabled when asset mix locked (prevents changes)
+- ENH 6: Deploy % defaults to previously used value per asset
+- ENH 7: Number of Units defaults to max available (v7.7.1 feature)
+
+**Enhancement 1: Better Asset Messages**
+Before: ✅ State Street SPDR Bloomberg 1-3 Month T-Bill ETF - $91.41
+After: ✅ State Street SPDR Bloomberg 1-3 Month T-Bill ETF - Asset target allocated
+
+**Enhancement 2: Today Button Fixed**
+Before: Click "Today" → Nothing happens
+After: Click "Today" → Date field updates to today ✅
+
+**Enhancement 3: Deploy All Context**
+Before: Shows anytime there's remaining cash
+After: Only shows after ALL assets reach 100% deployment
+Logic: Makes sense to "Deploy All Remaining" only after main deployment done
+
+**Enhancement 4: Consistent Text Size**
+Before: ### headings (very large) in Deploy All section
+After: #### and ** headings (normal sidebar size)
+Result: Visually consistent with rest of sidebar
+
+**Enhancement 5: Protect Locked Allocations**
+Before: Can change target % even when locked
+After: Target % field disabled when asset mix locked
+Unlock required to change allocations
+
+**Enhancement 6: Remember Deploy %**
+Before: Always defaults to 25%
+After: Defaults to last used % for each asset
+Example:
+  - First time SPXL: 25%
+  - Deploy 30%
+  - Next time SPXL: 30% (remembers!)
+
+**Enhancement 7: Max Units Default**
+Status: Already implemented in v7.7.1 ✅
+Number of Units defaults to max whole units available
+
 v7.7.1 (2026-02-02 21:30 EST) - 🔢 DEFAULT UNITS TO MAX
 - IMPROVED: "Number of Units" now defaults to maximum available
 - CHANGED: Default changed from 1 unit to max whole units
@@ -5369,7 +5413,11 @@ else:
                             except:
                                 ticker_name = a_sym
                             
-                            loading_placeholder.success(f"✅ **{ticker_name}** - ${last_price:,.2f}")
+                            # Enhancement 1: Show allocation message instead of price
+                            if is_existing:
+                                loading_placeholder.success(f"✅ **{ticker_name}** - Asset target allocated")
+                            else:
+                                loading_placeholder.success(f"✅ **{ticker_name}** - Ready to allocate")
                             valid_ticker = True
                         else:
                             loading_placeholder.error(f"❌ No data found for '{a_sym}'")
@@ -5401,10 +5449,21 @@ else:
                 st.markdown("---")
                 default_target = prof.get("assets", {}).get(a_sym, {}).get("target", 0.0)
                 
-                a_w = st.number_input("Target Allocation %", min_value=0.0, max_value=max_available,
-                                     value=min(float(default_target), max_available), step=0.5, 
+                # Enhancement 5: Disable target editing when asset mix is locked (unless editing existing asset)
+                is_locked = prof.get("asset_mix_locked", False)
+                can_edit_target = not is_locked or is_existing
+                
+                if is_locked and not is_existing:
+                    st.warning("🔒 Asset mix is locked. Unlock first to add new assets or change allocations.")
+                
+                a_w = st.number_input("Target Allocation %", 
+                                     min_value=0.0, 
+                                     max_value=max_available,
+                                     value=min(float(default_target), max_available), 
+                                     step=0.5, 
                                      help=f"Set the target % for {a_sym}. Max available: {max_available:.1f}%",
-                                     key="target_weight")
+                                     key="target_weight",
+                                     disabled=is_locked)
                 
                 st.markdown("---")
                 col_b1, col_b2 = st.columns(2)
@@ -5734,21 +5793,19 @@ else:
                                 # Date selection with Today button
                                 st.markdown("#### Select Purchase Date")
                                 col_date, col_today = st.columns([3, 1])
+                                
+                                # Initialize deploy_date_value if not exists
+                                if 'deploy_date_value' not in st.session_state:
+                                    st.session_state.deploy_date_value = date.today()
+                                
                                 with col_today:
                                     st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
                                     if st.button("📅 Today", key="set_today_btn", use_container_width=True):
-                                        # Force update to today's date
+                                        # Enhancement 2: Update to today and force widget refresh
                                         st.session_state.deploy_date_value = date.today()
-                                        # Clear the widget key to force complete refresh
-                                        if 'deploy_date_input' in st.session_state:
-                                            del st.session_state['deploy_date_input']
                                         st.rerun()
                                 
                                 with col_date:
-                                    # Always use session state value (or today if not set)
-                                    if 'deploy_date_value' not in st.session_state:
-                                        st.session_state.deploy_date_value = date.today()
-                                    
                                     deploy_date = st.date_input("Deployment Date", 
                                                                value=st.session_state.deploy_date_value,
                                                                max_value=date.today(), 
@@ -5807,7 +5864,12 @@ else:
                                     # Calculate max % based on remaining asset budget
                                     max_deployable_pct = remaining_pct
                                     
-                                    default_pct = min(25.0, remaining_pct) if remaining_pct > 0 else 0.1
+                                    # Enhancement 6: Use last deployed % as default
+                                    last_deploy_pct_key = f"last_deploy_pct_{selected_ticker}"
+                                    if last_deploy_pct_key in st.session_state:
+                                        default_pct = min(st.session_state[last_deploy_pct_key], remaining_pct)
+                                    else:
+                                        default_pct = min(25.0, remaining_pct) if remaining_pct > 0 else 0.1
                                     
                                     deploy_pct = st.number_input("Deploy % (of asset's target)", 
                                                                 min_value=0.1, 
@@ -5816,6 +5878,10 @@ else:
                                                                 step=0.1, 
                                                                 key="deploy_pct_input",
                                                                 help="Percentage of this asset's target allocation to deploy")
+                                    
+                                    # Store for next time
+                                    st.session_state[last_deploy_pct_key] = deploy_pct
+                                    
                                     portfolio_pct = (deploy_pct / 100) * target_pct
                                     deploy_amount = (portfolio_pct / 100) * prof['principal']
                                     
@@ -6280,16 +6346,23 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         st.rerun()
             
             # Show deployment opportunities if available (and NOT truly fractional)
-            if deployment_opportunities and not is_truly_fractional:
-                st.markdown("### 🚀 Deploy All Remaining Cash")
-                st.caption(f"Deploy ${deployable_cash:,.0f} across your portfolio with actual broker prices")
+            # Enhancement 3: Only show if all assets are fully deployed (100%)
+            all_assets_deployed = all(
+                asset_data.get("allocated_pct", 0) >= 99.5 
+                for asset_data in assets.values()
+            ) if assets else False
+            
+            if deployment_opportunities and not is_truly_fractional and all_assets_deployed:
+                # Enhancement 4: Use smaller headings to match sidebar text size
+                st.markdown("#### 🚀 Deploy All Remaining Cash")
+                st.caption(f"Deploy ${deployable_cash:,.0f} remaining across your portfolio with actual broker prices")
                 
                 # Initialize session state for actual prices if not exists
                 if "deploy_all_actual_prices" not in st.session_state:
                     st.session_state.deploy_all_actual_prices = {}
                 
                 # Show deployment opportunities with editable prices
-                st.markdown("#### Estimated Deployment Plan")
+                st.markdown("**Estimated Deployment Plan**")
                 st.caption("Review estimated units and update with actual broker prices before deploying")
                 
                 total_estimated_cost = 0
@@ -6313,13 +6386,13 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         col1, col2, col3 = st.columns([2, 2, 2])
                         
                         with col1:
-                            st.markdown("#### Estimated")
+                            st.markdown("**Estimated**")
                             st.metric("Units", f"{estimated_shares:,}", help="Whole shares to buy")
                             st.metric("Price/Unit", f"${estimated_price:.2f}", help="Current market price")
                             st.metric("Total Cost", f"${estimated_amount:,.2f}", help="Estimated total")
                         
                         with col2:
-                            st.markdown("#### Actual Broker Price")
+                            st.markdown("**Actual Broker Price**")
                             actual_price = st.number_input(
                                 "Price Paid per Unit",
                                 min_value=0.01,
@@ -6347,7 +6420,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                 st.caption("✅ Matches estimate")
                         
                         with col3:
-                            st.markdown("#### Final Deployment")
+                            st.markdown("**Final Deployment**")
                             st.metric("Units", f"{estimated_shares:,}", help="Shares to deploy")
                             st.metric("Actual Price", f"${actual_price:.2f}", help="Your broker price")
                             st.metric("Actual Total", f"${actual_cost:,.2f}", 
@@ -6359,17 +6432,17 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 col_summary1, col_summary2, col_summary3 = st.columns(3)
                 
                 with col_summary1:
-                    st.markdown("### 📊 Summary")
+                    st.markdown("**📊 Summary**")
                     st.metric("Assets to Deploy", len(deployment_opportunities))
                     st.metric("Available Cash", f"${deployable_cash:,.0f}")
                 
                 with col_summary2:
-                    st.markdown("### 💰 Estimated")
+                    st.markdown("**💰 Estimated**")
                     st.metric("Total Cost", f"${total_estimated_cost:,.2f}")
                     st.metric("Remaining", f"${deployable_cash - total_estimated_cost:,.2f}")
                 
                 with col_summary3:
-                    st.markdown("### ✅ Actual")
+                    st.markdown("**✅ Actual**")
                     st.metric("Total Cost", f"${total_actual_cost:,.2f}",
                              delta=f"{total_actual_cost - total_estimated_cost:+,.2f}" if abs(total_actual_cost - total_estimated_cost) > 0.01 else None)
                     st.metric("Remaining", f"${deployable_cash - total_actual_cost:,.2f}")
