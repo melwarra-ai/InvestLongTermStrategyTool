@@ -28,11 +28,47 @@ except ImportError:
 STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "7.7.2"
+VERSION = "7.7.3"
 VERSION_DATE = "2026-02-02"
-VERSION_TIME = "22:00:00"  # EST
-VERSION_NAME = "7 UX Enhancements"
+VERSION_TIME = "22:30:00"  # EST
+VERSION_NAME = "4 UX Refinements"
 CHANGELOG = """
+v7.7.3 (2026-02-02 22:30 EST) - ✨ 4 UX REFINEMENTS
+- ENH 1: Deployment status shows "In Progress - 50% complete" (clearer)
+- ENH 2: Deploy % defaults to max whole units % (no fractional)
+- ENH 3: Rebalance table shows precise deployed % (e.g., 99.95%)
+- ENH 4: Ticker input disabled when asset mix locked
+
+**Enhancement 1: Better Deployment Status**
+Before: Deployment: 0/4 - In Progress (confusing!)
+After: Deployment: In Progress - 50% complete ✅
+
+**Enhancement 2: Smart Deploy % Default**
+Calculates max whole units you can afford and defaults to that %.
+
+Example:
+  Available: $12,045
+  Price: $120.45
+  Max units: 100
+  Max amount: $12,045 (100 × $120.45)
+  Target budget: $20,000
+  Smart default: 60.2% (no fractional shares!)
+
+Before: Always defaulted to 25%
+After: Defaults to max whole units % ✅
+
+**Enhancement 3: Precise Deployed %**
+Before: Deployed: 99% or 100%
+After: Deployed: 99.95% (2 decimal precision)
+
+Shows exact deployment progress, not rounded.
+
+**Enhancement 4: Lock UI When Locked**
+Before: Ticker input active, buttons clickable when locked
+After: Ticker input disabled + info message shown ✅
+
+Clearer indication that mix is locked.
+
 v7.7.2 (2026-02-02 22:00 EST) - ✨ 7 UX ENHANCEMENTS
 - ENH 1: Asset allocation shows "target allocated" instead of price
 - ENH 2: "Today" button properly updates Deployment Date field
@@ -5354,8 +5390,14 @@ else:
             # Determine default value for text input
             default_ticker = st.session_state.get('ticker_input', '')
             
+            # Enhancement 4: Show info message when asset mix is locked
+            is_mix_locked = prof.get("asset_mix_locked", False)
+            if is_mix_locked:
+                st.info("🔒 **Asset mix is locked.** Unlock below if you need to add or modify assets.")
+            
             a_sym = st.text_input("Ticker Symbol", placeholder="e.g., AAPL", 
-                                 key="ticker_input", value=default_ticker).upper().strip()
+                                 key="ticker_input", value=default_ticker,
+                                 disabled=is_mix_locked).upper().strip()
             is_existing = a_sym in prof.get("assets", {})
             
             if is_existing:
@@ -5864,12 +5906,28 @@ else:
                                     # Calculate max % based on remaining asset budget
                                     max_deployable_pct = remaining_pct
                                     
-                                    # Enhancement 6: Use last deployed % as default
+                                    # Enhancement 2: Calculate default % based on max whole units we can afford
+                                    if preview_price and actual_available_budget > 0:
+                                        # Calculate max whole units we can buy
+                                        max_units = int(actual_available_budget / preview_price)
+                                        if max_units >= 1:
+                                            # Calculate what % of target this represents
+                                            max_amount = max_units * preview_price
+                                            portfolio_pct_for_max = (max_amount / prof['principal']) * 100
+                                            default_pct_calculated = (portfolio_pct_for_max / target_pct) * 100 if target_pct > 0 else 0
+                                            # Cap at remaining %
+                                            smart_default = min(default_pct_calculated, remaining_pct)
+                                        else:
+                                            smart_default = min(25.0, remaining_pct) if remaining_pct > 0 else 0.1
+                                    else:
+                                        smart_default = min(25.0, remaining_pct) if remaining_pct > 0 else 0.1
+                                    
+                                    # Enhancement 6: Use last deployed % as default (override smart default if exists)
                                     last_deploy_pct_key = f"last_deploy_pct_{selected_ticker}"
                                     if last_deploy_pct_key in st.session_state:
                                         default_pct = min(st.session_state[last_deploy_pct_key], remaining_pct)
                                     else:
-                                        default_pct = min(25.0, remaining_pct) if remaining_pct > 0 else 0.1
+                                        default_pct = smart_default
                                     
                                     deploy_pct = st.number_input("Deploy % (of asset's target)", 
                                                                 min_value=0.1, 
@@ -8154,7 +8212,9 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     
                     total_count = len(assets)
                     if deployed_count < total_count:
-                        st.metric("Deployment", f"{deployed_count}/{total_count}", delta="In Progress", delta_color="off")
+                        # Enhancement 1: Show clearer deployment message
+                        deployment_pct = (deployed_count / total_count * 100) if total_count > 0 else 0
+                        st.metric("Deployment", "In Progress", delta=f"{deployment_pct:.0f}% complete", delta_color="off")
                     elif has_rebalanced:
                         st.metric("Status", "✅ Balanced" if recently_rebalanced else "Active", delta="Monitoring", delta_color="off")
                     else:
@@ -8794,11 +8854,11 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             else:
                                 status_display = f"⏳ Deploying ({allocated_pct:.0f}%)"
                             
-                            # Deployed % display - show 100% when truly deployed (fractional only)
-                            if is_asset_truly_deployed or allocated_pct >= 99.5:
+                            # Enhancement 3: Show more accurate deployed % (2 decimal places)
+                            if is_asset_truly_deployed or allocated_pct >= 99.95:
                                 deployed_display = "100%"
                             else:
-                                deployed_display = f"{allocated_pct:.0f}%"
+                                deployed_display = f"{allocated_pct:.2f}%"
                             
                             rows.append({
                                 "Fund Name": fund_name, "Ticker": t, "Target %": f"{tar_w:.2f}%",
