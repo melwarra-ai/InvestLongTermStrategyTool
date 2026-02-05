@@ -31,7 +31,7 @@ VERSION_DATE = "2026-02-05"
 VERSION_TIME = "15:00:00"  # EST
 VERSION_NAME = "SQLite Revolution - MAJOR"
 CHANGELOG = """
-v8.0.0 (2026-02-05 15:00 EST) - 🚀 SQLITE REVOLUTION - MAJOR RELEASE
+v8.0.0 (2026-02-05 15:00 EST) - [ROCKET] SQLITE REVOLUTION - MAJOR RELEASE
 
 **BREAKING CHANGES:**
 - Complete database migration from Google Sheets to SQLite
@@ -60,7 +60,7 @@ All features from v7.7.3 fully functional:
 - All UX refinements from v7.7.x
 
 **PERFORMANCE:**
-- Query speed: 2-5 seconds → <20ms (200-500x faster)
+- Query speed: 2-5 seconds -> <20ms (200-500x faster)
 - Page loads: Instant (no network delays)
 - Offline capable: Works without internet
 - No API rate limits
