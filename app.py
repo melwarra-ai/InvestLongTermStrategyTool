@@ -98,7 +98,7 @@ def save_db(data=None, bypass_version_increment=False):
     pass  # No-op for SQLite
 
 # ===== VERSION INFORMATION =====
-VERSION = "11.3.0"
+VERSION = "11.4.0"
 VERSION_DATE = "2026-02-06"
 VERSION_TIME = "21:40:27"  # EST
 VERSION_NAME = "SQLite Revolution - MAJOR"
@@ -4289,7 +4289,7 @@ def show_login_page():
                     if username in db.get("users", {}):
                         user = db["users"][username]
                         if verify_password(password, user["password_hash"], user["password_salt"]):
-                            st.session_state.logged_in = True
+                            st.session_state.authenticated = True
                             st.session_state.username = username
                             st.session_state.user_data = user
                             st.success(f"✅ Welcome, {user.get('display_name', username)}!")
@@ -8780,7 +8780,7 @@ st.divider()
 st.markdown(f"""
     <div style="text-align: center; color: #64748b; padding: 20px;">
         <p><strong>Long Term Strategy Optimizer</strong> • v{VERSION} - {VERSION_NAME}</p>
-        <p style="font-size: 0.85rem;">Built: Built: 2026-02-06 21:59:23 EST • Market data by Yahoo Finance</p>
+        <p style="font-size: 0.85rem;">Built: Built: 2026-02-06 22:02:52 EST • Market data by Yahoo Finance</p>
         <p style="font-size: 0.8rem;">For informational purposes only</p>
     </div>
 """, unsafe_allow_html=True)
