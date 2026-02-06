@@ -98,7 +98,7 @@ def save_db(data=None, bypass_version_increment=False):
     pass  # No-op for SQLite
 
 # ===== VERSION INFORMATION =====
-VERSION = "11.2.0"
+VERSION = "11.3.0"
 VERSION_DATE = "2026-02-06"
 VERSION_TIME = "21:40:27"  # EST
 VERSION_NAME = "SQLite Revolution - MAJOR"
@@ -4305,7 +4305,7 @@ def show_login_page():
         
         with col_b:
             if st.button("📝 Create Account", use_container_width=True, key="register_button"):
-                st.session_state.page = "register"
+                st.session_state.auth_page = "register"
                 st.rerun()
         
         with st.expander("ℹ️ First time setup?"):
@@ -8780,7 +8780,7 @@ st.divider()
 st.markdown(f"""
     <div style="text-align: center; color: #64748b; padding: 20px;">
         <p><strong>Long Term Strategy Optimizer</strong> • v{VERSION} - {VERSION_NAME}</p>
-        <p style="font-size: 0.85rem;">Built: Built: 2026-02-06 21:45:25 EST • Market data by Yahoo Finance</p>
+        <p style="font-size: 0.85rem;">Built: Built: 2026-02-06 21:59:23 EST • Market data by Yahoo Finance</p>
         <p style="font-size: 0.8rem;">For informational purposes only</p>
     </div>
 """, unsafe_allow_html=True)
