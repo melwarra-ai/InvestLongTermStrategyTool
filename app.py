@@ -25,6 +25,22 @@ from database import Database
 # Set to "google_sheets" to use Google Sheets, "json" for local JSON file
 # Storage configuration removed - SQLite is now the only backend  # Default to JSON for backward compatibility
 
+
+# ===== DATABASE LOADING (COMPATIBILITY LAYER) =====
+
+def load_db():
+    """
+    Legacy compatibility function.
+    Returns empty dict - actual database access now uses get_database().
+    Kept for backward compatibility with old code patterns.
+    """
+    return {
+        "users": {},
+        "global_settings": {},
+        "system_logs": []
+    }
+
+
 # ===== VERSION INFORMATION =====
 VERSION = "8.0.0"
 VERSION_DATE = "2026-02-05"
@@ -1515,6 +1531,18 @@ DB_FILE = "alphastream_multiuser.json"
 
 # ===== ADMIN SUITE HELPER FUNCTIONS =====
 
+
+@st.cache_resource
+def get_database():
+    """
+    Initialize and return database instance.
+    Cached as a resource to reuse connection across reruns.
+    """
+    DB_PATH = os.environ.get("DB_PATH", "portfolio.db")
+    SCHEMA_PATH = os.environ.get("SCHEMA_PATH", "schema.sql")
+    return Database(DB_PATH, SCHEMA_PATH)
+
+
 def log_activity(db, username: str, action: str, details: str = "", ip_address: str = ""):
     """Log user activity for audit trail"""
     db.setdefault("activity_logs", [])
@@ -2751,7 +2779,9 @@ def send_rebalance_confirmation_email(db, username, profile_name, recommendation
 
 # ===== SESSION STATE INITIALIZATION =====
 if "db" not in st.session_state:
-    st.session_state.db = load_db()
+    # Initialize with cached database instance
+    st.session_state.db = load_db()  # Legacy dict for compatibility
+    st.session_state.database = get_database()  # Actual SQLite database
 
 # Ensure db has required structure (safety check)
 if "users" not in st.session_state.db:
