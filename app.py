@@ -41,6 +41,19 @@ def load_db():
     }
 
 
+
+def save_db(data=None, bypass_version_increment=False):
+    """
+    Legacy compatibility function for SQLite.
+    SQLite auto-commits transactions, so manual save not needed.
+    Kept for backward compatibility with old code.
+    
+    Args:
+        data: Ignored (legacy parameter)
+        bypass_version_increment: Ignored (legacy parameter)
+    """
+    pass  # No-op for SQLite
+
 # ===== VERSION INFORMATION =====
 VERSION = "8.0.0"
 VERSION_DATE = "2026-02-05"
