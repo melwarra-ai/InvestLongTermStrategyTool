@@ -1,4 +1,47 @@
 import streamlit as st
+
+
+# ===== AUTHENTICATION CONFIGURATION =====
+PASSWORD_MIN_LENGTH = 8
+
+# ===== PASSWORD HASHING FUNCTIONS =====
+import hashlib
+import secrets
+
+def hash_password(password: str, salt: str = None) -> tuple:
+    """Hash password with salt using PBKDF2-HMAC-SHA256."""
+    if salt is None:
+        salt = secrets.token_hex(16)
+    password_hash = hashlib.pbkdf2_hmac(
+        'sha256',
+        password.encode('utf-8'),
+        salt.encode('utf-8'),
+        100000
+    ).hex()
+    return password_hash, salt
+
+def verify_password(password: str, stored_hash: str, salt: str) -> bool:
+    """Verify a password against its hash."""
+    password_hash, _ = hash_password(password, salt)
+    return password_hash == stored_hash
+
+def log_system_event(db, event_type: str, message: str = "", details: dict = None):
+    """Log system event - compatible with 3 or 4 argument calls."""
+    # This function signature accepts both old (3 args) and new (4 args) calls
+    try:
+        if "system_logs" not in db:
+            db["system_logs"] = []
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "event_type": event_type,
+            "message": message,
+            "details": details or {}
+        }
+        db["system_logs"].append(log_entry)
+    except:
+        pass  # Fail silently
+
+
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -55,7 +98,7 @@ def save_db(data=None, bypass_version_increment=False):
     pass  # No-op for SQLite
 
 # ===== VERSION INFORMATION =====
-VERSION = "11.1.0"
+VERSION = "11.2.0"
 VERSION_DATE = "2026-02-06"
 VERSION_TIME = "21:40:27"  # EST
 VERSION_NAME = "SQLite Revolution - MAJOR"
@@ -8737,7 +8780,7 @@ st.divider()
 st.markdown(f"""
     <div style="text-align: center; color: #64748b; padding: 20px;">
         <p><strong>Long Term Strategy Optimizer</strong> • v{VERSION} - {VERSION_NAME}</p>
-        <p style="font-size: 0.85rem;">Built: Built: 2026-02-06 21:40:41 EST • Market data by Yahoo Finance</p>
+        <p style="font-size: 0.85rem;">Built: Built: 2026-02-06 21:45:25 EST • Market data by Yahoo Finance</p>
         <p style="font-size: 0.8rem;">For informational purposes only</p>
     </div>
 """, unsafe_allow_html=True)
