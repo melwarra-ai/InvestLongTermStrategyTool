@@ -1132,6 +1132,118 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+
+
+# ===== AUTHENTICATION HELPER FUNCTIONS =====
+
+def hash_password(password: str, salt: str = None) -> tuple:
+    """
+    Hash password using SHA-256 with salt.
+    
+    Args:
+        password: Plain text password
+        salt: Optional salt (generated if not provided)
+        
+    Returns:
+        (hashed_password, salt) tuple
+    """
+    if salt is None:
+        salt = secrets.token_hex(32)
+    salted_password = f"{password}{salt}"
+    hashed = hashlib.sha256(salted_password.encode()).hexdigest()
+    return hashed, salt
+
+def verify_password(password: str, stored_hash: str, salt: str) -> bool:
+    """
+    Verify password against stored hash.
+    
+    Args:
+        password: Plain text password to verify
+        stored_hash: Stored password hash
+        salt: Password salt
+        
+    Returns:
+        True if password matches, False otherwise
+    """
+    computed_hash, _ = hash_password(password, salt)
+    return secrets.compare_digest(computed_hash, stored_hash)
+
+def validate_password_strength(password: str) -> tuple:
+    """
+    Validate password meets security requirements.
+    
+    Args:
+        password: Password to validate
+        
+    Returns:
+        (is_valid, list_of_errors) tuple
+    """
+    errors = []
+    
+    # Minimum length
+    PASSWORD_MIN_LENGTH = 8
+    if len(password) < PASSWORD_MIN_LENGTH:
+        errors.append(f"Password must be at least {PASSWORD_MIN_LENGTH} characters")
+    
+    # Require uppercase
+    if not re.search(r'[A-Z]', password):
+        errors.append("Password must contain at least one uppercase letter")
+    
+    # Require lowercase
+    if not re.search(r'[a-z]', password):
+        errors.append("Password must contain at least one lowercase letter")
+    
+    # Require digit
+    if not re.search(r'\d', password):
+        errors.append("Password must contain at least one digit")
+    
+    is_valid = len(errors) == 0
+    return is_valid, errors
+
+def validate_email(email: str) -> bool:
+    """
+    Validate email format.
+    
+    Args:
+        email: Email address to validate
+        
+    Returns:
+        True if valid format, False otherwise
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def generate_session_token() -> str:
+    """
+    Generate a secure session token.
+    
+    Returns:
+        Secure random token string
+    """
+    return secrets.token_urlsafe(32)
+
+def check_session_freshness() -> bool:
+    """
+    Check if user session is still valid.
+    
+    Returns:
+        True if session is fresh, False if expired or missing
+    """
+    if 'authenticated' not in st.session_state or not st.session_state.authenticated:
+        return False
+    
+    if 'session_start' not in st.session_state:
+        return False
+    
+    # Check session timeout (24 hours)
+    SESSION_TIMEOUT_HOURS = 24
+    session_duration = datetime.now() - st.session_state.session_start
+    if session_duration.total_seconds() > SESSION_TIMEOUT_HOURS * 3600:
+        return False
+    
+    return True
+
+
 # ===== PREMIUM STYLING =====
 st.markdown("""
     <style>
