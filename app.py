@@ -109,7 +109,7 @@ v7.7.3 (2026-02-02 22:30 EST) - âœ¨ 4 UX REFINEMENTS
 
 **Enhancement 1: Better Deployment Status**
 Before: Deployment: 0/4 - In Progress (confusing!)
-After: Deployment: In Progress - 50% complete âœ…
+After: Deployment: In Progress - 50% complete âœ...
 
 **Enhancement 2: Smart Deploy % Default**
 Calculates max whole units you can afford and defaults to that %.
@@ -118,12 +118,12 @@ Example:
   Available: $12,045
   Price: $120.45
   Max units: 100
-  Max amount: $12,045 (100 Ã— $120.45)
+  Max amount: $12,045 (100 Ã- $120.45)
   Target budget: $20,000
   Smart default: 60.2% (no fractional shares!)
 
 Before: Always defaulted to 25%
-After: Defaults to max whole units % âœ…
+After: Defaults to max whole units % âœ...
 
 **Enhancement 3: Precise Deployed %**
 Before: Deployed: 99% or 100%
@@ -133,7 +133,7 @@ Shows exact deployment progress, not rounded.
 
 **Enhancement 4: Lock UI When Locked**
 Before: Ticker input active, buttons clickable when locked
-After: Ticker input disabled + info message shown âœ…
+After: Ticker input disabled + info message shown âœ...
 
 Clearer indication that mix is locked.
 
@@ -147,12 +147,12 @@ v7.7.2 (2026-02-02 22:00 EST) - âœ¨ 7 UX ENHANCEMENTS
 - ENH 7: Number of Units defaults to max available (v7.7.1 feature)
 
 **Enhancement 1: Better Asset Messages**
-Before: âœ… State Street SPDR Bloomberg 1-3 Month T-Bill ETF - $91.41
-After: âœ… State Street SPDR Bloomberg 1-3 Month T-Bill ETF - Asset target allocated
+Before: âœ... State Street SPDR Bloomberg 1-3 Month T-Bill ETF - $91.41
+After: âœ... State Street SPDR Bloomberg 1-3 Month T-Bill ETF - Asset target allocated
 
 **Enhancement 2: Today Button Fixed**
-Before: Click "Today" â†’ Nothing happens
-After: Click "Today" â†’ Date field updates to today âœ…
+Before: Click "Today" â+’ Nothing happens
+After: Click "Today" â+’ Date field updates to today âœ...
 
 **Enhancement 3: Deploy All Context**
 Before: Shows anytime there's remaining cash
@@ -178,10 +178,10 @@ Example:
   - Next time SPXL: 30% (remembers!)
 
 **Enhancement 7: Max Units Default**
-Status: Already implemented in v7.7.1 âœ…
+Status: Already implemented in v7.7.1 âœ...
 Number of Units defaults to max whole units available
 
-v7.7.1 (2026-02-02 21:30 EST) - ðŸ”¢ DEFAULT UNITS TO MAX
+v7.7.1 (2026-02-02 21:30 EST) - ðŸ”cents DEFAULT UNITS TO MAX
 - IMPROVED: "Number of Units" now defaults to maximum available
 - CHANGED: Default changed from 1 unit to max whole units
 - ADDED: Help text explains default behavior
@@ -191,16 +191,16 @@ v7.7.1 (2026-02-02 21:30 EST) - ðŸ”¢ DEFAULT UNITS TO MAX
 **What Changed:**
 
 Before (v7.7.0):
-```
+'''
 ðŸ’¡ Max whole units for available budget: 100
-Number of Units: [1] â† Default to 1, user must type 100
-```
+Number of Units: [1] â+ Default to 1, user must type 100
+'''
 
 After (v7.7.1):
-```
+'''
 ðŸ’¡ Max whole units for available budget: 100
-Number of Units: [100] â† Defaults to max! User can reduce if needed
-```
+Number of Units: [100] â+ Defaults to max! User can reduce if needed
+'''
 
 **Example Scenario:**
 
@@ -212,17 +212,17 @@ Before: User sees [1], must manually type 100
 After: User sees [100], can click Deploy or reduce to 50
 
 **Benefits:**
-- âœ… One-click full deployment (most common use case)
-- âœ… Maximizes capital deployment by default
-- âœ… Still allows partial deployment (user can change)
-- âœ… Faster workflow for users
-- âœ… Better UX - defaults to what most users want
+- âœ... One-click full deployment (most common use case)
+- âœ... Maximizes capital deployment by default
+- âœ... Still allows partial deployment (user can change)
+- âœ... Faster workflow for users
+- âœ... Better UX - defaults to what most users want
 
 **Use Cases:**
 
 Full Deployment (90% of users):
   1. Select asset
-  2. See: "Number of Units: [100]" âœ… Already set!
+  2. See: "Number of Units: [100]" âœ... Already set!
   3. Click Deploy
   
 Partial Deployment (10% of users):
@@ -231,7 +231,7 @@ Partial Deployment (10% of users):
   3. Change to: [50] (deploy half)
   4. Click Deploy
 
-v7.7.0 (2026-02-02 21:00 EST) - ðŸ’° DEPLOY ALL WITH ACTUAL PRICES
+v7.7.0 (2026-02-02 21:00 EST) - ðŸ’ deg DEPLOY ALL WITH ACTUAL PRICES
 - MAJOR: Deploy All Remaining Cash now allows actual price input
 - ADDED: Expandable sections for each asset in deployment plan
 - ADDED: Side-by-side comparison: Estimated vs Actual
@@ -272,28 +272,28 @@ v7.7.0 (2026-02-02 21:00 EST) - ðŸ’° DEPLOY ALL WITH ACTUAL PRICES
 Available Cash: $10,000
 
 SPXL:
-  Estimated: 40 shares Ã— $120.45 = $4,818.00
-  Actual: 40 shares Ã— $121.00 = $4,840.00 ðŸ“ˆ +$0.55
+  Estimated: 40 shares Ã- $120.45 = $4,818.00
+  Actual: 40 shares Ã- $121.00 = $4,840.00 ðŸ“ˆ +$0.55
   
 BIL:
-  Estimated: 48 shares Ã— $105.30 = $5,054.40
-  Actual: 48 shares Ã— $104.95 = $5,037.60 ðŸ“‰ -$0.35
+  Estimated: 48 shares Ã- $105.30 = $5,054.40
+  Actual: 48 shares Ã- $104.95 = $5,037.60 ðŸ“‰ -$0.35
 
 Summary:
   Estimated Total: $9,872.40
   Actual Total: $9,877.60 (+$5.20)
   Remaining: $122.40
 
-âœ… Confirm & Deploy All â†’ Records actual prices!
+âœ... Confirm & Deploy All â+’ Records actual prices!
 
 **Benefits:**
-- âœ… Accurate average cost tracking
-- âœ… No manual price entry errors
-- âœ… Real-time validation
-- âœ… Clear before/after comparison
-- âœ… Prevents over-spending
+- âœ... Accurate average cost tracking
+- âœ... No manual price entry errors
+- âœ... Real-time validation
+- âœ... Clear before/after comparison
+- âœ... Prevents over-spending
 
-v7.6.5 (2026-02-02 20:30 EST) - ðŸ‡¨ðŸ‡¦ CANADIAN BENCHMARK FIX
+v7.6.5 (2026-02-02 20:30 EST) - ðŸ++¨ðŸ++¦ CANADIAN BENCHMARK FIX
 - FIXED: Canadian benchmarks now display correctly on performance chart
 - ADDED: .TO suffix for Toronto Stock Exchange tickers
 - IMPROVED: Error messages show if benchmark fails to load
@@ -306,19 +306,19 @@ v7.6.5 (2026-02-02 20:30 EST) - ðŸ‡¨ðŸ‡¦ CANADIAN BENCHMARK FIX
 - Users saw empty chart with no explanation
 
 **What's Fixed (v7.6.5):**
-```python
+'''python
 # Before
 yf.download("XIU", ...)  # âŒ Fails silently
 
 # After  
-yf.download("XIU.TO", ...)  # âœ… Works!
-```
+yf.download("XIU.TO", ...)  # âœ... Works!
+'''
 
 **Automatic Suffix Mapping:**
-- XIU â†’ XIU.TO (iShares S&P/TSX 60)
-- XIC â†’ XIC.TO (iShares Core TSX Composite)
-- ZCN â†’ ZCN.TO (BMO TSX Capped Composite)
-- VCN â†’ VCN.TO (Vanguard FTSE Canada)
+- XIU â+’ XIU.TO (iShares S&P/TSX 60)
+- XIC â+’ XIC.TO (iShares Core TSX Composite)
+- ZCN â+’ ZCN.TO (BMO TSX Capped Composite)
+- VCN â+’ VCN.TO (Vanguard FTSE Canada)
 
 **Error Handling:**
 - Shows warning if benchmark fails to load
@@ -328,10 +328,10 @@ yf.download("XIU.TO", ...)  # âœ… Works!
 
 **Test It:**
 1. Go to Benchmark Comparison
-2. Select: ðŸ‡¨ðŸ‡¦ TSX 60 (XIU)
+2. Select: ðŸ++¨ðŸ++¦ TSX 60 (XIU)
 3. Save benchmarks
 4. Check Performance vs Goal Path chart
-5. Should see XIU dotted line! âœ…
+5. Should see XIU dotted line! âœ...
 6. Hover shows: "XIU (+X.X%)"
 
 v7.6.4 (2026-02-02 20:00 EST) - ðŸ“ LARGER TEXT IMPROVEMENTS
@@ -345,16 +345,16 @@ v7.6.4 (2026-02-02 20:00 EST) - ðŸ“ LARGER TEXT IMPROVEMENTS
 - IMPROVED: "Enter Actual Purchase Details" now ### (larger)
 
 **Before (v7.6.3):**
-```
+'''
 #### SPXL: Target $100,000 (100.0% of portfolio)
-**Deployed:** $0 (0%) â€¢ **Budget Remaining:** $100,000
-```
+**Deployed:** $0 (0%) âEURcents **Budget Remaining:** $100,000
+'''
 
 **After (v7.6.4):**
-```
+'''
 ### SPXL: Target $100,000 (100.0% of portfolio)
-[1.1rem font] Deployed: $0 (0%) â€¢ Budget Remaining: $100,000
-```
+[1.1rem font] Deployed: $0 (0%) âEURcents Budget Remaining: $100,000
+'''
 
 **Text Size Hierarchy:**
 - Asset name: ### (h3 heading - largest)
@@ -364,9 +364,9 @@ v7.6.4 (2026-02-02 20:00 EST) - ðŸ“ LARGER TEXT IMPROVEMENTS
 - Preview items: 1.05rem (5% larger)
 - Units value: 1.15rem (15% larger, highlighted)
 
-**All text more visible and easier to read!** âœ…
+**All text more visible and easier to read!** âœ...
 
-v7.6.3 (2026-02-02 19:30 EST) - ðŸ”§ PRICE PRE-FILL FIX
+v7.6.3 (2026-02-02 19:30 EST) - ðŸ”Section PRICE PRE-FILL FIX
 - FIXED: Actual Price Paid now properly pre-fills with estimated price
 - FIXED: Widget key now includes date and units to force refresh
 - IMPROVED: Price field updates immediately when date or units change
@@ -387,9 +387,9 @@ v7.6.3 (2026-02-02 19:30 EST) - ðŸ”§ PRICE PRE-FILL FIX
 2. Choose units (e.g., 10 units)
 3. See preview: "10 units @ $120.45"
 4. Scroll down to "Actual Price Paid"
-5. Should show: $120.45 (pre-filled!) âœ…
+5. Should show: $120.45 (pre-filled!) âœ...
 6. Change units to 20
-7. Price updates to new preview price âœ…
+7. Price updates to new preview price âœ...
 
 v7.6.2 (2026-02-02 19:00 EST) - âœ¨ UX ENHANCEMENTS
 - IMPROVED: Actual Price Paid now defaults to estimated price during deployment
@@ -413,25 +413,25 @@ v7.6.2 (2026-02-02 19:00 EST) - âœ¨ UX ENHANCEMENTS
 - Better readability for all users
 
 **Enhancement 3: Canadian Benchmarks**
-- ðŸ‡¨ðŸ‡¦ TSX 60 (XIU) - Top 60 large cap
-- ðŸ‡¨ðŸ‡¦ TSX Composite (XIC) - Broad market
-- ðŸ‡¨ðŸ‡¦ TSX Capped Comp (ZCN) - Capped weights
-- ðŸ‡¨ðŸ‡¦ FTSE Canada (VCN) - All cap
+- ðŸ++¨ðŸ++¦ TSX 60 (XIU) - Top 60 large cap
+- ðŸ++¨ðŸ++¦ TSX Composite (XIC) - Broad market
+- ðŸ++¨ðŸ++¦ TSX Capped Comp (ZCN) - Capped weights
+- ðŸ++¨ðŸ++¦ FTSE Canada (VCN) - All cap
 - US benchmarks still available (SPY, QQQ, etc.)
 - Flag emojis for easy identification
 
 v7.6.1 (2026-02-02 17:30 EST) - ðŸ“Š GOAL TRACKER - YEAR START VALUE ADDED
 - ADDED: Year Start Value now displayed alongside Current and Year-End Target
 - IMPROVED: Three-column layout for clear progression view
-- ENHANCED: Shows complete journey: Start â†’ Current â†’ Target
+- ENHANCED: Shows complete journey: Start â+’ Current â+’ Target
 - VISUAL: Grid layout with labels for each metric
 
 **New Display (3 Columns):**
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”Œâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”
 â”‚ Year Start        Current           Year-End Target         â”‚
 â”‚ $71,699          $73,252            $85,394                 â”‚
 â”‚                                     (19.1% goal)            â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+â””â”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”EURâ”˜
 
 **Why This Helps:**
 - See starting point (Year Start: $71,699)
@@ -446,7 +446,7 @@ Example: Started 2024 with $50k, grew to $65k by Jan 1 2026
 - Not the original $50,000 principal
 
 v7.6.0 (2026-02-02 17:00 EST) - ðŸŽ¯ GOAL PROGRESS TRACKER FIXED!
-- FIXED: Year-End Target now shows correct value (principal Ã— 1.191)
+- FIXED: Year-End Target now shows correct value (principal Ã- 1.191)
 - FIXED: Progress bar shows % of annual goal achieved (not confusing 128%)
 - FIXED: Delta shows how far ahead/behind pro-rated target
 - IMPROVED: Clear display: Current vs Year-End Target
@@ -457,15 +457,15 @@ v7.6.0 (2026-02-02 17:00 EST) - ðŸŽ¯ GOAL PROGRESS TRACKER FIXED!
 **What Changed (Your Example):**
 OLD (v7.5.1):
 - Current: $73,252
-- Target: $72,910 (19.1%/yr)  â† Wrong! Lower than current
-- Progress: 128% of goal path  â† Confusing!
+- Target: $72,910 (19.1%/yr)  â+ Wrong! Lower than current
+- Progress: 128% of goal path  â+ Confusing!
 
 NEW (v7.6.0):
 - Current: $73,252
-- Year-End Target: $85,394 (19.1%)  â† Correct! Shows year-end goal
-- Progress: 11% done (visual bar)      â† Clear!
-- Status: Ahead by $428                â† Precise delta
-- Projection: On pace for 26.4% annual â† Future outlook
+- Year-End Target: $85,394 (19.1%)  â+ Correct! Shows year-end goal
+- Progress: 11% done (visual bar)      â+ Clear!
+- Status: Ahead by $428                â+ Precise delta
+- Projection: On pace for 26.4% annual â+ Future outlook
 
 **The Math:**
 Principal: $71,699
@@ -481,25 +481,25 @@ v7.5.1 (2026-02-02 16:30 EST) - ðŸŽ¯ ADMIN DASHBOARD STATUS ALIGNMENT
 - FIXED: Status in table matches Global Dashboard and Portfolio Manager
 - REMOVED: Duplicate/outdated status calculation logic
 - ALIGNED: All three views (Global, Admin, Portfolio) show identical status
-- ADDED: "âš™ï¸ Setup" status for portfolios with 0 assets in Admin table
+- ADDED: "âš(TM)ï¸ Setup" status for portfolios with 0 assets in Admin table
 
 **What This Fixes:**
 Your Issue:
-- Global Dashboard: "âœ… Deployed"
-- Admin Table: "ðŸ“¥ Deploying (3/4)" â† WRONG!
+- Global Dashboard: "âœ... Deployed"
+- Admin Table: "ðŸ“JPY Deploying (3/4)" â+ WRONG!
 - Result: Confusing inconsistency
 
 After v7.5.1:
-- Global Dashboard: "âœ… Deployed"
-- Admin Table: "âœ… Deployed" â† CORRECT!
-- Portfolio Manager: "âœ… Deployed"
-- Result: Perfect alignment! âœ…
+- Global Dashboard: "âœ... Deployed"
+- Admin Table: "âœ... Deployed" â+ CORRECT!
+- Portfolio Manager: "âœ... Deployed"
+- Result: Perfect alignment! âœ...
 
 **Now Using ONE Function Everywhere:**
-- Portfolio Manager â†’ check_deployment_status()
-- Global Dashboard â†’ check_deployment_status()
-- Admin Dashboard â†’ check_deployment_status()
-- Action Items â†’ check_deployment_status()
+- Portfolio Manager â+’ check_deployment_status()
+- Global Dashboard â+’ check_deployment_status()
+- Admin Dashboard â+’ check_deployment_status()
+- Action Items â+’ check_deployment_status()
 
 v7.5.0 (2026-02-02 16:00 EST) - ðŸ”„ REFRESH BUTTON IMPLEMENTATION
 - ADDED: Refresh button at Portfolio Manager header (top right)
@@ -530,24 +530,24 @@ v7.5.0 (2026-02-02 16:00 EST) - ðŸ”„ REFRESH BUTTON IMPLEMENTATION
 - Perfect for checking prices before decisions
 
 v7.4.3 (2026-02-02 15:30 EST) - ðŸŽ¯ STATUS BADGE ALIGNMENT
-- FIXED: Global Dashboard now shows "âš™ï¸ Setup" for portfolios with 0 assets
+- FIXED: Global Dashboard now shows "âš(TM)ï¸ Setup" for portfolios with 0 assets
 - FIXED: Empty portfolios return is_fully_deployed = False (not True)
 - ADDED: Setup status badge in Global Dashboard (gray badge)
 - ALIGNED: Portfolio Manager and Global Dashboard now show same status
-- NOTE: "Test2" with 0 assets now shows "âš™ï¸ Setup" on both views!
+- NOTE: "Test2" with 0 assets now shows "âš(TM)ï¸ Setup" on both views!
 
 **Status Badge Hierarchy:**
 1. ðŸš¨ REBALANCE - Drift exceeds tolerance (priority 1)
-2. âœ… Balanced - Recently rebalanced and no drift (priority 2)
-3. âš™ï¸ Setup - No assets defined yet (NEW!)
-4. ðŸ“¥ Deploying (X/Y) - Has assets, partial deployment
-5. âœ… Deployed - All assets fully deployed
+2. âœ... Balanced - Recently rebalanced and no drift (priority 2)
+3. âš(TM)ï¸ Setup - No assets defined yet (NEW!)
+4. ðŸ“JPY Deploying (X/Y) - Has assets, partial deployment
+5. âœ... Deployed - All assets fully deployed
 6. âšª New - Fallback status
 
 **Your "Test2" Profile:**
 - Assets: 0
-- Old status: "âœ… Deployed" âŒ
-- New status: "âš™ï¸ Setup" âœ…
+- Old status: "âœ... Deployed" âŒ
+- New status: "âš(TM)ï¸ Setup" âœ...
 
 v7.4.2 (2026-02-02 15:00 EST) - ðŸ‘ï¸ SHOW ALL PROFILES
 - FIXED: Global Dashboard now shows ALL profiles, regardless of deployment status
@@ -559,9 +559,9 @@ v7.4.2 (2026-02-02 15:00 EST) - ðŸ‘ï¸ SHOW ALL PROFILES
 **What Changed:**
 - Old: Dashboard hidden until at least 1 asset has units deployed
 - New: Dashboard shown as soon as ANY profile is created
-- Result: "Test" profile with 1 asset but 0 units now shows on dashboard! âœ…
+- Result: "Test" profile with 1 asset but 0 units now shows on dashboard! âœ...
 
-v7.4.1 (2026-02-02 04:30 EST) - ðŸ”§ SELF-CONTAINED STATUS CHECK
+v7.4.1 (2026-02-02 04:30 EST) - ðŸ”Section SELF-CONTAINED STATUS CHECK
 - FIXED: check_deployment_status() now fetches its own prices
 - FIXED: No longer requires prices parameter (self-contained)
 - FIXED: Works in Portfolio Manager context (was getting NameError)
@@ -569,9 +569,9 @@ v7.4.1 (2026-02-02 04:30 EST) - ðŸ”§ SELF-CONTAINED STATUS CHECK
 - NOTE: Each view no longer needs to fetch prices before calling the function
 
 **What Changed:**
-- Before: check_deployment_status(profile, prices) â† needed prices from caller
-- After: check_deployment_status(profile) â† fetches prices itself
-- Result: Function works everywhere without dependencies! âœ…
+- Before: check_deployment_status(profile, prices) â+ needed prices from caller
+- After: check_deployment_status(profile) â+ fetches prices itself
+- Result: Function works everywhere without dependencies! âœ...
 
 v7.4.0 (2026-02-02 04:00 EST) - ðŸŽ¯ SINGLE SOURCE OF TRUTH (Major Architecture Fix!)
 - FIXED: Created centralized check_deployment_status() function
@@ -584,18 +584,18 @@ v7.4.0 (2026-02-02 04:00 EST) - ðŸŽ¯ SINGLE SOURCE OF TRUTH (Major Architect
 - Portfolio Manager status: Uses check_deployment_status()
 - Global Dashboard cards: Uses check_deployment_status()
 - Action Items Dashboard: Uses check_deployment_status()
-- Result: ALL THREE always show the SAME status! âœ…
+- Result: ALL THREE always show the SAME status! âœ...
 
 **The Fix You Requested:**
 "The status at the global dashboard should just reflect what the status at 
 the profile level is. There shouldn't be different logic for that."
-â†’ DONE! Now there's only ONE logic, used by all three views.
+â+’ DONE! Now there's only ONE logic, used by all three views.
 
-v7.3.6 (2026-02-02 03:00 EST) - âœ… PER-ASSET BUDGET CHECK (FINAL FIX!)
+v7.3.6 (2026-02-02 03:00 EST) - âœ... PER-ASSET BUDGET CHECK (FINAL FIX!)
 - FIXED: Now checks remaining budget PER ASSET, not total cash
 - FIXED: Treats assets as 100% deployed when remaining budget < share price
 - IMPROVED: Exactly implements the logic: "if can't buy 1 share, it's fractional"
-- ENHANCED: GLD at 99% with $215 remaining vs $445/share = Fully Deployed âœ…
+- ENHANCED: GLD at 99% with $215 remaining vs $445/share = Fully Deployed âœ...
 - NOTE: This is the correct implementation of your described logic!
 
 **The Right Logic:**
@@ -605,35 +605,35 @@ For GLD specifically:
 - Remaining budget: $215
 - GLD price: $445/share
 - Can buy 1 share? $215 < $445 = NO
-- Status: Fully Deployed âœ… (fractional remainder)
+- Status: Fully Deployed âœ... (fractional remainder)
 
 **Result:**
-- Action Items: "âœ… ALL CLEAR"
-- Portfolio Card: "âœ… Deployed"
+- Action Items: "âœ... ALL CLEAR"
+- Portfolio Card: "âœ... Deployed"
 - No more false "GLD needs 1% more" alerts!
 
-v7.3.5 (2026-02-02 02:30 EST) - ðŸ”§ DEPLOYMENT LOGIC SIMPLIFIED
+v7.3.5 (2026-02-02 02:30 EST) - ðŸ”Section DEPLOYMENT LOGIC SIMPLIFIED
 - FIXED: Simplified deployment check to use total undeployed cash
 - IMPROVED: Now checks if cash can buy shares in ANY under-allocated asset
 - FIXED: Handles edge case where GLD is 99% deployed with $215 remaining
 - ENHANCED: More robust logic that actually works in production
-- NOTE: If allocated_pct < 100% AND undeployed_cash >= price â†’ Not deployed
+- NOTE: If allocated_pct < 100% AND undeployed_cash >= price â+’ Not deployed
 
 **What This Really Fixes:**
 Your case:
 - GLD: 99% deployed (not 100%!)
 - GLD remaining: ~$215
 - GLD price: $445/share
-- $215 < $445 â†’ Can't buy
+- $215 < $445 â+’ Can't buy
 - All other assets: 100% deployed
-- Result: all_deployed = True âœ…
-- Status: "âœ… Deployed" (finally!)
+- Result: all_deployed = True âœ...
+- Status: "âœ... Deployed" (finally!)
 
 v7.3.4 (2026-02-02 02:00 EST) - ðŸŽ¯ SMART DEPLOYMENT DETECTION
 - FIXED: Now checks if assets have ROOM in target allocation, not just if cash exists
 - IMPROVED: Properly detects when portfolio is fully deployed despite having cash
 - ENHANCED: Handles edge case where all assets are at/over target
-- FIXED: Portfolio with $285 but all assets over-allocated now shows "âœ… Deployed"
+- FIXED: Portfolio with $285 but all assets over-allocated now shows "âœ... Deployed"
 - NOTE: Checks both "can afford shares" AND "has allocation budget" per asset!
 
 **What This Fixes:**
@@ -643,9 +643,9 @@ Your TFSA case:
 - BUT: DBRM already at 14.89% vs 15% target (over-allocated!)
 - GLD: Already at 30.70% vs 30% target (over-allocated!)
 - Result: No room to deploy without breaking allocation
-- Status: âœ… Deployed (correctly!)
+- Status: âœ... Deployed (correctly!)
 
-v7.3.3 (2026-02-02 01:30 EST) - âœ… ACTION ITEMS FIXED
+v7.3.3 (2026-02-02 01:30 EST) - âœ... ACTION ITEMS FIXED
 - FIXED: Action Items Dashboard now uses smart fractional detection
 - FIXED: No more false "GLD needs 1% more" alerts
 - FIXED: Portfolios with only fractional remainders show "ALL CLEAR"
@@ -655,10 +655,10 @@ v7.3.3 (2026-02-02 01:30 EST) - âœ… ACTION ITEMS FIXED
 **What This Fixes:**
 - Action Items Dashboard was using old simple 99.5% check
 - Now uses same smart fractional logic as everywhere else
-- Your TFSA with $285 fractional will show "âœ… ALL CLEAR" not "ðŸ“¥ IN PROGRESS"
+- Your TFSA with $285 fractional will show "âœ... ALL CLEAR" not "ðŸ“JPY IN PROGRESS"
 
-v7.3.2 (2026-02-02 01:00 EST) - âœ… DASHBOARD STATUS FIXED
-- FIXED: Global Dashboard now correctly shows "âœ… Deployed" status
+v7.3.2 (2026-02-02 01:00 EST) - âœ... DASHBOARD STATUS FIXED
+- FIXED: Global Dashboard now correctly shows "âœ... Deployed" status
 - FIXED: Status uses smart fractional detection like Portfolio Manager
 - IMPROVED: Accurate deployed count (X/Y assets) accounting for fractional remainders
 - ENHANCED: Portfolio with $285 fractional remainder now shows "Deployed" not "Deploying"
@@ -667,7 +667,7 @@ v7.3.2 (2026-02-02 01:00 EST) - âœ… DASHBOARD STATUS FIXED
 **What Changed:**
 - Old logic: Simple check if allocated_pct >= 99.5%
 - New logic: Smart check if undeployed cash < cheapest asset price (fractional)
-- Result: Portfolios with only fractional remainders show "âœ… Deployed" âœ¨
+- Result: Portfolios with only fractional remainders show "âœ... Deployed" âœ¨
 
 v7.3.1 (2026-02-02 00:30 EST) - ðŸ“¦ AI PACKAGE FIXED
 - FIXED: Added anthropic package to requirements.txt
@@ -680,8 +680,8 @@ v7.3.1 (2026-02-02 00:30 EST) - ðŸ“¦ AI PACKAGE FIXED
 2. AI Assistant feature will work without errors
 3. No manual pip install needed!
 
-v7.3.0 (2026-02-02 00:00 EST) - âš™ï¸ FEATURE VISIBILITY RESTORED
-- ADDED: AI Assistant configuration in Admin Dashboard â†’ Settings
+v7.3.0 (2026-02-02 00:00 EST) - âš(TM)ï¸ FEATURE VISIBILITY RESTORED
+- ADDED: AI Assistant configuration in Admin Dashboard â+’ Settings
 - IMPROVED: Clear UI for enabling/disabling AI Assistant
 - IMPROVED: Email notifications easier to find and configure
 - ENHANCED: Both features now have admin controls in Settings tab
@@ -689,13 +689,13 @@ v7.3.0 (2026-02-02 00:00 EST) - âš™ï¸ FEATURE VISIBILITY RESTORED
 - NOTE: Admins can now easily enable AI Assistant and Email Notifications!
 
 **How to Enable Features:**
-1. Go to Admin Dashboard â†’ System Management â†’ Global Settings
+1. Go to Admin Dashboard â+’ System Management â+’ Global Settings
 2. Enable "Email Notifications" and/or "AI Assistant"
 3. Configure SMTP settings (for email) or API key (for AI)
 4. Save settings
 5. Features will appear in user sidebars!
 
-v7.2.9 (2026-02-01 23:00 EST) - ðŸ”§ WELCOME BUTTON FIXED
+v7.2.9 (2026-02-01 23:00 EST) - ðŸ”Section WELCOME BUTTON FIXED
 - FIXED: "Create My First Portfolio" button now works!
 - IMPROVED: Button navigates to Portfolio Manager page
 - IMPROVED: Auto-expands "Create New Profile" section
@@ -716,7 +716,7 @@ v7.2.7 (2026-02-01 21:00 EST) - ðŸŽ‰ WELCOME EXPERIENCE ENHANCED
 - ENHANCED: Better first-time user experience
 - NOTE: Makes the app more user-friendly for new accounts
 
-v7.2.6 (2026-02-01 19:30 EST) - ðŸ”§ NATIVE COMPONENTS FIX
+v7.2.6 (2026-02-01 19:30 EST) - ðŸ”Section NATIVE COMPONENTS FIX
 - FIXED: HTML rendering issue by using Streamlit native components
 - CHANGED: Activity logs now use st.container() and st.columns()
 - REMOVED: Raw HTML that was being escaped by Streamlit
@@ -767,11 +767,11 @@ v7.2.1 (2026-01-30 04:25 EST) - ðŸš¨ CRITICAL BUG FIXES
 - NEW: Automatic log trimming (activity: 100, system: 50)
 - NEW: Rebalance log trimming (20 per profile)
 - NEW: Empty profile cleanup to reduce database size
-- NEW: Database size optimization (~60K â†’ ~40K characters)
-- Impact: Saves now succeed (below 50K limit) âœ…
-- Impact: All users preserved during merge âœ…
-- Impact: Proper save attribution âœ…
-- Impact: Sustainable database growth âœ…
+- NEW: Database size optimization (~60K â+’ ~40K characters)
+- Impact: Saves now succeed (below 50K limit) âœ...
+- Impact: All users preserved during merge âœ...
+- Impact: Proper save attribution âœ...
+- Impact: Sustainable database growth âœ...
 - Note: Existing data automatically cleaned on first save
 
 v7.2.0 (2026-01-30 02:45 EST) - ðŸ”’ MULTI-USER SAFE (CRITICAL UPDATE)
@@ -782,9 +782,9 @@ v7.2.0 (2026-01-30 02:45 EST) - ðŸ”’ MULTI-USER SAFE (CRITICAL UPDATE)
 - NEW: Audit trail tracks all database changes
 - NEW: Session staleness detection (auto-reload after 5 minutes)
 - NEW: Detailed conflict warnings with retry logic
-- Impact: 100% multi-user safe - no more data loss! âœ…
-- Impact: Multiple admins can work simultaneously safely âœ…
-- Impact: All changes tracked with timestamps and user attribution âœ…
+- Impact: 100% multi-user safe - no more data loss! âœ...
+- Impact: Multiple admins can work simultaneously safely âœ...
+- Impact: All changes tracked with timestamps and user attribution âœ...
 - Note: Automatic migration adds version metadata to existing data
 
 v7.1.0 (2026-01-27 11:08 EST) - ðŸŽ‰ PRODUCTION RELEASE
@@ -792,14 +792,14 @@ v7.1.0 (2026-01-27 11:08 EST) - ðŸŽ‰ PRODUCTION RELEASE
 - REMOVED: All debug logging messages for clean UI
 - KEPT: All functionality from v7.0.4 (working Google Sheets save)
 - KEPT: Critical fix using update_acell() for proper API calls
-- Impact: Professional, clean interface with persistent storage âœ…
+- Impact: Professional, clean interface with persistent storage âœ...
 - Status: Fully tested and confirmed working in production
 - Note: Data persistence verified and working perfectly
 
-v7.0.4 (2026-01-27 10:51 EST) - ðŸ”§ CRITICAL FIX: Google Sheets Save Error
+v7.0.4 (2026-01-27 10:51 EST) - ðŸ”Section CRITICAL FIX: Google Sheets Save Error
 - FIXED: Error 400 (Bad Request) when saving to Google Sheets
 - FIXED: Changed worksheet.update() to worksheet.update_acell()
-- Impact: Data now saves correctly to Google Sheets âœ…
+- Impact: Data now saves correctly to Google Sheets âœ...
 
 v7.0.3-debug (2026-01-27 09:54 EST) - ðŸ” DIAGNOSTIC BUILD
 - ADDED: Comprehensive debug logging to save_db() function
@@ -808,7 +808,7 @@ v7.0.3-debug (2026-01-27 09:54 EST) - ðŸ” DIAGNOSTIC BUILD
 - Purpose: Diagnose why data is not being saved to Google Sheets
 - Note: This is a temporary diagnostic version with verbose logging
 
-v7.0.2 (2026-01-26 22:31 EST) - ðŸ”§ CRITICAL FIX: Shared Sheet Support
+v7.0.2 (2026-01-26 22:31 EST) - ðŸ”Section CRITICAL FIX: Shared Sheet Support
 - FIXED: Service account can now access shared sheets via URL
 - NEW: Added GOOGLE_SHEETS_URL configuration option
 - NEW: Better error messages for storage quota issues
@@ -816,14 +816,14 @@ v7.0.2 (2026-01-26 22:31 EST) - ðŸ”§ CRITICAL FIX: Shared Sheet Support
 - Impact: Works with sheets in user's Drive (no service account storage needed)
 - Note: Add GOOGLE_SHEETS_URL to Streamlit Secrets to use existing shared sheet
 
-v7.0.1 (2026-01-26 22:06 EST) - ðŸ”§ CRITICAL HOTFIX
+v7.0.1 (2026-01-26 22:06 EST) - ðŸ”Section CRITICAL HOTFIX
 - FIXED: UnboundLocalError in load_db() function
 - FIXED: Added global STORAGE_TYPE declaration in load_db()
 - FIXED: Added global STORAGE_TYPE declaration in save_db()
 - Impact: App now loads correctly with Google Sheets storage
 - Note: Critical bug fix for v7.0.0 deployment issues
 
-v7.0.0 (2026-01-26 20:52 EST) - ðŸš€ GOOGLE SHEETS STORAGE (MAJOR RELEASE)
+v7.0.0 (2026-01-26 20:52 EST) - ðŸšEUR GOOGLE SHEETS STORAGE (MAJOR RELEASE)
 - MAJOR: Added Google Sheets as persistent storage option
 - MAJOR: Data now survives app redeployments when using Google Sheets
 - NEW: Configurable storage backend (JSON or Google Sheets)
@@ -833,21 +833,21 @@ v7.0.0 (2026-01-26 20:52 EST) - ðŸš€ GOOGLE SHEETS STORAGE (MAJOR RELEASE)
 - NEW: Comprehensive error handling for API failures
 - Changed: STORAGE_TYPE environment variable controls storage backend
 - Changed: Backward compatible - defaults to JSON if not configured
-- Impact: Zero data loss on Streamlit Cloud redeployments! âœ…
-- Impact: Automatic backups via Google's infrastructure âœ…
-- Impact: Version history and point-in-time recovery âœ…
+- Impact: Zero data loss on Streamlit Cloud redeployments! âœ...
+- Impact: Automatic backups via Google's infrastructure âœ...
+- Impact: Version history and point-in-time recovery âœ...
 - Note: Core app logic unchanged - only storage layer modified
 - Note: Setup guide included in documentation
 
 v6.7.33 (2026-01-26 09:13 EST) - COLOR-CODED TABLES
 - NEW: Color-coded "Risk Metrics by Account" table
-  - Volatility: Green (low) â†’ Yellow â†’ Red (high)
-  - Max Drawdown: Green (small) â†’ Yellow â†’ Red (large)
-  - Sharpe Ratio: Green (high) â†’ Yellow â†’ Red (low)
+  - Volatility: Green (low) â+’ Yellow â+’ Red (high)
+  - Max Drawdown: Green (small) â+’ Yellow â+’ Red (large)
+  - Sharpe Ratio: Green (high) â+’ Yellow â+’ Red (low)
 - NEW: Color-coded "Portfolio Comparison Table"
-  - CAGR/ROI: Green (high) â†’ Yellow â†’ Red (low/negative)
-  - Deployed %: Green (100%) â†’ Yellow (75%+) â†’ Orange (partial)
-  - Status: Green (Balanced) â†’ Red (Rebalance) â†’ Blue (Deploying) â†’ Gray (New)
+  - CAGR/ROI: Green (high) â+’ Yellow â+’ Red (low/negative)
+  - Deployed %: Green (100%) â+’ Yellow (75%+) â+’ Orange (partial)
+  - Status: Green (Balanced) â+’ Red (Rebalance) â+’ Blue (Deploying) â+’ Gray (New)
 - Impact: Much easier to spot good/bad performers at a glance
 - Impact: Visual hierarchy helps identify portfolios needing attention
 
@@ -877,7 +877,7 @@ v6.7.29 (2026-01-25 10:37 EST) - REBALANCE STATUS FIX
 - CRITICAL: Fixed false "Rebalance Needed" status in rebalance table
 - Fixed: max_drift now uses current portfolio value (not principal)
 - Changed: TOTAL row status now consistent with individual asset drifts
-- Impact: Â±0.05% drift with 5.0% tolerance now shows "âœ… Balanced" not "âš ï¸ Rebalance Needed"
+- Impact: Â+/-0.05% drift with 5.0% tolerance now shows "âœ... Balanced" not "âš ï¸ Rebalance Needed"
 - Impact: Status accurately reflects actual drift vs tolerance
 
 v6.7.28 (2026-01-25 10:30 EST) - QUICK ADD SAVE BUTTON FIX
@@ -885,7 +885,7 @@ v6.7.28 (2026-01-25 10:30 EST) - QUICK ADD SAVE BUTTON FIX
 - Changed: Quick Add now clears all widget states for clean slate
 - Changed: Save button explicitly enabled after successful Quick Add validation
 - Impact: Users no longer need to re-type ticker after Quick Add
-- Impact: One-click workflow now works as intended (click â†’ validate â†’ save)
+- Impact: One-click workflow now works as intended (click â+’ validate â+’ save)
 
 v6.7.27 (2026-01-25 10:16 EST) - TWO CRITICAL FIXES
 - CRITICAL: Fixed dashboard message showing "deployment in progress" after rebalancing
@@ -911,7 +911,7 @@ v6.7.25 (2026-01-24 23:22 EST) - CRITICAL DEPLOYMENT FILTER FIX
 - Changed: Dropdown only shows assets that can still receive capital
 - Impact: 100% deployed assets (SPXL, GLD) no longer appear in dropdown
 - Impact: Deployment status correctly shows 4/4 when all fractional remainder
-- Status: SPXL ($165 < $225.60) + GLD ($250 < $458) = both excluded âœ…
+- Status: SPXL ($165 < $225.60) + GLD ($250 < $458) = both excluded âœ...
 
 v6.7.24 (2026-01-24 22:49 EST) - CRITICAL CONSISTENCY FIX
 - CRITICAL: Fixed contradictory budget display when asset 100% deployed
@@ -934,7 +934,7 @@ v6.7.23 (2026-01-24 22:35 EST)
 v6.7.22 (2026-01-24 22:21 EST)
 - CRITICAL: Fixed progress bar to show continuous deployment (not just fully deployed count)
 - Fixed: Today button now properly updates date field by clearing widget cache
-- Enhanced: Progress bar now shows "X/Y assets deployed â€¢ Z% capital deployed"
+- Enhanced: Progress bar now shows "X/Y assets deployed âEURcents Z% capital deployed"
 - Changed: Progress bar color based on capital deployed percentage
 - Impact: Progress updates immediately after each deployment (was stuck at 0/2)
 - Impact: Today button now reliably resets date to current date
@@ -948,7 +948,7 @@ v6.7.21 (2026-01-24 22:05 EST)
 - Fixed: Active profile defaults to newly created profile
 - Philosophy: Maintain target allocations during deployment, not after
 - Impact: More intuitive, matches real-world investment approach
-- Example: SPXL budget $50k, remaining $63, price $212 â†’ can't buy 1 â†’ 100% deployed
+- Example: SPXL budget $50k, remaining $63, price $212 â+’ can't buy 1 â+’ 100% deployed
 
 v6.7.20 (2026-01-24 17:35 EST) - CRITICAL HOTFIX
 - CRITICAL: Fixed Portfolio % in rebalance table showing 144.78% total (impossible!)
@@ -1011,7 +1011,7 @@ v6.7.15 (2026-01-24 16:38 EST)
 v6.7.14 (2026-01-24 16:23 EST)
 - CRITICAL: Fixed "Actual %" column showing confusing 100% when portfolio partially deployed
 - Changed: "Actual %" now calculates as % of PRINCIPAL instead of % of deployed capital
-- Renamed: "Actual %" â†’ "Portfolio %" for clarity
+- Renamed: "Actual %" â+’ "Portfolio %" for clarity
 - Enhanced: Drift shows "âš ï¸ Deploying" status during deployment phase instead of misleading drift %
 - Fixed: "Today" button in deployment date picker now correctly sets today's date
 - UX: TOTAL row "Portfolio %" now matches deployment percentage (not always 100%)
@@ -1028,7 +1028,7 @@ v6.7.12 (2026-01-23 16:37 EST)
 - CRITICAL: Fixed progress bar showing "1/2 deployed" when portfolio truly 100% deployed
 - CRITICAL: Fixed table status showing "Deploying" when fractional remainder only
 - Enhanced: Progress bar uses smart fractional detection (checks cheapest asset price)
-- Enhanced: All assets show "âœ… Deployed" when portfolio has only fractional remainder
+- Enhanced: All assets show "âœ... Deployed" when portfolio has only fractional remainder
 - Fixed: Consistency between progress bar, table status, and info box messages
 - Fixed: User case where SPXL at 99% showed "Deploying" despite no shares affordable
 - UX: Progress shows "2/2 assets fully deployed" when truly complete
@@ -1087,8 +1087,8 @@ v6.7.6 (2026-01-23 18:00)
 - Insight: Shows exact $ amount that couldn't be deployed per asset
 
 v6.7.5 (2026-01-23 07:00)
-- Fixed: User registration now visible in Admin Dashboard â†’ Activity & Logs
-- Fixed: User login now visible in Admin Dashboard â†’ Activity Timeline
+- Fixed: User registration now visible in Admin Dashboard â+’ Activity & Logs
+- Fixed: User login now visible in Admin Dashboard â+’ Activity Timeline
 - Added: Failed login attempts logged to activity feed
 - Added: Account lockouts visible to admin
 - Enhanced: Admin can now see all user activity (registrations, logins, failures)
@@ -1104,7 +1104,7 @@ v6.7.4 (2026-01-23 06:00)
 v6.7.3 (2026-01-23 05:00)
 - Fixed: Renamed "Phase A/C" to "Step 1/2" for two-step workflow clarity
 - Fixed: TOTAL row Status now shows drift status instead of confusing deployment %
-- Enhanced: Status shows "âš ï¸ Rebalance Needed", "ðŸŸ¡ Monitor", or "âœ… Balanced"
+- Enhanced: Status shows "âš ï¸ Rebalance Needed", "ðŸŸ¡ Monitor", or "âœ... Balanced"
 - Fixed: Eliminated conflicting deployment information (94% vs 100%)
 
 v6.7.2 (2026-01-23 04:15)
@@ -1824,7 +1824,7 @@ def get_system_health(db):
                 "name": "Database Size",
                 "value": f"{db_size_chars:,} chars ({db_size_kb:.1f} KB)",
                 "status": "error" if db_size_chars > 50000 else ("warning" if db_size_chars > 45000 else "healthy"),
-                "icon": "ðŸ”´" if db_size_chars > 50000 else ("ðŸŸ¡" if db_size_chars > 45000 else "ðŸŸ¢")
+                "icon": "ðŸ”'" if db_size_chars > 50000 else ("ðŸŸ¡" if db_size_chars > 45000 else "ðŸŸcents")
             })
         else:
             # For JSON file storage
@@ -1833,7 +1833,7 @@ def get_system_health(db):
                 "name": "Database Size",
                 "value": f"{db_size:.2f} MB",
                 "status": "warning" if db_size > 50 else "healthy",
-                "icon": "ðŸŸ¡" if db_size > 50 else "ðŸŸ¢"
+                "icon": "ðŸŸ¡" if db_size > 50 else "ðŸŸcents"
             })
     except Exception as e:
         health["checks"].append({
@@ -1848,7 +1848,7 @@ def get_system_health(db):
         "name": "Total Users",
         "value": str(len(users)),
         "status": "healthy",
-        "icon": "ðŸŸ¢"
+        "icon": "ðŸŸcents"
     })
     
     system_logs = db.get("system_logs", [])
@@ -1857,7 +1857,7 @@ def get_system_health(db):
         "name": "Recent Errors",
         "value": f"{recent_errors}/100 logs",
         "status": "warning" if recent_errors > 10 else "healthy",
-        "icon": "ðŸŸ¡" if recent_errors > 10 else "ðŸŸ¢"
+        "icon": "ðŸŸ¡" if recent_errors > 10 else "ðŸŸcents"
     })
     
     settings = db.get("global_settings", {})
@@ -1866,7 +1866,7 @@ def get_system_health(db):
         "name": "Email Notifications",
         "value": "Configured" if email_configured else "Not Configured",
         "status": "healthy" if email_configured else "info",
-        "icon": "ðŸŸ¢" if email_configured else "â„¹ï¸"
+        "icon": "ðŸŸcents" if email_configured else "â„¹ï¸"
     })
     
     if any(c["status"] == "error" for c in health["checks"]):
@@ -2583,10 +2583,10 @@ AlphaStream is a long-term investment portfolio management tool that helps users
 ### 1. Portfolio Setup (Sidebar Steps)
 - **Strategy Setup (â‘ )**: Create a profile with name, principal amount, goal %, currency, bank/account info
 - **Drift Strategy (â‘¡)**: Set tolerance % (how much drift is acceptable before rebalancing)
-- **Benchmark (â‘¢)**: Select benchmarks to compare against (SPY, QQQ, VTI, etc.)
-- **Asset Allocation (â‘£)**: Add tickers and set target percentages (must total 100%)
+- **Benchmark (â‘cents)**: Select benchmarks to compare against (SPY, QQQ, VTI, etc.)
+- **Asset Allocation (â‘GBP)**: Add tickers and set target percentages (must total 100%)
 - **Lock Asset Mix (â‘¤)**: Lock allocation when ready to deploy capital
-- **Asset Deployment (â‘¥)**: Record actual purchases at real broker prices
+- **Asset Deployment (â‘JPY)**: Record actual purchases at real broker prices
 
 ### 2. Key Metrics Explained
 - **CAGR**: Compound Annual Growth Rate - annualized return
@@ -2635,7 +2635,7 @@ def get_ai_response(user_message, chat_history, api_key):
         
         return response.content[0].text
     except ImportError:
-        return "âŒ The `anthropic` package is not installed. Please run: `pip install anthropic`"
+        return "âŒ The 'anthropic' package is not installed. Please run: 'pip install anthropic'"
     except Exception as e:
         return f"âŒ Error: {str(e)}"
 
@@ -2832,13 +2832,13 @@ def send_rebalance_confirmation_email(db, username, profile_name, recommendation
     total_slippage = ((total_actual_value / total_recommended_value) - 1) * 100 if total_recommended_value > 0 else 0
     total_slippage_color = "#10b981" if abs(total_slippage) < 0.5 else "#f59e0b" if abs(total_slippage) < 2 else "#ef4444"
     
-    subject = f"âœ… AlphaStream: Rebalance Complete - {profile_name}"
+    subject = f"âœ... AlphaStream: Rebalance Complete - {profile_name}"
     
     html_body = f"""
     <html>
     <body style="font-family: Arial, sans-serif; color: #1e293b; max-width: 700px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">âœ… Rebalance Complete</h1>
+            <h1 style="color: white; margin: 0;">âœ... Rebalance Complete</h1>
         </div>
         
         <div style="padding: 20px;">
@@ -2847,7 +2847,7 @@ def send_rebalance_confirmation_email(db, username, profile_name, recommendation
             <p>Your portfolio <strong>"{profile_name}"</strong> has been successfully rebalanced.</p>
             
             <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
-                <strong>ðŸ“… Executed:</strong> {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                <strong>ðŸ“... Executed:</strong> {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
             </div>
             
             <h3 style="color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">ðŸ“Š Trade Summary</h3>
@@ -2980,7 +2980,7 @@ def show_admin_overview_tab(db, all_profiles):
     """Tab 1: Overview - Profiles, Users, Needs Action"""
     sub_tab1, sub_tab2, sub_tab3 = st.tabs([
         "ðŸ“Š All Profiles Overview",
-        "ðŸ‘¥ User Management",
+        "ðŸ‘JPY User Management",
         "âš ï¸ Profiles Needing Action"
     ])
     
@@ -3037,7 +3037,7 @@ def show_admin_overview_tab(db, all_profiles):
                 }.get(profile["status"], "#6b7280")
                 
                 status_label = {
-                    "balanced": "âœ… Balanced",
+                    "balanced": "âœ... Balanced",
                     "needs_action": "âš ï¸ Action Required",
                     "empty": "ðŸ“­ Empty"
                 }.get(profile["status"], "Unknown")
@@ -3097,7 +3097,7 @@ def show_admin_overview_tab(db, all_profiles):
     
     # SUB-TAB 2: User Management
     with sub_tab2:
-        st.markdown("### ðŸ‘¥ User Management")
+        st.markdown("### ðŸ‘JPY User Management")
         st.caption("View and manage all registered users")
         
         # Add refresh button to reload fresh data
@@ -3109,7 +3109,7 @@ def show_admin_overview_tab(db, all_profiles):
                     del st.session_state['admin_dashboard_loaded']
                 # Force reload from Google Sheets
                 st.session_state.db = load_db()
-                st.success("âœ… User list refreshed!")
+                st.success("âœ... User list refreshed!")
                 st.rerun()
         
         # IMPORTANT: Get users from session state (freshest data)
@@ -3123,7 +3123,7 @@ def show_admin_overview_tab(db, all_profiles):
                 is_active = user_data.get("is_active", True)
                 status_color = "#10b981" if is_active else "#ef4444"
                 status_text = "Active" if is_active else "Inactive"
-                status_icon = "âœ…" if is_active else "ðŸ”´"
+                status_icon = "âœ..." if is_active else "ðŸ”'"
                 
                 st.markdown(f"""
                     <div style="background: white; padding: 20px; border-radius: 10px; 
@@ -3132,10 +3132,10 @@ def show_admin_overview_tab(db, all_profiles):
                             <div>
                                 <h4 style="margin: 0; color: #1e293b;">ðŸ‘¤ {user_data.get('display_name', username)}</h4>
                                 <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.9rem;">
-                                    @{username} â€¢ {user_data.get('email', 'N/A')}
+                                    @{username} âEURcents {user_data.get('email', 'N/A')}
                                 </p>
                                 <p style="margin: 8px 0 0 0; color: #64748b; font-size: 0.85rem;">
-                                    ðŸ“ {len(user_data.get('profiles', {}))} portfolios â€¢ 
+                                    ðŸ“ {len(user_data.get('profiles', {}))} portfolios âEURcents 
                                     Joined: {user_data.get('created_at', 'Unknown')[:10]}
                                 </p>
                             </div>
@@ -3175,7 +3175,7 @@ def show_admin_overview_tab(db, all_profiles):
                         log_security_event(db, "password_reset", username, "Admin reset password", "info")
                         save_db(db)
                         
-                        st.success(f"âœ… Password reset! New password: `{temp_password}`")
+                        st.success(f"âœ... Password reset! New password: '{temp_password}'")
                         st.info("âš ï¸ User should change this password immediately after login.")
                 
                 with col3:
@@ -3188,7 +3188,7 @@ def show_admin_overview_tab(db, all_profiles):
                             st.warning(f"User {username} has been deactivated")
                             st.rerun()
                     else:
-                        if st.button(f"âœ… Activate", key=f"activate_{username}", use_container_width=True, type="primary"):
+                        if st.button(f"âœ... Activate", key=f"activate_{username}", use_container_width=True, type="primary"):
                             user_data["is_active"] = True
                             user_data["login_attempts"] = 0
                             user_data["lockout_until"] = None
@@ -3199,7 +3199,7 @@ def show_admin_overview_tab(db, all_profiles):
                             st.rerun()
                 
                 with col4:
-                    if st.button(f"ðŸ—‘ï¸ Delete User", key=f"delete_{username}", use_container_width=True):
+                    if st.button(f"ðŸ-‘ï¸ Delete User", key=f"delete_{username}", use_container_width=True):
                         # Show confirmation
                         if f"confirm_delete_{username}" not in st.session_state:
                             st.session_state[f"confirm_delete_{username}"] = True
@@ -3212,7 +3212,7 @@ def show_admin_overview_tab(db, all_profiles):
                             log_security_event(db, "user_deleted", username, "Admin deleted account", "critical")
                             save_db(db)
                             del st.session_state[f"confirm_delete_{username}"]
-                            st.success(f"âœ… User {username} has been permanently deleted")
+                            st.success(f"âœ... User {username} has been permanently deleted")
                             st.rerun()
                 
                 st.divider()
@@ -3265,7 +3265,7 @@ def show_admin_overview_tab(db, all_profiles):
                 
                 with col_action:
                     st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button(f"ðŸ”§ Fix", key=f"fix_{profile['username']}_{profile['profile_name']}", 
+                    if st.button(f"ðŸ”Section Fix", key=f"fix_{profile['username']}_{profile['profile_name']}", 
                                use_container_width=True, type="primary"):
                         login_as_user(profile['username'])
                         st.session_state.active_profile = profile['profile_name']
@@ -3278,7 +3278,7 @@ def show_activity_logs_tab(db):
     sub_tab1, sub_tab2, sub_tab3 = st.tabs([
         "ðŸ“ User Activity",
         "ðŸš¨ System Errors",
-        "ðŸ“§ Notifications"
+        "ðŸ“Section Notifications"
     ])
     
     # SUB-TAB 1: User Activity
@@ -3338,17 +3338,17 @@ def show_activity_logs_tab(db):
         error_logs = [log for log in system_logs if log.get("type") in ["error", "warning"]]
         
         if not error_logs:
-            st.success("âœ… No errors! System is running smoothly.")
+            st.success("âœ... No errors! System is running smoothly.")
         else:
             st.warning(f"âš ï¸ {len(error_logs)} error/warning events in logs")
             
             # Display errors
             for log in error_logs[:50]:
-                severity = "ðŸ”´" if log.get("type") == "error" else "ðŸŸ¡"
+                severity = "ðŸ”'" if log.get("type") == "error" else "ðŸŸ¡"
                 st.markdown(f"""
                     <div style="background: #fef2f2; padding: 12px; border-radius: 6px; margin-bottom: 8px;">
                         <p style="margin: 0; font-size: 0.85rem; color: #64748b;">
-                            {severity} {log.get('timestamp', '')} â€¢ {log.get('user_id', 'system')}
+                            {severity} {log.get('timestamp', '')} âEURcents {log.get('user_id', 'system')}
                         </p>
                         <p style="margin: 4px 0 0 0; color: #991b1b; font-weight: 500;">
                             {log.get('message', '')}
@@ -3358,7 +3358,7 @@ def show_activity_logs_tab(db):
     
     # SUB-TAB 3: Notifications
     with sub_tab3:
-        st.markdown("### ðŸ“§ Notification History")
+        st.markdown("### ðŸ“Section Notification History")
         st.caption("Track all email notifications sent to users")
         
         notifications = db.get("notification_history", [])
@@ -3369,7 +3369,7 @@ def show_activity_logs_tab(db):
             st.caption(f"Total notifications: {len(notifications)}")
             
             for notif in notifications[:50]:
-                status_icon = "âœ…" if notif.get("status") == "sent" else "âŒ"
+                status_icon = "âœ..." if notif.get("status") == "sent" else "âŒ"
                 status_color = "#10b981" if notif.get("status") == "sent" else "#ef4444"
                 
                 st.markdown(f"""
@@ -3381,7 +3381,7 @@ def show_activity_logs_tab(db):
                                     {notif.get('subject', '')}
                                 </p>
                                 <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #64748b;">
-                                    To: {notif.get('username', '')} â€¢ Type: {notif.get('type', '')}
+                                    To: {notif.get('username', '')} âEURcents Type: {notif.get('type', '')}
                                 </p>
                                 <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: #64748b;">
                                     {notif.get('timestamp', '')}
@@ -3446,7 +3446,7 @@ def show_analytics_tab(db, analytics):
             col_chart1, col_chart2 = st.columns([2, 1])
             
             with col_chart1:
-                st.markdown("#### ðŸ“… Activity by Date")
+                st.markdown("#### ðŸ“... Activity by Date")
                 if activity_by_date:
                     # Sort by date
                     sorted_dates = sorted(activity_by_date.items())
@@ -3485,7 +3485,7 @@ def show_analytics_tab(db, analytics):
                     st.info("No activity types data")
             
             # Recent activity list - ENHANCED v7.2.4
-            st.markdown("#### ðŸ• Recent Activity Details")
+            st.markdown("#### ðŸ* Recent Activity Details")
             
             # Export button
             col_title, col_export = st.columns([3, 1])
@@ -3504,7 +3504,7 @@ def show_analytics_tab(db, analytics):
                         csv_buffer.write(f'"{timestamp}","{username}","{action}","{details}","{ip}"\n')
                     
                     st.download_button(
-                        label="ðŸ“¥ Export CSV",
+                        label="ðŸ“JPY Export CSV",
                         data=csv_buffer.getvalue(),
                         file_name=f"activity_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                         mime="text/csv",
@@ -3602,22 +3602,22 @@ def show_analytics_tab(db, analytics):
                     # Action icon and color mapping
                     action_icons = {
                         "login": "ðŸ”", "user_login": "ðŸ”", "user_registered": "ðŸ“",
-                        "logout": "ðŸšª", "profile_created": "âž•", "profile_updated": "âœï¸",
-                        "profile_deleted": "ðŸ—‘ï¸", "rebalance_executed": "âš–ï¸",
+                        "logout": "ðŸšª", "profile_created": "âž*", "profile_updated": "âœï¸",
+                        "profile_deleted": "ðŸ-‘ï¸", "rebalance_executed": "âš-ï¸",
                         "user_created": "ðŸ‘¤", "user_deleted": "âŒ",
-                        "settings_changed": "âš™ï¸", "password_changed": "ðŸ”‘",
-                        "database_reset": "ðŸ”¥", "backup_created": "ðŸ’¾",
+                        "settings_changed": "âš(TM)ï¸", "password_changed": "ðŸ”‘",
+                        "database_reset": "ðŸ”JPY", "backup_created": "ðŸ’¾",
                         "asset_added": "ðŸ“ˆ", "asset_removed": "ðŸ“‰"
                     }
                     
                     action_colors = {
-                        "login": "ðŸŸ¢", "user_login": "ðŸŸ¢", "user_registered": "ðŸ”µ",
+                        "login": "ðŸŸcents", "user_login": "ðŸŸcents", "user_registered": "ðŸ”µ",
                         "logout": "âšª", "profile_created": "ðŸ”µ", "profile_updated": "ðŸŸ ",
-                        "profile_deleted": "ðŸ”´", "rebalance_executed": "ðŸŸ£",
-                        "user_created": "ðŸ”µ", "user_deleted": "ðŸ”´",
+                        "profile_deleted": "ðŸ”'", "rebalance_executed": "ðŸŸGBP",
+                        "user_created": "ðŸ”µ", "user_deleted": "ðŸ”'",
                         "settings_changed": "ðŸŸ ", "password_changed": "ðŸŸ ",
-                        "database_reset": "ðŸ”´", "backup_created": "ðŸŸ¢",
-                        "asset_added": "ðŸŸ¢", "asset_removed": "ðŸ”´"
+                        "database_reset": "ðŸ”'", "backup_created": "ðŸŸcents",
+                        "asset_added": "ðŸŸcents", "asset_removed": "ðŸ”'"
                     }
                     
                     icon = action_icons.get(action, "ðŸ“")
@@ -3630,7 +3630,7 @@ def show_analytics_tab(db, analytics):
                         col_main, col_meta = st.columns([3, 1])
                         
                         with col_main:
-                            st.markdown(f"**{icon} {color_emoji} {action_display}** â€¢ @{username}")
+                            st.markdown(f"**{icon} {color_emoji} {action_display}** âEURcents @{username}")
                             if details:
                                 st.caption(f"â„¹ï¸ {details}")
                             if ip_address:
@@ -3676,19 +3676,19 @@ def show_analytics_tab(db, analytics):
 def show_system_management_tab(db):
     """Tab 4: System Management"""
     sub_tab1, sub_tab2, sub_tab3 = st.tabs([
-        "âš™ï¸ Global Settings",
-        "ðŸ¥ System Health",
+        "âš(TM)ï¸ Global Settings",
+        "ðŸJPY System Health",
         "ðŸ’¾ Backup & Restore"
     ])
     
     # SUB-TAB 1: Global Settings
     with sub_tab1:
-        st.markdown("### âš™ï¸ Global Settings")
+        st.markdown("### âš(TM)ï¸ Global Settings")
         st.caption("Configure system-wide settings")
         
         settings = db.get("global_settings", {})
         
-        st.markdown("#### ðŸ“§ Email Configuration")
+        st.markdown("#### ðŸ“Section Email Configuration")
         email_enabled = st.checkbox("Enable Email Notifications", 
                                     value=settings.get("email_notifications_enabled", False),
                                     key="email_enabled_setting")
@@ -3707,12 +3707,12 @@ def show_system_management_tab(db):
                 settings["smtp_password"] = smtp_password
                 db["global_settings"] = settings
                 save_db(db)
-                st.success("âœ… Email settings saved!")
+                st.success("âœ... Email settings saved!")
                 log_system_event(db, "settings_changed", "Email settings updated", "admin")
         
         st.divider()
         
-        st.markdown("#### ðŸ¤– AI Assistant Configuration")
+        st.markdown("#### ðŸ¤- AI Assistant Configuration")
         ai_enabled = st.checkbox("Enable AI Assistant", 
                                  value=settings.get("ai_assistant_enabled", False),
                                  key="ai_enabled_setting",
@@ -3731,7 +3731,7 @@ def show_system_management_tab(db):
                 settings["ai_assistant_api_key"] = ai_api_key
                 db["global_settings"] = settings
                 save_db(db)
-                st.success("âœ… AI Assistant settings saved! Users can now see the AI chatbot in the sidebar.")
+                st.success("âœ... AI Assistant settings saved! Users can now see the AI chatbot in the sidebar.")
                 log_system_event(db, "settings_changed", "AI Assistant settings updated", "admin")
                 st.rerun()
         else:
@@ -3741,7 +3741,7 @@ def show_system_management_tab(db):
                 settings["ai_assistant_api_key"] = ""
                 db["global_settings"] = settings
                 save_db(db)
-                st.success("âœ… AI Assistant disabled")
+                st.success("âœ... AI Assistant disabled")
                 log_system_event(db, "settings_changed", "AI Assistant disabled", "admin")
                 st.rerun()
         
@@ -3771,13 +3771,13 @@ def show_system_management_tab(db):
             settings["allow_registration"] = allow_registration
             db["global_settings"] = settings
             save_db(db)
-            st.success("âœ… Default settings saved!")
+            st.success("âœ... Default settings saved!")
             st.info(f"New profiles will use: {default_drift}% drift tolerance, {default_growth}% growth goal")
             log_system_event(db, "settings_changed", "Default settings updated", "admin")
     
     # SUB-TAB 2: System Health
     with sub_tab2:
-        st.markdown("### ðŸ¥ System Health Dashboard")
+        st.markdown("### ðŸJPY System Health Dashboard")
         st.caption("Monitor system status and performance")
         
         # Database Version Info (NEW for v7.2.0)
@@ -3792,7 +3792,7 @@ def show_system_management_tab(db):
             with col_meta3:
                 st.caption("**Last Modified:**")
                 st.caption(f"ðŸ‘¤ {metadata.get('last_save_by', 'unknown')}")
-                st.caption(f"ðŸ• {metadata.get('last_save_timestamp', 'unknown')}")
+                st.caption(f"ðŸ* {metadata.get('last_save_timestamp', 'unknown')}")
             
             # Show session info
             if 'data_version' in st.session_state:
@@ -3802,8 +3802,8 @@ def show_system_management_tab(db):
                     age_seconds = (datetime.now() - loaded_at).total_seconds()
                     age_minutes = int(age_seconds / 60)
                     
-                    version_match = "âœ… In Sync" if session_version == metadata.get('version', 0) else "âš ï¸ Out of Sync"
-                    staleness = "ðŸŸ¢ Fresh" if age_seconds < 300 else "ðŸŸ¡ Stale"
+                    version_match = "âœ... In Sync" if session_version == metadata.get('version', 0) else "âš ï¸ Out of Sync"
+                    staleness = "ðŸŸcents Fresh" if age_seconds < 300 else "ðŸŸ¡ Stale"
                     
                     st.info(f"""
                     **Your Session:** Version {session_version} {version_match}  
@@ -3827,9 +3827,9 @@ def show_system_management_tab(db):
         }.get(health["status"], "#6b7280")
         
         status_icon = {
-            "healthy": "ðŸŸ¢",
+            "healthy": "ðŸŸcents",
             "warning": "ðŸŸ¡",
-            "error": "ðŸ”´"
+            "error": "ðŸ”'"
         }.get(health["status"], "âšª")
         
         st.markdown(f"""
@@ -3867,7 +3867,7 @@ def show_system_management_tab(db):
         col_backup1, col_backup2 = st.columns([2, 1])
         with col_backup1:
             st.download_button(
-                label="ðŸ“¥ Download Database Backup",
+                label="ðŸ“JPY Download Database Backup",
                 data=backup_data,
                 file_name=backup_filename,
                 mime="application/json",
@@ -3911,7 +3911,7 @@ def show_system_management_tab(db):
                 restored_db = json.loads(backup_content)
                 
                 # Show preview
-                st.success(f"âœ… Backup file loaded: {uploaded_file.name}")
+                st.success(f"âœ... Backup file loaded: {uploaded_file.name}")
                 
                 preview_col1, preview_col2, preview_col3 = st.columns(3)
                 with preview_col1:
@@ -3928,7 +3928,7 @@ def show_system_management_tab(db):
                 st.warning("âš ï¸ **WARNING:** Restoring will REPLACE your current database with the backup!")
                 
                 restore_confirm = st.checkbox(
-                    "âœ… I understand this will replace all current data",
+                    "âœ... I understand this will replace all current data",
                     key="restore_confirm"
                 )
                 
@@ -3949,7 +3949,7 @@ def show_system_management_tab(db):
                                     # Restore database
                                     st.session_state.db = restored_db
                                     if save_db(restored_db):
-                                        st.success("âœ… Database restored successfully!")
+                                        st.success("âœ... Database restored successfully!")
                                         st.info("ðŸ”„ Reloading application...")
                                         
                                         # Clear cache
@@ -3973,7 +3973,7 @@ def show_system_management_tab(db):
         st.markdown("### âš ï¸ Danger Zone")
         st.caption("âš ï¸ **WARNING:** These actions are irreversible!")
         
-        with st.expander("ðŸ”¥ Reset Database to Fresh State", expanded=False):
+        with st.expander("ðŸ”JPY Reset Database to Fresh State", expanded=False):
             st.error("""
             **âš ï¸ EXTREME CAUTION REQUIRED**
             
@@ -3996,9 +3996,9 @@ def show_system_management_tab(db):
             # Confirmation checkboxes
             col_check1, col_check2 = st.columns(2)
             with col_check1:
-                confirm_backup = st.checkbox("âœ… I have created a backup", key="reset_confirm_backup")
+                confirm_backup = st.checkbox("âœ... I have created a backup", key="reset_confirm_backup")
             with col_check2:
-                confirm_understand = st.checkbox("âœ… I understand this is permanent", key="reset_confirm_understand")
+                confirm_understand = st.checkbox("âœ... I understand this is permanent", key="reset_confirm_understand")
             
             # Password confirmation
             admin_password = st.text_input(
@@ -4012,7 +4012,7 @@ def show_system_management_tab(db):
             if confirm_backup and confirm_understand and admin_password:
                 col_reset1, col_reset2 = st.columns([3, 1])
                 with col_reset2:
-                    if st.button("ðŸ”¥ RESET DATABASE", type="primary", use_container_width=True, key="execute_reset"):
+                    if st.button("ðŸ”JPY RESET DATABASE", type="primary", use_container_width=True, key="execute_reset"):
                         with st.spinner("ðŸ”„ Resetting database..."):
                             success, message, fresh_db = reset_database_to_fresh(admin_password, keep_admin=True)
                             
@@ -4022,9 +4022,9 @@ def show_system_management_tab(db):
                                 save_result = save_db(fresh_db, bypass_version_increment=True)
                                 
                                 if save_result:
-                                    st.success("âœ… Database reset successfully!")
-                                    st.success("âœ… Admin account preserved")
-                                    st.success("âœ… All other data removed")
+                                    st.success("âœ... Database reset successfully!")
+                                    st.success("âœ... Admin account preserved")
+                                    st.success("âœ... All other data removed")
                                     st.info("ðŸ”„ Reloading application...")
                                     
                                     # Clear session state
@@ -4058,7 +4058,7 @@ def show_security_tab(db):
         security_logs = db.get("security_logs", [])
         
         if not security_logs:
-            st.success("âœ… No security events logged")
+            st.success("âœ... No security events logged")
         else:
             # Filter by severity
             severity_filter = st.selectbox("Filter by Severity", 
@@ -4096,7 +4096,7 @@ def show_security_tab(db):
                                     {severity_icon} {log.get('event_type', '')}
                                 </p>
                                 <p style="margin: 0; font-size: 0.85rem; color: #64748b;">
-                                    User: {log.get('username', '')} â€¢ {log.get('details', '')}
+                                    User: {log.get('username', '')} âEURcents {log.get('details', '')}
                                 </p>
                             </div>
                         </div>
@@ -4112,7 +4112,7 @@ def show_security_tab(db):
         failed_logins = [log for log in security_logs if log.get("event_type") == "failed_login"]
         
         if not failed_logins:
-            st.success("âœ… No failed login attempts")
+            st.success("âœ... No failed login attempts")
         else:
             st.warning(f"âš ï¸ {len(failed_logins)} failed login attempts detected")
             
@@ -4126,7 +4126,7 @@ def show_security_tab(db):
                 with col1:
                     st.caption(f"**{username}**")
                 with col2:
-                    st.caption(f"ðŸ”´ {count} attempts")
+                    st.caption(f"ðŸ”' {count} attempts")
                 with col3:
                     if count >= 5:
                         st.caption("âš ï¸ Potential brute force")
@@ -4135,7 +4135,7 @@ def show_security_tab(db):
             
             st.markdown("#### Recent Failed Logins")
             for log in failed_logins[:20]:
-                st.caption(f"ðŸ”´ {log.get('timestamp', '')} - {log.get('username', '')} from {log.get('ip_address', 'unknown')}")
+                st.caption(f"ðŸ”' {log.get('timestamp', '')} - {log.get('username', '')} from {log.get('ip_address', 'unknown')}")
 
 def show_admin_dashboard(db, current_user):
     """Enhanced Admin Dashboard with 5 comprehensive tabs"""
@@ -4198,7 +4198,7 @@ def show_admin_dashboard(db, current_user):
         "ðŸ“Š Overview",
         "ðŸ“œ Activity & Logs", 
         "ðŸ“ˆ Analytics",
-        "âš™ï¸ System",
+        "âš(TM)ï¸ System",
         "ðŸ” Security"
     ])
     
@@ -4234,7 +4234,7 @@ def show_login_page():
             password = st.text_input("Password", type="password", placeholder="Enter your password")
             col_login, col_register = st.columns(2)
             with col_login:
-                login_btn = st.form_submit_button("ðŸš€ Sign In", use_container_width=True, type="primary")
+                login_btn = st.form_submit_button("ðŸšEUR Sign In", use_container_width=True, type="primary")
             with col_register:
                 register_btn = st.form_submit_button("ðŸ“œ Create Account", use_container_width=True)
             
@@ -4248,7 +4248,7 @@ def show_login_page():
                         st.session_state.current_user = username.lower()
                         st.session_state.username = username.lower()  # v7.2.1: Ensure username is stored
                         st.session_state.session_token = generate_session_token()
-                        st.success(f"âœ… {message}")
+                        st.success(f"âœ... {message}")
                         st.rerun()
                     else:
                         st.error(f"âŒ {message}")
@@ -4260,8 +4260,8 @@ def show_login_page():
             with st.expander("â„¹ï¸ First time setup?", expanded=False):
                 st.markdown("""
                     **Default Admin Account:**
-                    - Username: `admin`
-                    - Password: `admin123`
+                    - Username: 'admin'
+                    - Password: 'admin123'
                     
                     âš ï¸ **Important:** Change the admin password after first login!
                 """)
@@ -4280,7 +4280,7 @@ def show_registration_page():
         st.markdown("### ðŸ“œ Register")
         if not st.session_state.db.get("global_settings", {}).get("allow_registration", True):
             st.warning("âš ï¸ New registrations are currently disabled.")
-            if st.button("â† Back to Login"):
+            if st.button("â+ Back to Login"):
                 st.session_state.auth_page = "login"
                 st.rerun()
             return
@@ -4299,9 +4299,9 @@ def show_registration_page():
             
             col_reg, col_back = st.columns(2)
             with col_reg:
-                register_btn = st.form_submit_button("âœ… Create Account", use_container_width=True, type="primary")
+                register_btn = st.form_submit_button("âœ... Create Account", use_container_width=True, type="primary")
             with col_back:
-                back_btn = st.form_submit_button("â† Back to Login", use_container_width=True)
+                back_btn = st.form_submit_button("â+ Back to Login", use_container_width=True)
             
             if register_btn:
                 if password != password_confirm:
@@ -4309,7 +4309,7 @@ def show_registration_page():
                 else:
                     success, message = register_user(st.session_state.db, username, email, password, display_name)
                     if success:
-                        st.success(f"âœ… {message}")
+                        st.success(f"âœ... {message}")
                         st.session_state.auth_page = "login"
                         st.rerun()
                     else:
@@ -4351,7 +4351,7 @@ else:
                 </div>
             """, unsafe_allow_html=True)
             
-            if st.button("ðŸ”™ Return to Admin Dashboard", use_container_width=True, type="secondary", key="return_admin"):
+            if st.button("ðŸ”(TM) Return to Admin Dashboard", use_container_width=True, type="secondary", key="return_admin"):
                 stop_impersonation()
                 st.session_state.current_page = "Admin Dashboard"
                 st.rerun()
@@ -4450,15 +4450,15 @@ else:
                 steps = [
                     ("â‘  Profile Created", has_profile, "Profile exists"),
                     ("â‘¡ Principal Set", has_principal, "Capital amount defined"),
-                    ("â‘¢ Benchmarks Added", has_benchmarks, "Performance tracking configured"),
-                    ("â‘£ Assets Allocated", has_assets, "Investment mix defined"),
+                    ("â‘cents Benchmarks Added", has_benchmarks, "Performance tracking configured"),
+                    ("â‘GBP Assets Allocated", has_assets, "Investment mix defined"),
                     ("â‘¤ Mix Locked", asset_mix_locked, "Ready for deployment"),
-                    ("â‘¥ Deployed", has_deployments, "Capital invested")
+                    ("â‘JPY Deployed", has_deployments, "Capital invested")
                 ]
                 
                 for step_name, is_complete, tooltip in steps:
                     if is_complete:
-                        st.markdown(f"âœ… {step_name}", help=tooltip)
+                        st.markdown(f"âœ... {step_name}", help=tooltip)
                     else:
                         st.markdown(f"â³ {step_name}", help=tooltip)
                         # Show what to do next for first incomplete step
@@ -4468,11 +4468,11 @@ else:
                             elif not has_benchmarks:
                                 st.caption("ðŸ‘‰ Add benchmarks below (optional)")
                             elif not has_assets:
-                                st.caption("ðŸ‘‰ Add assets in â‘£ Asset Allocation")
+                                st.caption("ðŸ‘‰ Add assets in â‘GBP Asset Allocation")
                             elif not asset_mix_locked:
                                 st.caption("ðŸ‘‰ Lock mix in â‘¤ Lock Asset Mix")
                             elif not has_deployments:
-                                st.caption("ðŸ‘‰ Deploy capital in â‘¥ Asset Deployment")
+                                st.caption("ðŸ‘‰ Deploy capital in â‘JPY Asset Deployment")
                         break  # Only show hint for first incomplete
                 
                 st.divider()
@@ -4488,7 +4488,7 @@ else:
             # Clear the flag after using it
             st.session_state.auto_expand_create_profile = False
         
-        with st.expander("ðŸ†• Create New Profile", expanded=should_expand):
+        with st.expander("ðŸ+* Create New Profile", expanded=should_expand):
             with st.form("new_profile_form"):
                 # Get global defaults for pre-filling form
                 global_settings = st.session_state.db.get("global_settings", {})
@@ -4503,12 +4503,12 @@ else:
                 n_curr = st.selectbox("Currency*", ["USD", "CAD"])
                 n_p = st.number_input("Principal ($)*", value=10000.0, step=1000.0, min_value=0.0)
                 n_goal = st.number_input("Annual Growth Goal (%)*", 
-                                        value=default_growth_goal,  # Use global default! âœ…
+                                        value=default_growth_goal,  # Use global default! âœ...
                                         step=0.5, min_value=0.0,
                                         help=f"Target annual return (default: {default_growth_goal}%)")
                 n_start = st.date_input("Inception Date*", value=date.today() - timedelta(days=365), max_value=date.today())
                 
-                submitted = st.form_submit_button("ðŸš€ Initialize Profile", use_container_width=True)
+                submitted = st.form_submit_button("ðŸšEUR Initialize Profile", use_container_width=True)
                 if submitted:
                     user_profiles = get_user_profiles(st.session_state.db, current_user)
                     
@@ -4530,7 +4530,7 @@ else:
                             "start_date": str(n_start), "bank_name": n_bank, "account_type": n_account_type,
                             "account_name": f"{n_bank} {n_account_type}", "initialization_date": str(n_start),
                             "asset_mix_locked": False, "assets": {}, "rebalance_logs": [],
-                            "drift_tolerance": default_drift,  # Use global default! âœ…
+                            "drift_tolerance": default_drift,  # Use global default! âœ...
                             "rebalance_stats": [], "last_rebalanced": None, 
                             "benchmark": None, "benchmarks": []
                         }
@@ -4542,7 +4542,7 @@ else:
                         st.session_state.active_profile = n_name
                         
                         # Enhanced success message with guidance
-                        st.success(f"âœ… Portfolio '{n_name}' created successfully!")
+                        st.success(f"âœ... Portfolio '{n_name}' created successfully!")
                         st.info(f"""
 ðŸ“Š **Next Step:** Click '**Portfolio Manager**' button in the sidebar to:
 - Set target allocation percentages for **{n_name}**
@@ -4555,7 +4555,7 @@ else:
 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
             color: white; padding: 15px; border-radius: 10px; text-align: center; margin-top: 15px;">
     <p style="margin: 0; font-size: 1rem; font-weight: 600;">
-        ðŸ‘‰ Click '<strong>ðŸ“Š Portfolio Manager</strong>' in the sidebar above to continue â†’
+        ðŸ‘‰ Click '<strong>ðŸ“Š Portfolio Manager</strong>' in the sidebar above to continue â+’
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -4585,12 +4585,12 @@ else:
                 st.rerun()
             
             prof = user_profiles[st.session_state.active_profile]
-            p_flag = "ðŸ‡ºðŸ‡¸" if prof.get("currency") == "USD" else "ðŸ‡¨ðŸ‡¦"
-            st.caption(f"ðŸ¦ {prof.get('bank_name', 'N/A')} â€¢ {prof.get('account_type', 'N/A')}")
+            p_flag = "ðŸ++ºðŸ++¸" if prof.get("currency") == "USD" else "ðŸ++¨ðŸ++¦"
+            st.caption(f"ðŸ¦ {prof.get('bank_name', 'N/A')} âEURcents {prof.get('account_type', 'N/A')}")
             
             # CRUD Actions
             st.divider()
-            st.markdown("### âš™ï¸ Profile Actions")
+            st.markdown("### âš(TM)ï¸ Profile Actions")
             col_crud1, col_crud2, col_crud3 = st.columns(3)
             with col_crud1:
                 if st.button("âœï¸ Edit", use_container_width=True, key="edit_profile"):
@@ -4599,7 +4599,7 @@ else:
                 if st.button("ðŸ”ž Reset", use_container_width=True, key="reset_profile"):
                     st.session_state.reset_confirm = True
             with col_crud3:
-                if st.button("ðŸ—‘ï¸ Delete", use_container_width=True, key="delete_profile", type="secondary"):
+                if st.button("ðŸ-‘ï¸ Delete", use_container_width=True, key="delete_profile", type="secondary"):
                     st.session_state.delete_confirm = True
             
             # Edit Dialog
@@ -4627,7 +4627,7 @@ else:
                             save_db(st.session_state.db)
                             log_profile(prof, "Profile edited")
                             st.session_state.editing_profile = False
-                            st.success("âœ… Updated!")
+                            st.success("âœ... Updated!")
                             st.rerun()
                     with col_cancel:
                         if st.form_submit_button("âŒ Cancel", use_container_width=True):
@@ -4650,7 +4650,7 @@ else:
                         save_db(st.session_state.db)
                         log_profile(prof, "Profile reset")
                         st.session_state.reset_confirm = False
-                        st.success("âœ… Reset!")
+                        st.success("âœ... Reset!")
                         st.rerun()
                 with col_r2:
                     if st.button("âŒ Cancel", use_container_width=True, key="cancel_reset"):
@@ -4659,17 +4659,17 @@ else:
             
             # Delete Confirmation
             if st.session_state.get("delete_confirm", False):
-                st.error("ðŸ—‘ï¸ **Delete Profile?**")
+                st.error("ðŸ-‘ï¸ **Delete Profile?**")
                 st.caption(f"Permanently delete '{st.session_state.active_profile}'?")
                 col_d1, col_d2 = st.columns(2)
                 with col_d1:
-                    if st.button("ðŸ—‘ï¸ Yes, Delete", use_container_width=True, type="primary", key="confirm_delete"):
+                    if st.button("ðŸ-‘ï¸ Yes, Delete", use_container_width=True, type="primary", key="confirm_delete"):
                         profile_to_delete = st.session_state.active_profile
                         del st.session_state.db["users"][current_user]["profiles"][profile_to_delete]
                         save_db(st.session_state.db)
                         st.session_state.active_profile = None
                         st.session_state.delete_confirm = False
-                        st.success(f"âœ… Deleted!")
+                        st.success(f"âœ... Deleted!")
                         st.rerun()
                 with col_d2:
                     if st.button("âŒ Cancel", use_container_width=True, key="cancel_delete"):
@@ -4694,13 +4694,13 @@ else:
                 prof['drift_tolerance'] = new_tolerance
                 save_db(st.session_state.db)
                 log_profile(prof, f"Updated drift tolerance to {new_tolerance}%")
-                st.success("âœ… Updated!")
+                st.success("âœ... Updated!")
                 st.rerun()
             
             st.divider()
             
             # Benchmark Selection
-            st.markdown("### â‘¢ Benchmark Comparison")
+            st.markdown("### â‘cents Benchmark Comparison")
             st.caption("Compare against market benchmarks (US & Canadian)")
             with st.expander("â„¹ï¸ Why use a benchmark?", expanded=False):
                 st.markdown("""
@@ -4709,23 +4709,23 @@ else:
                 - **Outperforming** = your strategy adds value
                 - Select multiple to compare different indices
                 
-                **ðŸ‡ºðŸ‡¸ US Markets:** SPY, QQQ, VTI, IWM, DIA, BND  
-                **ðŸ‡¨ðŸ‡¦ Canadian Markets:** XIU, XIC, ZCN, VCN
+                **ðŸ++ºðŸ++¸ US Markets:** SPY, QQQ, VTI, IWM, DIA, BND  
+                **ðŸ++¨ðŸ++¦ Canadian Markets:** XIU, XIC, ZCN, VCN
                 """)
             
             benchmark_options = {
                 # US Benchmarks
-                "ðŸ‡ºðŸ‡¸ S&P 500 (SPY)": "SPY",
-                "ðŸ‡ºðŸ‡¸ NASDAQ-100 (QQQ)": "QQQ",
-                "ðŸ‡ºðŸ‡¸ Total Market (VTI)": "VTI",
-                "ðŸ‡ºðŸ‡¸ Russell 2000 (IWM)": "IWM",
-                "ðŸ‡ºðŸ‡¸ Dow Jones (DIA)": "DIA",
-                "ðŸ‡ºðŸ‡¸ US Bonds (BND)": "BND",
+                "ðŸ++ºðŸ++¸ S&P 500 (SPY)": "SPY",
+                "ðŸ++ºðŸ++¸ NASDAQ-100 (QQQ)": "QQQ",
+                "ðŸ++ºðŸ++¸ Total Market (VTI)": "VTI",
+                "ðŸ++ºðŸ++¸ Russell 2000 (IWM)": "IWM",
+                "ðŸ++ºðŸ++¸ Dow Jones (DIA)": "DIA",
+                "ðŸ++ºðŸ++¸ US Bonds (BND)": "BND",
                 # Canadian Benchmarks
-                "ðŸ‡¨ðŸ‡¦ TSX 60 (XIU)": "XIU",
-                "ðŸ‡¨ðŸ‡¦ TSX Composite (XIC)": "XIC",
-                "ðŸ‡¨ðŸ‡¦ TSX Capped Comp (ZCN)": "ZCN",
-                "ðŸ‡¨ðŸ‡¦ FTSE Canada (VCN)": "VCN"
+                "ðŸ++¨ðŸ++¦ TSX 60 (XIU)": "XIU",
+                "ðŸ++¨ðŸ++¦ TSX Composite (XIC)": "XIC",
+                "ðŸ++¨ðŸ++¦ TSX Capped Comp (ZCN)": "ZCN",
+                "ðŸ++¨ðŸ++¦ FTSE Canada (VCN)": "VCN"
             }
             current_benchmarks = prof.get('benchmarks', [])
             # Migration: convert old single benchmark to list
@@ -4746,7 +4746,7 @@ else:
                 prof['benchmarks'] = [benchmark_options[b] for b in selected_benchmarks]
                 prof['benchmark'] = prof['benchmarks'][0] if prof['benchmarks'] else None  # Keep for backward compat
                 save_db(st.session_state.db)
-                st.success("âœ… Saved!")
+                st.success("âœ... Saved!")
                 st.rerun()
             
             if prof.get('benchmarks'):
@@ -4755,7 +4755,7 @@ else:
             st.divider()
             
             # Asset Allocation
-            st.markdown("### â‘£ Asset Allocation")
+            st.markdown("### â‘GBP Asset Allocation")
             st.caption("Add assets and set target percentages")
             with st.expander("â„¹ï¸ How asset allocation works", expanded=False):
                 st.markdown("""
@@ -4805,7 +4805,7 @@ else:
                         
                         # Create clickable card
                         if units > 0:
-                            status = f"âœ… {allocated_pct:.0f}% deployed"
+                            status = f"âœ... {allocated_pct:.0f}% deployed"
                         else:
                             status = "â³ Not deployed"
                         
@@ -4821,7 +4821,7 @@ else:
                 st.divider()
             
             # Quick-add buttons for common tickers (user's specific assets)
-            st.markdown("**ðŸš€ Quick Add:**")
+            st.markdown("**ðŸšEUR Quick Add:**")
             col_q1, col_q2, col_q3, col_q4 = st.columns(4)
             with col_q1:
                 if st.button("SPXL", key="quick_spxl", help="S&P 500 3X", use_container_width=True):
@@ -4931,16 +4931,16 @@ else:
                             
                             # Enhancement 1: Show allocation message instead of price
                             if is_existing:
-                                loading_placeholder.success(f"âœ… **{ticker_name}** - Asset target allocated")
+                                loading_placeholder.success(f"âœ... **{ticker_name}** - Asset target allocated")
                             else:
-                                loading_placeholder.success(f"âœ… **{ticker_name}** - Ready to allocate")
+                                loading_placeholder.success(f"âœ... **{ticker_name}** - Ready to allocate")
                             valid_ticker = True
                         else:
                             loading_placeholder.error(f"âŒ No data found for '{a_sym}'")
                             validation_error = f"Ticker '{a_sym}' exists but has no price data. Try another ticker."
                             
                     except TimeoutError:
-                        loading_placeholder.error(f"â±ï¸ Timeout validating '{a_sym}'")
+                        loading_placeholder.error(f"â+/-ï¸ Timeout validating '{a_sym}'")
                         validation_error = f"Yahoo Finance took too long to respond for '{a_sym}'. Try again or use Quick Add buttons."
                         try:
                             signal.alarm(0)
@@ -5010,15 +5010,15 @@ else:
                             action = "Updated" if is_existing else "Added"
                             log_profile(prof, f"{action} {a_sym}: {a_w}% target")
                             save_db(st.session_state.db)
-                            st.success(f"âœ… {action} {a_sym}!")
+                            st.success(f"âœ... {action} {a_sym}!")
                             st.rerun()
                 with col_b2:
                     if is_existing:
-                        if st.button("ðŸ—‘ï¸ Remove", use_container_width=True, key="remove_asset"):
+                        if st.button("ðŸ-‘ï¸ Remove", use_container_width=True, key="remove_asset"):
                             del prof["assets"][a_sym]
                             log_profile(prof, f"Removed {a_sym}")
                             save_db(st.session_state.db)
-                            st.success(f"âœ… Removed {a_sym}!")
+                            st.success(f"âœ... Removed {a_sym}!")
                             st.rerun()
             
             # Asset Mix Locking
@@ -5031,7 +5031,7 @@ else:
             is_complete = (total_allocation == 100.0 and len(assets) > 0)
             
             # Debug info expander
-            with st.expander("ðŸ”§ Troubleshooting / Current State", expanded=False):
+            with st.expander("ðŸ”Section Troubleshooting / Current State", expanded=False):
                 st.caption("**Portfolio Status:**")
                 st.json({
                     "Total Allocation": f"{total_allocation:.1f}%",
@@ -5042,7 +5042,7 @@ else:
                 })
                 st.caption("**Assets:**")
                 for ticker, data in assets.items():
-                    st.caption(f"â€¢ {ticker}: {data.get('target', 0)}% target, {data.get('allocated_pct', 0):.1f}% deployed, {data.get('units', 0)} units")
+                    st.caption(f"âEURcents {ticker}: {data.get('target', 0)}% target, {data.get('allocated_pct', 0):.1f}% deployed, {data.get('units', 0)} units")
                 
                 if st.button("ðŸ”„ Reset Portfolio (Emergency)", key="emergency_reset"):
                     if st.button("âš ï¸ Confirm Reset - This will delete ALL data", key="confirm_reset", type="primary"):
@@ -5050,11 +5050,11 @@ else:
                         prof["asset_mix_locked"] = False
                         save_db(st.session_state.db)
                         log_profile(prof, "Emergency reset - all assets deleted")
-                        st.success("âœ… Portfolio reset!")
+                        st.success("âœ... Portfolio reset!")
                         st.rerun()
             
             if prof.get("asset_mix_locked", False):
-                st.success("âœ… **Asset Mix Locked**")
+                st.success("âœ... **Asset Mix Locked**")
                 st.caption(f"{len(assets)} assets defined. Ready for deployment.")
                 any_deployments = any(a.get("allocated_pct", 0) > 0 for a in assets.values())
                 
@@ -5062,7 +5062,7 @@ else:
                     if any_deployments:
                         # Show warning but allow
                         st.warning("âš ï¸ You have deployments recorded. Unlocking will allow you to modify targets, but existing deployments remain unchanged.")
-                        if st.button("âœ… Yes, Unlock Anyway", key="confirm_unlock", type="primary"):
+                        if st.button("âœ... Yes, Unlock Anyway", key="confirm_unlock", type="primary"):
                             prof["asset_mix_locked"] = False
                             save_db(st.session_state.db)
                             log_profile(prof, "Asset mix unlocked (with deployments)")
@@ -5076,11 +5076,11 @@ else:
                 if is_complete:
                     st.warning("ðŸ”œ **Ready to Lock**")
                     st.caption(f"{len(assets)} assets, {total_allocation:.1f}% allocated")
-                    if st.button("ðŸ”™ Lock Asset Mix", type="primary", use_container_width=True, key="lock_mix"):
+                    if st.button("ðŸ”(TM) Lock Asset Mix", type="primary", use_container_width=True, key="lock_mix"):
                         prof["asset_mix_locked"] = True
                         save_db(st.session_state.db)
                         log_profile(prof, f"Asset mix locked: {len(assets)} assets")
-                        st.success("âœ… Asset mix locked!")
+                        st.success("âœ... Asset mix locked!")
                         st.rerun()
                 else:
                     st.info("â„¹ï¸ **Asset Mix Not Complete**")
@@ -5089,11 +5089,11 @@ else:
             st.divider()
             
             # Asset Deployment
-            st.markdown("### â‘¥ Asset Deployment")
+            st.markdown("### â‘JPY Asset Deployment")
             st.caption("Deploy capital into individual assets")
             
             if not prof.get("asset_mix_locked", False):
-                st.info("ðŸ”™ **Lock your asset mix first**")
+                st.info("ðŸ”(TM) **Lock your asset mix first**")
             else:
                 assets = prof.get("assets", {})
                 
@@ -5112,7 +5112,7 @@ else:
                 # Calculate deployment progress for progress bar
                 deployment_progress = (total_deployed_capital / prof['principal']) if prof['principal'] > 0 else 0
                 
-                st.markdown(f"**Progress:** {fully_deployed_count}/{total_assets} assets fully deployed â€¢ {deployment_progress*100:.1f}% capital deployed")
+                st.markdown(f"**Progress:** {fully_deployed_count}/{total_assets} assets fully deployed âEURcents {deployment_progress*100:.1f}% capital deployed")
                 
                 if total_assets > 0:
                     progress_pct = deployment_progress * 100
@@ -5175,11 +5175,11 @@ else:
                 
                 if not deployable_assets:
                     if is_truly_fully_deployed and undeployed_cash > 0:
-                        st.success(f"âœ… **All assets 100% deployed!** (${undeployed_cash:,.2f} fractional remainder)")
+                        st.success(f"âœ... **All assets 100% deployed!** (${undeployed_cash:,.2f} fractional remainder)")
                     else:
-                        st.success("âœ… **All assets 100% deployed!**")
+                        st.success("âœ... **All assets 100% deployed!**")
                 else:
-                    with st.expander("âž¢ Record Asset Deployment", expanded=False):
+                    with st.expander("âžcents Record Asset Deployment", expanded=False):
                         st.markdown("### Deploy Capital Into Assets")
                         st.markdown("**Record your actual purchases from your broker**")
                         
@@ -5219,7 +5219,7 @@ else:
                             
                             # Make text bigger and more prominent
                             st.markdown(f"### {selected_ticker}: Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
-                            st.markdown(f"<div style='font-size: 1.1rem; margin-bottom: 12px;'><strong>Deployed:</strong> ${actual_spent:,.0f} ({display_allocated}%) â€¢ <strong>Budget Remaining:</strong> ${remaining_budget:,.0f}</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='font-size: 1.1rem; margin-bottom: 12px;'><strong>Deployed:</strong> ${actual_spent:,.0f} ({display_allocated}%) âEURcents <strong>Budget Remaining:</strong> ${remaining_budget:,.0f}</div>", unsafe_allow_html=True)
                             
                             # CRITICAL: Check smart "100% deployed" FIRST (before showing budget display)
                             # Asset is 100% deployed when remaining budget can't buy 1 unit
@@ -5242,7 +5242,7 @@ else:
                                 # Asset is 100% deployed - show success message only
                                 st.markdown("---")
                                 st.success(f"""
-                                    âœ… **{selected_ticker} is 100% Deployed!**
+                                    âœ... **{selected_ticker} is 100% Deployed!**
                                     
                                     Deployed: ${actual_spent:,.0f} ({display_allocated}% of target)
                                     Remaining budget: ${remaining_budget:,.2f}
@@ -5252,11 +5252,11 @@ else:
                                     
                                     ðŸ’¡ This is normal! You've maximized deployment for this asset.
                                 """)
-                                st.info("âœ… Select another asset to continue deploying.")
+                                st.info("âœ... Select another asset to continue deploying.")
                             else:
                                 # Asset still has deployable budget - show budget display
                                 st.markdown("---")
-                                st.markdown("### ðŸ’° Per-Asset Budget Allocation")
+                                st.markdown("### ðŸ’ deg Per-Asset Budget Allocation")
                                 
                                 col_b1, col_b2 = st.columns(2)
                                 with col_b1:
@@ -5275,7 +5275,7 @@ else:
                                 # Show budget constraint explanation
                                 if remaining_budget <= 0:
                                     st.success(f"""
-                                        âœ… **{selected_ticker} Target Reached**
+                                        âœ... **{selected_ticker} Target Reached**
                                         
                                         You've deployed ${actual_spent:,.0f} to {selected_ticker}.
                                         This meets or exceeds the {target_pct}% target allocation.
@@ -5293,7 +5293,7 @@ else:
                                     """)
                                 else:
                                     st.success(f"""
-                                        âœ… **Ready to Deploy**
+                                        âœ... **Ready to Deploy**
                                         
                                         You can deploy up to ${actual_available_budget:,.0f} to {selected_ticker}.
                                         This stays within the {target_pct}% target allocation.
@@ -5316,7 +5316,7 @@ else:
                                 
                                 with col_today:
                                     st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-                                    if st.button("ðŸ“… Today", key="set_today_btn", use_container_width=True):
+                                    if st.button("ðŸ“... Today", key="set_today_btn", use_container_width=True):
                                         # Enhancement 2: Update to today and force widget refresh
                                         st.session_state.deploy_date_value = date.today()
                                         st.rerun()
@@ -5358,7 +5358,7 @@ else:
                                 
                                 # Show price info - make it bigger and more visible
                                 if preview_price:
-                                    p_flag = "ðŸ‡ºðŸ‡¸" if prof.get("currency") == "USD" else "ðŸ‡¨ðŸ‡¦"
+                                    p_flag = "ðŸ++ºðŸ++¸" if prof.get("currency") == "USD" else "ðŸ++¨ðŸ++¦"
                                     st.markdown(f"""
                                     <div style="background: #e0f2fe; border-left: 4px solid #0284c7; padding: 16px; border-radius: 8px; margin: 12px 0;">
                                         <div style="font-size: 1.2rem; font-weight: 600; color: #0c4a6e;">
@@ -5499,16 +5499,16 @@ else:
                                     st.markdown(f'''
                                         <div class="buying-guide" style="font-size: 1.05rem;">
                                             <div style="margin-bottom: 10px; font-size: 1.2rem;"><strong>ðŸ“Š Deployment Preview:</strong></div>
-                                            <div style="margin-bottom: 6px;">â€¢ <strong>Units:</strong> <span class="buying-guide-highlight" style="font-size: 1.15rem;">{int(estimated_units):,} units</span></div>
-                                            <div style="margin-bottom: 6px;">â€¢ <strong>Estimated Cost:</strong> ${deploy_amount:,.2f} (based on ${preview_price:,.2f}/unit)</div>
-                                            <div style="margin-bottom: 6px;">â€¢ <strong>Asset Target Budget:</strong> ${target_budget:,.2f} ({target_pct}% of ${prof['principal']:,.0f})</div>
-                                            <div style="margin-bottom: 6px;">â€¢ <strong>Already Spent:</strong> ${actual_spent:,.2f} ({current_allocated:.1f}%)</div>
+                                            <div style="margin-bottom: 6px;">âEURcents <strong>Units:</strong> <span class="buying-guide-highlight" style="font-size: 1.15rem;">{int(estimated_units):,} units</span></div>
+                                            <div style="margin-bottom: 6px;">âEURcents <strong>Estimated Cost:</strong> ${deploy_amount:,.2f} (based on ${preview_price:,.2f}/unit)</div>
+                                            <div style="margin-bottom: 6px;">âEURcents <strong>Asset Target Budget:</strong> ${target_budget:,.2f} ({target_pct}% of ${prof['principal']:,.0f})</div>
+                                            <div style="margin-bottom: 6px;">âEURcents <strong>Already Spent:</strong> ${actual_spent:,.2f} ({current_allocated:.1f}%)</div>
                                         </div>
                                     ''', unsafe_allow_html=True)
                                     
                                     # Actual price input - user enters what they actually paid
                                     st.markdown("---")
-                                    st.markdown("### ðŸ’° Enter Actual Purchase Details")
+                                    st.markdown("### ðŸ’ deg Enter Actual Purchase Details")
                                     st.caption("After buying at your broker, enter the actual price you paid (pre-filled with estimated price)")
                                     
                                     # Enhancement 1: Default to preview_price to align with Deployment Preview
@@ -5540,9 +5540,9 @@ else:
                                     
                                     st.markdown(f'''
                                         <div style="background: #f0fdf4; border: 1px solid #10b981; border-radius: 8px; padding: 12px; margin-top: 8px;">
-                                            <div style="font-weight: 600; color: #065f46; margin-bottom: 4px;">âœ… Final Deployment:</div>
-                                            <div style="color: #047857;">â€¢ <strong>{int(estimated_units):,} units</strong> @ <strong>${actual_price:,.2f}</strong> = <strong>${actual_deploy_amount:,.2f}</strong></div>
-                                            <div style="color: #047857; font-size: 0.85rem;">â€¢ After deploy: ${new_total_spent_actual:,.2f} ({new_total_pct:.1f}% of target)</div>
+                                            <div style="font-weight: 600; color: #065f46; margin-bottom: 4px;">âœ... Final Deployment:</div>
+                                            <div style="color: #047857;">âEURcents <strong>{int(estimated_units):,} units</strong> @ <strong>${actual_price:,.2f}</strong> = <strong>${actual_deploy_amount:,.2f}</strong></div>
+                                            <div style="color: #047857; font-size: 0.85rem;">âEURcents After deploy: ${new_total_spent_actual:,.2f} ({new_total_pct:.1f}% of target)</div>
                                         </div>
                                     ''', unsafe_allow_html=True)
                                     
@@ -5590,7 +5590,7 @@ else:
                                 if validation_error:
                                     st.error(validation_error)
                                 
-                                if st.button("ðŸ“¥ Record Deployment", type="primary", use_container_width=True, 
+                                if st.button("ðŸ“JPY Record Deployment", type="primary", use_container_width=True, 
                                             key="record_deploy_btn", disabled=not can_deploy):
                                     try:
                                         price = actual_price  # Use actual price entered by user
@@ -5620,7 +5620,7 @@ else:
                                             
                                             log_profile(prof, f"Deployed {quantity:,} units of {selected_ticker} (${final_amount:,.2f} @ ${price:.2f})")
                                             save_db(st.session_state.db)
-                                            st.success(f"âœ… Deployed {quantity:,} units of {selected_ticker} @ ${price:.2f}")
+                                            st.success(f"âœ... Deployed {quantity:,} units of {selected_ticker} @ ${price:.2f}")
                                             if asset_data['allocated_pct'] >= 100.0:
                                                 st.balloons()
                                             st.rerun()
@@ -5629,7 +5629,7 @@ else:
             
             # Capital Overview Section
             st.divider()
-            st.markdown("### ðŸ’° Capital Overview")
+            st.markdown("### ðŸ’ deg Capital Overview")
             
             # Calculate total deployed from purchases
             total_deployed_capital = 0
@@ -5760,7 +5760,7 @@ You have deployed MORE than your principal!
                     # Show success - portfolio is fully deployed
                     st.metric("Undeployed Cash", f"${undeployed_cash:,.0f}",
                              delta="100% deployed", delta_color="normal")
-                    st.caption(f"âœ… Fractional remainder (can't buy partial shares)")
+                    st.caption(f"âœ... Fractional remainder (can't buy partial shares)")
                 else:
                     st.metric("Undeployed Cash", f"${undeployed_cash:,.0f}",
                              delta=f"{deployment_rate:.1f}% deployed" if undeployed_cash > 0 else None)
@@ -5798,8 +5798,8 @@ You have deployed MORE than your principal!
                     # (Sum all deployments after this one)
                     remaining_after = principal_amt - sum(d["amount"] for d in all_deployments[:i+1])
                     
-                    icon = "ðŸ’°" if i == 0 else "ðŸ“Œ"
-                    st.caption(f"""{icon} **{deployment['date']}** â€¢ {deployment['ticker']}: {deployment['quantity']:.0f} units @ ${deployment['price']:.2f} = ${deployment['amount']:,.2f} â€¢ Cash left: ${remaining_after:,.0f}""")
+                    icon = "ðŸ’ deg" if i == 0 else "ðŸ“Œ"
+                    st.caption(f"""{icon} **{deployment['date']}** âEURcents {deployment['ticker']}: {deployment['quantity']:.0f} units @ ${deployment['price']:.2f} = ${deployment['amount']:,.2f} âEURcents Cash left: ${remaining_after:,.0f}""")
                 
                 if len(all_deployments) > 5:
                     st.caption(f"_... and {len(all_deployments) - 5} more deployments_")
@@ -5810,7 +5810,7 @@ You have deployed MORE than your principal!
             if is_truly_fractional and undeployed_cash > 0:
                 # Show success message with fractional explanation
                 st.success(f"""
-âœ… **Portfolio 100% Deployed!**
+âœ... **Portfolio 100% Deployed!**
 
 You have ${undeployed_cash:,.2f} remaining, which is a **fractional remainder**.
 
@@ -5826,14 +5826,14 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 """)
                 
                 # Add Capital button
-                if st.button("âž• Add More Capital to Portfolio", use_container_width=True, key="add_capital_btn"):
+                if st.button("âž* Add More Capital to Portfolio", use_container_width=True, key="add_capital_btn"):
                     st.session_state.show_add_capital_form = True
                     st.rerun()
             
             # Show add capital form if triggered
             if st.session_state.get('show_add_capital_form', False):
                 with st.form("add_capital_form"):
-                    st.markdown("### âž• Add Capital to Portfolio")
+                    st.markdown("### âž* Add Capital to Portfolio")
                     st.caption("Inject additional capital into your portfolio")
                     
                     current_principal = prof['principal']
@@ -5859,17 +5859,17 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     
                     col_submit, col_cancel = st.columns(2)
                     with col_submit:
-                        submit_add = st.form_submit_button("âœ… Add Capital", type="primary", use_container_width=True)
+                        submit_add = st.form_submit_button("âœ... Add Capital", type="primary", use_container_width=True)
                     with col_cancel:
                         cancel_add = st.form_submit_button("âŒ Cancel", use_container_width=True)
                     
                     if submit_add:
                         # Update principal
                         prof['principal'] = new_principal
-                        log_profile(prof, f"Added capital: ${additional_amount:,.2f} (Principal: ${current_principal:,.2f} â†’ ${new_principal:,.2f})")
+                        log_profile(prof, f"Added capital: ${additional_amount:,.2f} (Principal: ${current_principal:,.2f} â+’ ${new_principal:,.2f})")
                         save_db(st.session_state.db)
                         st.session_state.show_add_capital_form = False
-                        st.success(f"âœ… Added ${additional_amount:,.2f} to portfolio! New principal: ${new_principal:,.2f}")
+                        st.success(f"âœ... Added ${additional_amount:,.2f} to portfolio! New principal: ${new_principal:,.2f}")
                         st.balloons()
                         st.rerun()
                     
@@ -5886,7 +5886,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             
             if deployment_opportunities and not is_truly_fractional and all_assets_deployed:
                 # Enhancement 4: Use smaller headings to match sidebar text size
-                st.markdown("#### ðŸš€ Deploy All Remaining Cash")
+                st.markdown("#### ðŸšEUR Deploy All Remaining Cash")
                 st.caption(f"Deploy ${deployable_cash:,.0f} remaining across your portfolio with actual broker prices")
                 
                 # Initialize session state for actual prices if not exists
@@ -5949,7 +5949,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                 diff_icon = "ðŸ“ˆ" if price_diff > 0 else "ðŸ“‰"
                                 st.caption(f"{diff_icon} {price_diff:+.2f} ({price_diff_pct:+.1f}%) vs estimated")
                             else:
-                                st.caption("âœ… Matches estimate")
+                                st.caption("âœ... Matches estimate")
                         
                         with col3:
                             st.markdown("**Final Deployment**")
@@ -5969,12 +5969,12 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     st.metric("Available Cash", f"${deployable_cash:,.0f}")
                 
                 with col_summary2:
-                    st.markdown("**ðŸ’° Estimated**")
+                    st.markdown("**ðŸ’ deg Estimated**")
                     st.metric("Total Cost", f"${total_estimated_cost:,.2f}")
                     st.metric("Remaining", f"${deployable_cash - total_estimated_cost:,.2f}")
                 
                 with col_summary3:
-                    st.markdown("**âœ… Actual**")
+                    st.markdown("**âœ... Actual**")
                     st.metric("Total Cost", f"${total_actual_cost:,.2f}",
                              delta=f"{total_actual_cost - total_estimated_cost:+,.2f}" if abs(total_actual_cost - total_estimated_cost) > 0.01 else None)
                     st.metric("Remaining", f"${deployable_cash - total_actual_cost:,.2f}")
@@ -6000,7 +6000,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         st.rerun()
                 
                 with col_deploy:
-                    if st.button("âœ… Confirm & Deploy All", 
+                    if st.button("âœ... Confirm & Deploy All", 
                                  type="primary", 
                                  use_container_width=True, 
                                  disabled=not can_deploy,
@@ -6046,7 +6046,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         # Clear actual prices from session state
                         st.session_state.deploy_all_actual_prices = {}
                         
-                        st.success(f"âœ… Successfully deployed ${total_deployed:,.2f} across {len(deployed_assets)} assets!")
+                        st.success(f"âœ... Successfully deployed ${total_deployed:,.2f} across {len(deployed_assets)} assets!")
                         st.balloons()
                         st.rerun()
             
@@ -6085,7 +6085,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
         email_enabled_globally = global_settings.get("email_notifications_enabled", False)
         
         if email_enabled_globally:
-            with st.expander("ðŸ“§ Notification Preferences", expanded=False):
+            with st.expander("ðŸ“Section Notification Preferences", expanded=False):
                 user_settings = user_data.get("settings", {})
                 current_email = user_data.get("email", "")
                 
@@ -6097,7 +6097,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     email_rebalance = st.checkbox("ðŸš¨ Rebalance Needed Alerts", 
                                                   value=user_settings.get("email_rebalance_alerts", False),
                                                   help="Get notified when portfolios need rebalancing (max once per 24h)")
-                    email_confirmation = st.checkbox("âœ… Rebalance Confirmation Emails", 
+                    email_confirmation = st.checkbox("âœ... Rebalance Confirmation Emails", 
                                                      value=user_settings.get("email_rebalance_confirmation", False),
                                                      help="Receive detailed summary after executing a rebalance")
                     
@@ -6108,7 +6108,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         st.session_state.db["users"][current_user]["settings"]["email_rebalance_alerts"] = email_rebalance
                         st.session_state.db["users"][current_user]["settings"]["email_rebalance_confirmation"] = email_confirmation
                         save_db(st.session_state.db)
-                        st.success("âœ… Notification preferences saved!")
+                        st.success("âœ... Notification preferences saved!")
                         st.rerun()
         
         # ===== AI ASSISTANT CHAT =====
@@ -6118,13 +6118,13 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
         
         if ai_enabled and ai_api_key:
             st.divider()
-            st.markdown("### ðŸ¤– AI Assistant")
+            st.markdown("### ðŸ¤- AI Assistant")
             
             # Initialize chat history
             if "ai_chat_history" not in st.session_state:
                 st.session_state.ai_chat_history = []
             
-            with st.expander("ðŸ’¬ Ask me anything about the app", expanded=False):
+            with st.expander("ðŸ’NOT Ask me anything about the app", expanded=False):
                 # Display chat history
                 chat_container = st.container()
                 with chat_container:
@@ -6135,7 +6135,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         if msg["role"] == "user":
                             st.markdown(f"**You:** {msg['content']}")
                         else:
-                            st.markdown(f"**ðŸ¤– Assistant:** {msg['content']}")
+                            st.markdown(f"**ðŸ¤- Assistant:** {msg['content']}")
                 
                 # Input for new message
                 user_input = st.text_input("Type your question...", key="ai_user_input", 
@@ -6168,7 +6168,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             st.rerun()
                 
                 with col_clear:
-                    if st.button("ðŸ—‘ï¸", use_container_width=True, key="ai_clear_btn", help="Clear chat"):
+                    if st.button("ðŸ-‘ï¸", use_container_width=True, key="ai_clear_btn", help="Clear chat"):
                         st.session_state.ai_chat_history = []
                         st.rerun()
         
@@ -6233,7 +6233,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             """, unsafe_allow_html=True)
             
             # Quick Start Guide
-            st.markdown("## ðŸš€ Quick Start Guide")
+            st.markdown("## ðŸšEUR Quick Start Guide")
             st.caption("Follow these steps to set up your first portfolio")
             
             col_step1, col_step2, col_step3 = st.columns(3)
@@ -6277,7 +6277,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                 box-shadow: 0 4px 15px rgba(79, 172, 254, 0.2);">
                         <div style="background: white; width: 60px; height: 60px; border-radius: 50%; 
                                     display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
-                            <span style="font-size: 2rem;">â‘¢</span>
+                            <span style="font-size: 2rem;">â‘cents</span>
                         </div>
                         <h3 style="color: white; text-align: center; margin: 0 0 15px 0;">Deploy Capital</h3>
                         <p style="color: rgba(255,255,255,0.9); text-align: center; margin: 0; font-size: 0.95rem;">
@@ -6298,7 +6298,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 st.markdown("""
                     <div style="background: white; padding: 30px 20px; border-radius: 12px; text-align: center;
                                 border: 2px solid #667eea; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);">
-                        <div style="font-size: 3rem; margin-bottom: 10px;">â™¾ï¸</div>
+                        <div style="font-size: 3rem; margin-bottom: 10px;">â(TM)¾ï¸</div>
                         <div style="font-size: 2rem; font-weight: 700; color: #667eea; margin-bottom: 5px;">Unlimited</div>
                         <div style="color: #64748b; font-size: 0.95rem;">Portfolios</div>
                     </div>
@@ -6366,7 +6366,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     <div style="background: white; padding: 25px; border-radius: 12px; 
                                 border-left: 4px solid #4facfe; margin-bottom: 20px;
                                 box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                        <h3 style="margin: 0 0 12px 0; color: #1e293b;">âš–ï¸ Smart Rebalancing Engine</h3>
+                        <h3 style="margin: 0 0 12px 0; color: #1e293b;">âš-ï¸ Smart Rebalancing Engine</h3>
                         <p style="margin: 0; color: #64748b; line-height: 1.6;">
                             Two-step rebalancing workflow shows exactly what to buy/sell, 
                             manages slippage, and tracks execution history.
@@ -6424,7 +6424,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 """, unsafe_allow_html=True)
                 
                 # Big CTA Button
-                if st.button("ðŸš€ Create My First Portfolio", 
+                if st.button("ðŸšEUR Create My First Portfolio", 
                            use_container_width=True, 
                            type="primary",
                            key="welcome_create_profile"):
@@ -6433,7 +6433,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     st.session_state.auto_expand_create_profile = True
                     st.rerun()
                 
-                st.caption("ðŸ‘† Click here to get started in seconds!")
+                st.caption("ðŸ‘+ Click here to get started in seconds!")
             
             # Tips Section
             st.markdown("")
@@ -6449,7 +6449,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             
             with tip_col2:
                 st.success("""
-                    **âš–ï¸ Set Drift Tolerance**  
+                    **âš-ï¸ Set Drift Tolerance**  
                     5% is a good starting point for most investors. Adjust based on your rebalancing preferences.
                 """)
             
@@ -6475,7 +6475,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     seconds_ago = (datetime.now() - last_refresh).total_seconds()
                     if seconds_ago < 5:
                         can_refresh = False
-                        st.caption(f"ðŸ• {int(seconds_ago)}s ago")
+                        st.caption(f"ðŸ* {int(seconds_ago)}s ago")
                 
                 if st.button("ðŸ”„ Refresh", 
                              key="refresh_global_dashboard",
@@ -6490,7 +6490,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         st.session_state["last_refresh_global"] = datetime.now()
                         import time
                         time.sleep(0.3)
-                    st.success("âœ… All portfolios updated!")
+                    st.success("âœ... All portfolios updated!")
                     time.sleep(0.5)
                     st.rerun()
             
@@ -6568,7 +6568,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     remaining = [(t, a.get("allocated_pct", 0)) for t, a in p_assets.items() if a.get("allocated_pct", 0) < 99.5]
                     action_items.append({
                         "priority": 2, "type": "deployment", "profile": p_name,
-                        "message": f"ðŸ“¥ IN PROGRESS - {p_name} deployment ({deployed_count}/{total_assets} assets)",
+                        "message": f"ðŸ“JPY IN PROGRESS - {p_name} deployment ({deployed_count}/{total_assets} assets)",
                         "detail": ", ".join([f"{t} needs {100-pct:.0f}% more" for t, pct in remaining[:3]]),
                         "action": "Complete remaining asset deployments"
                     })
@@ -6610,7 +6610,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                         border-left: 4px solid #ef4444; padding: 16px; border-radius: 8px; margin: 12px 0;">
                                 <div style="font-weight: 700; color: #991b1b; font-size: 1.05rem; margin-bottom: 8px;">{item['message']}</div>
                                 <div style="color: #7f1d1d; font-size: 0.9rem; margin-bottom: 8px;">ðŸ“Š {item['detail']}</div>
-                                <div style="color: #7f1d1d; font-size: 0.85rem; font-style: italic;">â†™ {item['action']}</div>
+                                <div style="color: #7f1d1d; font-size: 0.85rem; font-style: italic;">â+(TM) {item['action']}</div>
                             </div>
                         ''', unsafe_allow_html=True)
                     else:
@@ -6619,14 +6619,14 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                         border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 12px 0;">
                                 <div style="font-weight: 700; color: #92400e; font-size: 1.05rem; margin-bottom: 8px;">{item['message']}</div>
                                 <div style="color: #78350f; font-size: 0.9rem; margin-bottom: 8px;">ðŸ“‹ {item['detail']}</div>
-                                <div style="color: #78350f; font-size: 0.85rem; font-style: italic;">â†™ {item['action']}</div>
+                                <div style="color: #78350f; font-size: 0.85rem; font-style: italic;">â+(TM) {item['action']}</div>
                             </div>
                         ''', unsafe_allow_html=True)
             else:
                 st.markdown('''
                     <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
                                 border-left: 4px solid #10b981; padding: 16px; border-radius: 8px; margin: 12px 0;">
-                        <div style="font-weight: 700; color: #065f46; font-size: 1.05rem; margin-bottom: 8px;">âœ… ALL CLEAR - No actions required</div>
+                        <div style="font-weight: 700; color: #065f46; font-size: 1.05rem; margin-bottom: 8px;">âœ... ALL CLEAR - No actions required</div>
                         <div style="color: #047857; font-size: 0.9rem;">All portfolios are properly balanced and fully deployed. Great job! ðŸŽ‰</div>
                     </div>
                 ''', unsafe_allow_html=True)
@@ -6671,7 +6671,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 else:
                     cagr = ((curr_v / p_deployed) ** (1 / years_elapsed) - 1) * 100 if p_deployed > 0 else 0
                 
-                p_flag = "ðŸ‡ºðŸ‡¸" if p_data.get("currency") == "USD" else "ðŸ‡¨ðŸ‡¦"
+                p_flag = "ðŸ++ºðŸ++¸" if p_data.get("currency") == "USD" else "ðŸ++¨ðŸ++¦"
                 
                 # Use centralized deployment status check (SINGLE SOURCE OF TRUTH)
                 all_deployed, deployed_count, total_assets = check_deployment_status(p_data)
@@ -6679,21 +6679,21 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 # Status and tile class (with pulse animation for rebalance)
                 if recently_rebalanced or (has_rebalanced and not needs_rebal):
                     tile_class = "profile-tile-optimized"
-                    status_badge = '<span class="success-badge">âœ… Balanced</span>'
+                    status_badge = '<span class="success-badge">âœ... Balanced</span>'
                 elif needs_rebal:
                     tile_class = "profile-tile-warning"
                     status_badge = '<span class="drift-badge">ðŸš¨ REBALANCE</span>'
                 elif len(p_assets) == 0:
                     # No assets defined yet - Setup status
                     tile_class = "profile-tile"
-                    status_badge = '<span style="background: #64748b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">âš™ï¸ Setup</span>'
+                    status_badge = '<span style="background: #64748b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">âš(TM)ï¸ Setup</span>'
                 elif not all_deployed and len(p_assets) > 0:
                     tile_class = "profile-tile"
                     # deployed_count already comes from centralized function above
-                    status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">ðŸ“¥ Deploying ({deployed_count}/{total_assets})</span>'
+                    status_badge = f'<span style="background: #f59e0b; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">ðŸ“JPY Deploying ({deployed_count}/{total_assets})</span>'
                 elif all_deployed:
                     tile_class = "profile-tile-optimized"
-                    status_badge = '<span class="success-badge">âœ… Deployed</span>'
+                    status_badge = '<span class="success-badge">âœ... Deployed</span>'
                 else:
                     tile_class = "profile-tile"
                     status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">âšª New</span>'
@@ -6883,7 +6883,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                 sr_color = "#10b981" if sharpe_ratio > 1 else "#f59e0b" if sharpe_ratio > 0.5 else "#ef4444"
                                 st.markdown(f'''
                                     <div style="background: white; border: 2px solid {sr_color}; padding: 16px; border-radius: 10px; text-align: center;">
-                                        <div style="font-size: 12px; color: #64748b;">âš–ï¸ Sharpe Ratio</div>
+                                        <div style="font-size: 12px; color: #64748b;">âš-ï¸ Sharpe Ratio</div>
                                         <div style="font-size: 24px; font-weight: 700; color: {sr_color};">{sharpe_ratio:.2f}</div>
                                         <div style="font-size: 10px; color: #94a3b8;">Risk-adjusted</div>
                                     </div>
@@ -6891,7 +6891,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             with col_r4:
                                 st.markdown(f'''
                                     <div style="background: white; border: 2px solid #10b981; padding: 16px; border-radius: 10px; text-align: center;">
-                                        <div style="font-size: 12px; color: #64748b;">ðŸš€ Best Day</div>
+                                        <div style="font-size: 12px; color: #64748b;">ðŸšEUR Best Day</div>
                                         <div style="font-size: 24px; font-weight: 700; color: #10b981;">{best_day:+.1f}%</div>
                                         <div style="font-size: 10px; color: #94a3b8;">Single day</div>
                                     </div>
@@ -6899,7 +6899,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             with col_r5:
                                 st.markdown(f'''
                                     <div style="background: white; border: 2px solid #ef4444; padding: 16px; border-radius: 10px; text-align: center;">
-                                        <div style="font-size: 12px; color: #64748b;">ðŸ’¥ Worst Day</div>
+                                        <div style="font-size: 12px; color: #64748b;">ðŸ’JPY Worst Day</div>
                                         <div style="font-size: 24px; font-weight: 700; color: #ef4444;">{worst_day:+.1f}%</div>
                                         <div style="font-size: 10px; color: #94a3b8;">Single day</div>
                                     </div>
@@ -7106,7 +7106,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     # Determine status and colors
                     if delta >= total_needed_growth * 0.05:  # More than 5% ahead
                         status_color = "#10b981"
-                        status_text = "ðŸš€ Exceeding Goal"
+                        status_text = "ðŸšEUR Exceeding Goal"
                         bar_color = "#10b981"
                     elif delta >= 0:  # On track or slightly ahead
                         status_color = "#10b981"
@@ -7118,7 +7118,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         bar_color = "#f59e0b"
                     else:  # More than 5% behind
                         status_color = "#ef4444"
-                        status_text = "ðŸ”´ Below Target"
+                        status_text = "ðŸ”' Below Target"
                         bar_color = "#ef4444"
                     
                     # Format delta display
@@ -7353,19 +7353,19 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 **Column explanations:**
                 - **Profile**: Your portfolio strategy name
                 - **Account**: Bank and account type (TFSA, RRSP, IRA, etc.)
-                - **Value**: Current market value of all holdings (â€” if $0)
+                - **Value**: Current market value of all holdings (âEUR” if $0)
                 - **Deployed**: Percentage of principal that has been invested
                 - **Age**: Time since portfolio inception (d=days, mo=months, yr=years)
                 - **CAGR**: Compound Annual Growth Rate (shows "< 90d" if portfolio too young)
                 - **ROI**: Total Return on Investment since inception
                 - **Goal**: Your target annual return percentage
-                - **Assets**: Number of different assets in this portfolio (â€” if none)
+                - **Assets**: Number of different assets in this portfolio (âEUR” if none)
                 - **Status**: Current state (Balanced, Needs Rebalancing, Deploying, or New)
                 
                 **Notes:**
                 - *Asterisk (*) = Metrics calculated on deployed capital only
                 - "< 90d" = CAGR unreliable for portfolios under 90 days old
-                - "â€”" = Not applicable or no data
+                - "âEUR”" = Not applicable or no data
                 """)
             
             comparison_data = []
@@ -7397,8 +7397,8 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 
                 # Handle $0 portfolios or 0 assets
                 if curr_val <= 0 or ct_deployed <= 0:
-                    cagr_display = "â€”"
-                    roi_display = "â€”"
+                    cagr_display = "âEUR”"
+                    roi_display = "âEUR”"
                     cagr_val = None
                     roi_val = None
                 elif days_elapsed < 90:
@@ -7431,24 +7431,24 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 if needs_rebal:
                     status = "ðŸš¨ Rebalance"
                 elif len(p_assets) == 0:
-                    status = "âš™ï¸ Setup"
+                    status = "âš(TM)ï¸ Setup"
                 elif not all_deployed and total_assets > 0:
-                    status = f"ðŸ“¥ Deploying ({deployed_count}/{total_assets})"
+                    status = f"ðŸ“JPY Deploying ({deployed_count}/{total_assets})"
                 elif all_deployed:
-                    status = "âœ… Deployed"
+                    status = "âœ... Deployed"
                 else:
                     status = "âšª New"
                 
                 # Deployed % display
-                deployed_display = f"{ct_deployment_pct:.0f}%" if ct_deployment_pct > 0 else "â€”"
+                deployed_display = f"{ct_deployment_pct:.0f}%" if ct_deployment_pct > 0 else "âEUR”"
                 
                 # Assets display
-                assets_display = str(total_assets) if total_assets > 0 else "â€”"
+                assets_display = str(total_assets) if total_assets > 0 else "âEUR”"
                 
                 comparison_data.append({
                     "Profile": p_name,
                     "Account": f"{p_data.get('bank_name', 'N/A')} {p_data.get('account_type', '')}",
-                    "Value": f"${curr_val:,.0f}" if curr_val > 0 else "â€”",
+                    "Value": f"${curr_val:,.0f}" if curr_val > 0 else "âEUR”",
                     "Deployed": deployed_display,
                     "Age": age_display,
                     "CAGR": cagr_display,
@@ -7479,9 +7479,9 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             
             def get_status_color(status):
                 """Color code for status"""
-                if 'âœ… Balanced' in status or 'Balanced' in status: return '#dcfce7'  # Light green
+                if 'âœ... Balanced' in status or 'Balanced' in status: return '#dcfce7'  # Light green
                 elif 'ðŸš¨ Rebalance' in status or 'Rebalance' in status: return '#fee2e2'  # Light red
-                elif 'ðŸ“¥ Deploying' in status or 'Deploying' in status: return '#dbeafe'  # Light blue
+                elif 'ðŸ“JPY Deploying' in status or 'Deploying' in status: return '#dbeafe'  # Light blue
                 else: return '#f9fafb'  # Light gray for New
             
             # Create styled HTML table
@@ -7544,13 +7544,13 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             st.rerun()
         
         prof = user_profiles[st.session_state.active_profile]
-        p_flag = "ðŸ‡ºðŸ‡¸" if prof.get("currency") == "USD" else "ðŸ‡¨ðŸ‡¦"
+        p_flag = "ðŸ++ºðŸ++¸" if prof.get("currency") == "USD" else "ðŸ++¨ðŸ++¦"
         
         # Portfolio Header with Refresh Button
         col_title, col_refresh = st.columns([5, 1])
         with col_title:
             st.title(f"{p_flag} {st.session_state.active_profile}")
-            st.caption(f"Portfolio Manager â€¢ Inception: {prof.get('start_date', 'N/A')} â€¢ Drift Tolerance: {prof.get('drift_tolerance', 5.0)}%")
+            st.caption(f"Portfolio Manager âEURcents Inception: {prof.get('start_date', 'N/A')} âEURcents Drift Tolerance: {prof.get('drift_tolerance', 5.0)}%")
         with col_refresh:
             # Check if recently refreshed (prevent spam)
             last_refresh_key = f"last_refresh_{st.session_state.active_profile}"
@@ -7562,7 +7562,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 seconds_ago = (datetime.now() - last_refresh).total_seconds()
                 if seconds_ago < 5:
                     can_refresh = False
-                    st.caption(f"ðŸ• {int(seconds_ago)}s ago")
+                    st.caption(f"ðŸ* {int(seconds_ago)}s ago")
             
             if st.button("ðŸ”„ Refresh", 
                          key=f"refresh_portfolio_{st.session_state.active_profile}",
@@ -7578,7 +7578,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     st.session_state[last_refresh_key] = datetime.now()
                     import time
                     time.sleep(0.3)  # Brief pause for better UX
-                st.success("âœ… Updated!")
+                st.success("âœ... Updated!")
                 time.sleep(0.5)
                 st.rerun()
         
@@ -7633,7 +7633,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 st.info(f"ðŸ“Š **Deployment in progress** - {len(partial)} asset(s) not fully deployed")
             elif assets and all_deployed and not has_rebalanced:
                 # Only show "all deployed" message if haven't rebalanced yet
-                st.success("âœ… **All assets deployed** - Ready to monitor drift")
+                st.success("âœ... **All assets deployed** - Ready to monitor drift")
             # If rebalanced, don't show any deployment message (status badge shows "Balanced/Active")
         
         # Portfolio Summary
@@ -7651,7 +7651,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             st.metric("Last Rebalanced", prof.get("last_rebalanced", "Never")[:10] if prof.get("last_rebalanced") else "Never")
         with col_sum4:
             if not prof.get("asset_mix_locked", False):
-                st.metric("Status", "âš™ï¸ Setup", delta="Lock assets", delta_color="off")
+                st.metric("Status", "âš(TM)ï¸ Setup", delta="Lock assets", delta_color="off")
             else:
                 assets = prof.get("assets", {})
                 if assets:
@@ -7690,9 +7690,9 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         deployment_pct = (deployed_count / total_count * 100) if total_count > 0 else 0
                         st.metric("Deployment", "In Progress", delta=f"{deployment_pct:.0f}% complete", delta_color="off")
                     elif has_rebalanced:
-                        st.metric("Status", "âœ… Balanced" if recently_rebalanced else "Active", delta="Monitoring", delta_color="off")
+                        st.metric("Status", "âœ... Balanced" if recently_rebalanced else "Active", delta="Monitoring", delta_color="off")
                     else:
-                        st.metric("Status", "âœ… Deployed", delta="Ready", delta_color="normal")
+                        st.metric("Status", "âœ... Deployed", delta="Ready", delta_color="normal")
         
         st.divider()
         
@@ -7705,12 +7705,12 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             st.markdown("""
             **Follow the sidebar steps in order:**
             
-            1. **â‘  Strategy Setup**: Create your investment profile (âœ… Done!)
+            1. **â‘  Strategy Setup**: Create your investment profile (âœ... Done!)
             2. **â‘¡ Drift Strategy**: Set your rebalancing tolerance threshold
-            3. **â‘¢ Benchmark**: Choose a market benchmark for comparison
-            4. **â‘£ Asset Allocation**: Add ticker symbols and set target percentages
+            3. **â‘cents Benchmark**: Choose a market benchmark for comparison
+            4. **â‘GBP Asset Allocation**: Add ticker symbols and set target percentages
             5. **â‘¤ Lock Asset Mix**: Lock your allocation when it totals 100%
-            6. **â‘¥ Asset Deployment**: Record your purchases at actual broker prices
+            6. **â‘JPY Asset Deployment**: Record your purchases at actual broker prices
             
             **After deployment:**
             - **Monitor Drift**: System alerts when rebalancing is needed
@@ -7864,11 +7864,11 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 # Status badge
                 has_rebalanced = prof.get("last_rebalanced") is not None
                 if recently_rebalanced:
-                    alert_html = '<span class="success-badge">âœ… Balanced</span>'
+                    alert_html = '<span class="success-badge">âœ... Balanced</span>'
                 elif needs_rebalance:
                     alert_html = '<span class="drift-badge">ðŸš¨ REBALANCE REQUIRED</span>'
                 elif has_rebalanced:
-                    alert_html = '<span class="success-badge">âœ… Balanced</span>'
+                    alert_html = '<span class="success-badge">âœ... Balanced</span>'
                 else:
                     alert_html = '<span style="background: #3b82f6; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem;">ðŸ“Š Monitoring</span>'
                 
@@ -8066,13 +8066,13 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     
                     ðŸ“Š **Benchmarks (Dotted lines)** *(if selected)*  
                     Each shows what $100K invested in that index would be worth today.
-                    Colors: ðŸ”´ Red, ðŸŸ  Orange, ðŸŸ£ Purple, ðŸ’— Pink, ðŸ©µ Teal, ðŸ’™ Indigo
+                    Colors: ðŸ”' Red, ðŸŸ  Orange, ðŸŸGBP Purple, ðŸ’- Pink, ðŸ(C)µ Teal, ðŸ’(TM) Indigo
                     
                     ðŸ”µ **Actual Portfolio (Blue solid line)**  
                     Your portfolio's relative performance - normalized to show how your asset mix 
                     would have grown from the principal value.
                     
-                    ðŸŸ¢ **Goal Path (Green dashed line)**  
+                    ðŸŸcents **Goal Path (Green dashed line)**  
                     Your target growth trajectory based on your yearly goal of {prof['yearly_goal_pct']}%.
                     
                     **Tooltip Info:**
@@ -8098,7 +8098,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 # Rebalance Analysis with Refresh
                 col_rebal_title, col_rebal_refresh = st.columns([5, 1])
                 with col_rebal_title:
-                    st.markdown("### âš–ï¸ Rebalance Analysis")
+                    st.markdown("### âš-ï¸ Rebalance Analysis")
                     st.caption("Review asset allocation drift and required trades to restore target percentages")
                 with col_rebal_refresh:
                     # Refresh button for rebalance section
@@ -8123,7 +8123,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             st.session_state[f"last_refresh_rebal_{st.session_state.active_profile}"] = datetime.now()
                             import time
                             time.sleep(0.3)
-                        st.success("âœ… Prices updated!")
+                        st.success("âœ... Prices updated!")
                         time.sleep(0.5)
                         st.rerun()
                 
@@ -8144,9 +8144,9 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         - Will match Target % when fully deployed (assuming no price changes)
                     - **Drift**: Difference between Portfolio % and Target %
                         - âš ï¸ Gray "Deploying" = asset still being deployed (drift tracking not meaningful yet)
-                        - ðŸ”´ Red = exceeds tolerance (action needed after deployment complete)
+                        - ðŸ”' Red = exceeds tolerance (action needed after deployment complete)
                         - ðŸŸ¡ Yellow = warning (close to tolerance)
-                        - ðŸŸ¢ Green = within tolerance (good)
+                        - ðŸŸcents Green = within tolerance (good)
                     - **Status**: Current state (Deploying = adding capital, Deployed = monitoring drift)
                     
                     **Example to clarify Deployed vs Portfolio %:**
@@ -8169,13 +8169,13 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     "Target %": st.column_config.TextColumn("Target % â„¹ï¸", help="Your desired allocation percentage for this asset in the portfolio", width="small"),
                     "Deployed": st.column_config.TextColumn("Deployed â„¹ï¸", help="Deployment progress: 0-100% shows how much of your planned capital for THIS ASSET has been deployed (NOT portfolio allocation). 100% = fully deployed.", width="small"),
                     "Portfolio %": st.column_config.TextColumn("Portfolio % â„¹ï¸", help="Current portfolio percentage based on market values (% of total principal). Shows true portfolio allocation.", width="small"),
-                    "Drift": st.column_config.TextColumn("Drift â„¹ï¸", help="Difference between Portfolio % and Target % (ðŸ”´ = exceeds tolerance and needs rebalancing, âš ï¸ = still deploying)", width="small"),
+                    "Drift": st.column_config.TextColumn("Drift â„¹ï¸", help="Difference between Portfolio % and Target % (ðŸ”' = exceeds tolerance and needs rebalancing, âš ï¸ = still deploying)", width="small"),
                     "Status": st.column_config.TextColumn("Status â„¹ï¸", help="Current state: Deploying = still adding capital, Deployed = fully funded and monitoring drift", width="medium"),
                     "Avg Cost": st.column_config.TextColumn("Avg Cost â„¹ï¸", help="Weighted average cost per unit (calculated when 100% deployed)", width="small"),
                     "Units": st.column_config.TextColumn("Units â„¹ï¸", help="Total shares/units owned", width="small"),
                     "Current Price": st.column_config.TextColumn("Price â„¹ï¸", help="Latest market price per unit", width="small"),
                     "%Daily Change": st.column_config.TextColumn("%Change â„¹ï¸", help="Price change from previous trading day", width="small"),
-                    "Amount": st.column_config.TextColumn("Value â„¹ï¸", help="Current market value (Units Ã— Current Price)", width="medium"),
+                    "Amount": st.column_config.TextColumn("Value â„¹ï¸", help="Current market value (Units Ã- Current Price)", width="medium"),
                     "Buy/Sell Amt": st.column_config.TextColumn("Trade Amt â„¹ï¸", help="Dollar amount to trade for rebalancing", width="medium"),
                     "Buy/Sell Shares": st.column_config.TextColumn("Trade Shares â„¹ï¸", help="Number of shares to buy (+) or sell (-)", width="small")
                 }
@@ -8313,18 +8313,18 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             if not is_asset_truly_deployed and allocated_pct < 99.5:  # Still deploying
                                 drift_display = "âš ï¸ Deploying"
                             elif abs(drift) >= drift_tolerance:
-                                drift_display = f"ðŸ”´ {drift:+.2f}%"
+                                drift_display = f"ðŸ”' {drift:+.2f}%"
                             elif abs(drift) >= drift_tolerance * 0.6:  # Warning at 60% of tolerance
                                 drift_display = f"ðŸŸ¡ {drift:+.2f}%"
                             else:
-                                drift_display = f"ðŸŸ¢ {drift:+.2f}%"
+                                drift_display = f"ðŸŸcents {drift:+.2f}%"
                             
                             # Status - use smart fractional detection
                             if table_is_truly_fully_deployed or is_asset_truly_deployed:
                                 # Asset is truly fully deployed (fractional only)
-                                status_display = "âœ… Deployed"
+                                status_display = "âœ... Deployed"
                             elif allocated_pct >= 99.5:
-                                status_display = "âœ… Deployed"
+                                status_display = "âœ... Deployed"
                             else:
                                 status_display = f"â³ Deploying ({allocated_pct:.0f}%)"
                             
@@ -8341,7 +8341,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                 "Avg Cost": avg_cost_display,
                                 "Units": f"{cur_u:.0f}", "Current Price": f"${current_price:.2f}",
                                 "%Daily Change": f"{daily_change_pct:+.2f}%", "Amount": f"${act_val:,.0f}",
-                                "Buy/Sell Amt": f"${abs(val_diff):,.0f}", "Buy/Sell Shares": f"{int(unit_diff):+.0f}" if np.isfinite(unit_diff) else "â€”"
+                                "Buy/Sell Amt": f"${abs(val_diff):,.0f}", "Buy/Sell Shares": f"{int(unit_diff):+.0f}" if np.isfinite(unit_diff) else "âEUR”"
                             })
                         except Exception as e:
                             st.warning(f"âš ï¸ Error processing {t}: {str(e)}")
@@ -8405,15 +8405,15 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                 elif max_drift >= drift_tolerance * 0.6:
                     total_status = "ðŸŸ¡ Monitor"
                 else:
-                    total_status = "âœ… Balanced"
+                    total_status = "âœ... Balanced"
                 
                 rows.append({
                     "Fund Name": "**TOTAL**", "Ticker": "", "Target %": "**100.00%**",
                     "Deployed": f"**{deployment_pct:.0f}%**" if not is_fully_deployed else "**100%**", 
-                    "Portfolio %": f"**{total_portfolio_pct:.2f}%**", "Drift": "â€”", "Status": total_status,
+                    "Portfolio %": f"**{total_portfolio_pct:.2f}%**", "Drift": "âEUR”", "Status": total_status,
                     "Avg Cost": "", "Units": "", "Current Price": "", "%Daily Change": "",
                     "Amount": f"**${total_current_val:,.0f}**",
-                    "Buy/Sell Amt": f"**${total_turnover:,.0f}**", "Buy/Sell Shares": "â€”"
+                    "Buy/Sell Amt": f"**${total_turnover:,.0f}**", "Buy/Sell Shares": "âEUR”"
                 })
                 
                 df_rebalance = pd.DataFrame(rows)
@@ -8439,7 +8439,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     if is_truly_fractional_table:
                         # TRUE FRACTIONAL - show success
                         st.success(f"""
-âœ… **Portfolio 100% Deployed!**
+âœ... **Portfolio 100% Deployed!**
 
 You have ${actual_undeployed_cash:,.2f} ({actual_undeployed_pct:.1f}%) remaining as **fractional remainder**.
 
@@ -8450,7 +8450,7 @@ You can't buy partial shares. The cheapest asset in your portfolio costs ${cheap
 
 **Options for ${actual_undeployed_cash:,.0f}:**
 - Keep as cash reserve for rebalancing (recommended)
-- Add more capital via **ðŸ’° Capital Overview** section above
+- Add more capital via **ðŸ’ deg Capital Overview** section above
 - Add to next capital injection
                         """)
                     elif actual_undeployed_cash > 100:  # More than just fractional remainder
@@ -8465,8 +8465,8 @@ This is NOT just fractional remainder - you can still deploy more capital!
 - You're not at your target allocation levels
 
 **What to do:**
-1. Go to **ðŸ’° Capital Overview** section above
-2. Click **"ðŸš€ Deploy All Remaining Cash"** button
+1. Go to **ðŸ’ deg Capital Overview** section above
+2. Click **"ðŸšEUR Deploy All Remaining Cash"** button
 3. Or manually deploy more in **Asset Deployment** section
 
 After full deployment, you'll typically have only $100-300 left as true fractional remainder (can't buy partial shares).
@@ -8476,7 +8476,7 @@ After full deployment, you'll typically have only $100-300 left as true fraction
                         st.info(f"""
 ðŸ’¡ **${actual_undeployed_cash:,.0f} ({actual_undeployed_pct:.1f}%) undeployed**
 
-This is likely fractional remainder - check if you can still deploy any amount in the **ðŸ’° Capital Overview** section above.
+This is likely fractional remainder - check if you can still deploy any amount in the **ðŸ’ deg Capital Overview** section above.
 
 Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                         """)
@@ -8490,7 +8490,7 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                 st.divider()
                 
                 # Two-Step Rebalance Workflow
-                st.markdown("### ðŸš€ Two-Step Rebalance Workflow")
+                st.markdown("### ðŸšEUR Two-Step Rebalance Workflow")
                 st.caption("Professional slippage management: Get recommendations, execute at broker, then enter actual prices")
                 
                 with st.expander("â„¹ï¸ How the two-step workflow works", expanded=False):
@@ -8503,7 +8503,7 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                     **The Workflow:**
                     1. **ðŸ“‹ Recommend**: View suggested trades at current prices
                     2. **ðŸ¦ Execute at Broker**: Go to your broker and execute trades
-                    3. **âœ… Enter Actual Prices**: Return here with your **exact fill prices**
+                    3. **âœ... Enter Actual Prices**: Return here with your **exact fill prices**
                     4. **ðŸ’¾ Commit**: App updates with real-world data
                     """)
                 
@@ -8542,17 +8542,17 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                         st.info("âœ” Portfolio is optimally balanced")
                 
                 with col_exec2:
-                    st.markdown("#### âœ… Step 2: Execute with Actuals")
+                    st.markdown("#### âœ... Step 2: Execute with Actuals")
                     st.caption("After trading, enter your actual fill prices")
                     has_recommendation = "pending_rebalance" in prof
-                    if st.button("âœ… Execute Rebalance Now", type="primary", use_container_width=True,
+                    if st.button("âœ... Execute Rebalance Now", type="primary", use_container_width=True,
                                 disabled=not has_recommendation, key="execute_rebalance"):
                         st.session_state.show_execute_form = True
                         st.rerun()
                     if not has_recommendation:
                         st.info("ðŸ“‹ Get recommendation first")
                     elif st.session_state.get("show_execute_form", False):
-                        st.success("ðŸ‘‡ **Scroll down** to enter your actual broker prices")
+                        st.success("ðŸ‘++ **Scroll down** to enter your actual broker prices")
                 
                 # Show recommendation details
                 if st.session_state.get("show_rebalance_recommendation", False) and "pending_rebalance" in prof:
@@ -8564,10 +8564,10 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                     if recommendations:
                         st.markdown("**Recommended Trades:**")
                         for rec in recommendations:
-                            color = "ðŸŸ¢" if rec['action'] == "BUY" else "ðŸ”´"
+                            color = "ðŸŸcents" if rec['action'] == "BUY" else "ðŸ”'"
                             exact_shares = rec.get('exact_shares', rec['shares'])
                             rounded_shares = int(rec['shares'])
-                            st.markdown(f"{color} **{rec['action']} {rec['ticker']}**: {exact_shares:.4f} shares â†™ **Execute {rounded_shares:,} shares** @ ~${rec['estimated_price']:.2f} (${rec['estimated_value']:.2f})")
+                            st.markdown(f"{color} **{rec['action']} {rec['ticker']}**: {exact_shares:.4f} shares â+(TM) **Execute {rounded_shares:,} shares** @ ~${rec['estimated_price']:.2f} (${rec['estimated_value']:.2f})")
                         
                         st.info("ðŸ’¡ **Note:** Exact calculations shown with recommended whole units to execute at your broker.")
                         
@@ -8576,7 +8576,7 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                         1. Go to your broker (Fidelity, IBKR, etc.)
                         2. Execute the **rounded** trades listed above
                         3. Note the **actual prices** you received
-                        4. Return here and click **"âœ… Execute Rebalance Now"**
+                        4. Return here and click **"âœ... Execute Rebalance Now"**
                         """)
                     else:
                         st.info("No trades needed - portfolio already balanced")
@@ -8590,7 +8590,7 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                     st.markdown('''
                         <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
                                     border-left: 4px solid #10b981; padding: 16px; border-radius: 8px; margin: 12px 0;">
-                            <h3 style="margin: 0 0 8px 0; color: #065f46;">ðŸ’° ACTION REQUIRED: Enter Actual Broker Prices</h3>
+                            <h3 style="margin: 0 0 8px 0; color: #065f46;">ðŸ’ deg ACTION REQUIRED: Enter Actual Broker Prices</h3>
                             <p style="margin: 0; color: #047857;">Enter the exact prices you received when executing trades at your broker.</p>
                         </div>
                     ''', unsafe_allow_html=True)
@@ -8605,14 +8605,14 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                             exact_shares = rec.get('exact_shares', rec['shares'])
                             rounded_shares = int(rec['shares'])
                             st.markdown(f"**{rec['action']} {rec['ticker']}**")
-                            st.caption(f"Calculated: {exact_shares:.4f} shares â†™ **Execute: {rounded_shares:,} shares**")
+                            st.caption(f"Calculated: {exact_shares:.4f} shares â+(TM) **Execute: {rounded_shares:,} shares**")
                             st.caption(f"Estimated price: ${rec['estimated_price']:.2f}")
                             actual_price = st.number_input(f"Actual price for {rec['ticker']}",
                                 min_value=0.01, value=float(rec['estimated_price']), step=0.01,
                                 format="%.2f", key=f"actual_price_{rec['ticker']}")
                             actual_prices[rec['ticker']] = actual_price
                             slippage = ((actual_price / rec['estimated_price']) - 1) * 100
-                            slippage_color = "ðŸŸ¢" if abs(slippage) < 0.5 else "ðŸŸ¡" if abs(slippage) < 2 else "ðŸ”´"
+                            slippage_color = "ðŸŸcents" if abs(slippage) < 0.5 else "ðŸŸ¡" if abs(slippage) < 2 else "ðŸ”'"
                             st.caption(f"{slippage_color} Slippage: {slippage:+.2f}%")
                             st.markdown("---")
                         
@@ -8631,10 +8631,10 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                                 shares = int(rec['shares'])  # Ensure whole units
                                 if rec['action'] == "BUY":
                                     asset_dict[ticker]["units"] = int(asset_dict[ticker]["units"]) + shares
-                                    changes.append(f"ðŸŸ¢ {ticker} BUY {shares:,} @ ${actual_price:.2f}")
+                                    changes.append(f"ðŸŸcents {ticker} BUY {shares:,} @ ${actual_price:.2f}")
                                 else:
                                     asset_dict[ticker]["units"] = int(asset_dict[ticker]["units"]) - shares
-                                    changes.append(f"ðŸ”´ {ticker} SELL {shares:,} @ ${actual_price:.2f}")
+                                    changes.append(f"ðŸ”' {ticker} SELL {shares:,} @ ${actual_price:.2f}")
                             
                             detail_log += ", ".join(changes) if changes else "No changes"
                             prof.setdefault("rebalance_stats", []).insert(0, detail_log)
@@ -8659,9 +8659,9 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                             
                             st.session_state.show_execute_form = False
                             st.session_state.show_rebalance_recommendation = False
-                            st.success("âœ… Portfolio rebalanced successfully!")
+                            st.success("âœ... Portfolio rebalanced successfully!")
                             if email_success:
-                                st.info("ðŸ”§ Confirmation email sent!")
+                                st.info("ðŸ”Section Confirmation email sent!")
                             st.balloons()
                             st.rerun()
                         
@@ -8686,9 +8686,9 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                 with st.expander("â„¹ï¸ How to read rebalance history", expanded=False):
                     st.markdown("""
                     **Each entry shows trades executed:**
-                    - ðŸŸ¢ **BUY**: Shares purchased with actual broker price
-                    - ðŸ”´ **SELL**: Shares sold with actual broker price
-                    - **Format**: `Date - ðŸŸ¢ AAPL BUY 5.2345 @ $150.25`
+                    - ðŸŸcents **BUY**: Shares purchased with actual broker price
+                    - ðŸ”' **SELL**: Shares sold with actual broker price
+                    - **Format**: 'Date - ðŸŸcents AAPL BUY 5.2345 @ $150.25'
                     """)
                 
                 col_filter1, col_filter2 = st.columns([3, 1])
@@ -8733,8 +8733,8 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
 st.divider()
 st.markdown(f"""
     <div style="text-align: center; color: #64748b; padding: 20px;">
-        <p><strong>Long Term Strategy Optimizer</strong> â€¢ v{VERSION} - {VERSION_NAME}</p>
-        <p style="font-size: 0.85rem;">Built: {VERSION_DATE} {VERSION_TIME} â€¢ Market data by Yahoo Finance</p>
+        <p><strong>Long Term Strategy Optimizer</strong> âEURcents v{VERSION} - {VERSION_NAME}</p>
+        <p style="font-size: 0.85rem;">Built: {VERSION_DATE} {VERSION_TIME} âEURcents Market data by Yahoo Finance</p>
         <p style="font-size: 0.8rem;">For informational purposes only</p>
     </div>
 """, unsafe_allow_html=True)
