@@ -55,9 +55,9 @@ def save_db(data=None, bypass_version_increment=False):
     pass  # No-op for SQLite
 
 # ===== VERSION INFORMATION =====
-VERSION = "11.0.0"
-VERSION_DATE = "2026-02-05"
-VERSION_TIME = "15:00:00"  # EST
+VERSION = "11.1.0"
+VERSION_DATE = "2026-02-06"
+VERSION_TIME = "21:40:27"  # EST
 VERSION_NAME = "SQLite Revolution - MAJOR"
 CHANGELOG = """
 v8.0.0 (2026-02-05 15:00 EST) - [ROCKET] SQLITE REVOLUTION - MAJOR RELEASE
@@ -347,13 +347,13 @@ v7.6.4 (2026-02-02 20:00 EST) - ðŸ“ LARGER TEXT IMPROVEMENTS
 **Before (v7.6.3):**
 ```
 #### SPXL: Target $100,000 (100.0% of portfolio)
-**Deployed:** $0 (0%) â€¢ **Budget Remaining:** $100,000
+**Deployed:** $0 (0%) • **Budget Remaining:** $100,000
 ```
 
 **After (v7.6.4):**
 ```
 ### SPXL: Target $100,000 (100.0% of portfolio)
-[1.1rem font] Deployed: $0 (0%) â€¢ Budget Remaining: $100,000
+[1.1rem font] Deployed: $0 (0%) • Budget Remaining: $100,000
 ```
 
 **Text Size Hierarchy:**
@@ -934,7 +934,7 @@ v6.7.23 (2026-01-24 22:35 EST)
 v6.7.22 (2026-01-24 22:21 EST)
 - CRITICAL: Fixed progress bar to show continuous deployment (not just fully deployed count)
 - Fixed: Today button now properly updates date field by clearing widget cache
-- Enhanced: Progress bar now shows "X/Y assets deployed â€¢ Z% capital deployed"
+- Enhanced: Progress bar now shows "X/Y assets deployed • Z% capital deployed"
 - Changed: Progress bar color based on capital deployed percentage
 - Impact: Progress updates immediately after each deployment (was stuck at 0/2)
 - Impact: Today button now reliably resets date to current date
@@ -3132,10 +3132,10 @@ def show_admin_overview_tab(db, all_profiles):
                             <div>
                                 <h4 style="margin: 0; color: #1e293b;">ðŸ‘¤ {user_data.get('display_name', username)}</h4>
                                 <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.9rem;">
-                                    @{username} â€¢ {user_data.get('email', 'N/A')}
+                                    @{username} • {user_data.get('email', 'N/A')}
                                 </p>
                                 <p style="margin: 8px 0 0 0; color: #64748b; font-size: 0.85rem;">
-                                    ðŸ“ {len(user_data.get('profiles', {}))} portfolios â€¢ 
+                                    ðŸ“ {len(user_data.get('profiles', {}))} portfolios • 
                                     Joined: {user_data.get('created_at', 'Unknown')[:10]}
                                 </p>
                             </div>
@@ -3348,7 +3348,7 @@ def show_activity_logs_tab(db):
                 st.markdown(f"""
                     <div style="background: #fef2f2; padding: 12px; border-radius: 6px; margin-bottom: 8px;">
                         <p style="margin: 0; font-size: 0.85rem; color: #64748b;">
-                            {severity} {log.get('timestamp', '')} â€¢ {log.get('user_id', 'system')}
+                            {severity} {log.get('timestamp', '')} • {log.get('user_id', 'system')}
                         </p>
                         <p style="margin: 4px 0 0 0; color: #991b1b; font-weight: 500;">
                             {log.get('message', '')}
@@ -3381,7 +3381,7 @@ def show_activity_logs_tab(db):
                                     {notif.get('subject', '')}
                                 </p>
                                 <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #64748b;">
-                                    To: {notif.get('username', '')} â€¢ Type: {notif.get('type', '')}
+                                    To: {notif.get('username', '')} • Type: {notif.get('type', '')}
                                 </p>
                                 <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: #64748b;">
                                     {notif.get('timestamp', '')}
@@ -3630,7 +3630,7 @@ def show_analytics_tab(db, analytics):
                         col_main, col_meta = st.columns([3, 1])
                         
                         with col_main:
-                            st.markdown(f"**{icon} {color_emoji} {action_display}** â€¢ @{username}")
+                            st.markdown(f"**{icon} {color_emoji} {action_display}** • @{username}")
                             if details:
                                 st.caption(f"â„¹ï¸ {details}")
                             if ip_address:
@@ -4096,7 +4096,7 @@ def show_security_tab(db):
                                     {severity_icon} {log.get('event_type', '')}
                                 </p>
                                 <p style="margin: 0; font-size: 0.85rem; color: #64748b;">
-                                    User: {log.get('username', '')} â€¢ {log.get('details', '')}
+                                    User: {log.get('username', '')} • {log.get('details', '')}
                                 </p>
                             </div>
                         </div>
@@ -4229,37 +4229,45 @@ def show_login_page():
         """, unsafe_allow_html=True)
         
         st.markdown("### 🔐 Sign In")
-        with st.form("login_form"):
-            username = st.text_input("Username", placeholder="Enter your username")
-            password = st.text_input("Password", type="password", placeholder="Enter your password")
-            
-            col1, col2 = st.columns(2)
-            login_btn = col1.form_submit_button("🚀 Sign In", use_container_width=True)
-            register_btn = col2.form_submit_button("📝 Create Account", use_container_width=True)
-            
-            if register_btn:
+        
+        # Username field
+        username = st.text_input("Username", placeholder="Enter your username", key="login_username")
+        
+        # Password field  
+        password = st.text_input("Password", type="password", placeholder="Enter your password", key="login_password")
+        
+        # Buttons in columns
+        col_a, col_b = st.columns(2)
+        
+        with col_a:
+            if st.button("🚀 Sign In", use_container_width=True, key="login_button"):
+                if username and password:
+                    db = st.session_state.get("db", {"users": {}})
+                    if username in db.get("users", {}):
+                        user = db["users"][username]
+                        if verify_password(password, user["password_hash"], user["password_salt"]):
+                            st.session_state.logged_in = True
+                            st.session_state.username = username
+                            st.session_state.user_data = user
+                            st.success(f"✅ Welcome, {user.get('display_name', username)}!")
+                            import time
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ Invalid password")
+                    else:
+                        st.error("❌ User not found")
+                else:
+                    st.warning("⚠️ Please enter username and password")
+        
+        with col_b:
+            if st.button("📝 Create Account", use_container_width=True, key="register_button"):
                 st.session_state.page = "register"
                 st.rerun()
-            
-            if login_btn and username and password:
-                db = st.session_state.db
-                if username in db.get("users", {}):
-                    user = db["users"][username]
-                    if verify_password(password, user["password_hash"], user["password_salt"]):
-                        st.session_state.logged_in = True
-                        st.session_state.username = username
-                        st.session_state.user_data = user
-                        st.success(f"✅ Welcome, {user.get('display_name', username)}!")
-                        import time
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("❌ Invalid password")
-                else:
-                    st.error("❌ User not found")
         
         with st.expander("ℹ️ First time setup?"):
-            st.info("Click 'Create Account' to register. First user becomes admin.")
+            st.info("Click 'Create Account' button above to register. First user becomes admin automatically.")
+
 
 def show_registration_page():
     """Display registration page"""
@@ -4581,7 +4589,7 @@ else:
             
             prof = user_profiles[st.session_state.active_profile]
             p_flag = "ðŸ‡ºðŸ‡¸" if prof.get("currency") == "USD" else "ðŸ‡¨ðŸ‡¦"
-            st.caption(f"ðŸ¦ {prof.get('bank_name', 'N/A')} â€¢ {prof.get('account_type', 'N/A')}")
+            st.caption(f"ðŸ¦ {prof.get('bank_name', 'N/A')} • {prof.get('account_type', 'N/A')}")
             
             # CRUD Actions
             st.divider()
@@ -5037,7 +5045,7 @@ else:
                 })
                 st.caption("**Assets:**")
                 for ticker, data in assets.items():
-                    st.caption(f"â€¢ {ticker}: {data.get('target', 0)}% target, {data.get('allocated_pct', 0):.1f}% deployed, {data.get('units', 0)} units")
+                    st.caption(f"• {ticker}: {data.get('target', 0)}% target, {data.get('allocated_pct', 0):.1f}% deployed, {data.get('units', 0)} units")
                 
                 if st.button("ðŸ”„ Reset Portfolio (Emergency)", key="emergency_reset"):
                     if st.button("âš ï¸ Confirm Reset - This will delete ALL data", key="confirm_reset", type="primary"):
@@ -5107,7 +5115,7 @@ else:
                 # Calculate deployment progress for progress bar
                 deployment_progress = (total_deployed_capital / prof['principal']) if prof['principal'] > 0 else 0
                 
-                st.markdown(f"**Progress:** {fully_deployed_count}/{total_assets} assets fully deployed â€¢ {deployment_progress*100:.1f}% capital deployed")
+                st.markdown(f"**Progress:** {fully_deployed_count}/{total_assets} assets fully deployed • {deployment_progress*100:.1f}% capital deployed")
                 
                 if total_assets > 0:
                     progress_pct = deployment_progress * 100
@@ -5214,7 +5222,7 @@ else:
                             
                             # Make text bigger and more prominent
                             st.markdown(f"### {selected_ticker}: Target ${target_budget:,.0f} ({target_pct}% of portfolio)")
-                            st.markdown(f"<div style='font-size: 1.1rem; margin-bottom: 12px;'><strong>Deployed:</strong> ${actual_spent:,.0f} ({display_allocated}%) â€¢ <strong>Budget Remaining:</strong> ${remaining_budget:,.0f}</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='font-size: 1.1rem; margin-bottom: 12px;'><strong>Deployed:</strong> ${actual_spent:,.0f} ({display_allocated}%) • <strong>Budget Remaining:</strong> ${remaining_budget:,.0f}</div>", unsafe_allow_html=True)
                             
                             # CRITICAL: Check smart "100% deployed" FIRST (before showing budget display)
                             # Asset is 100% deployed when remaining budget can't buy 1 unit
@@ -5494,10 +5502,10 @@ else:
                                     st.markdown(f'''
                                         <div class="buying-guide" style="font-size: 1.05rem;">
                                             <div style="margin-bottom: 10px; font-size: 1.2rem;"><strong>ðŸ“Š Deployment Preview:</strong></div>
-                                            <div style="margin-bottom: 6px;">â€¢ <strong>Units:</strong> <span class="buying-guide-highlight" style="font-size: 1.15rem;">{int(estimated_units):,} units</span></div>
-                                            <div style="margin-bottom: 6px;">â€¢ <strong>Estimated Cost:</strong> ${deploy_amount:,.2f} (based on ${preview_price:,.2f}/unit)</div>
-                                            <div style="margin-bottom: 6px;">â€¢ <strong>Asset Target Budget:</strong> ${target_budget:,.2f} ({target_pct}% of ${prof['principal']:,.0f})</div>
-                                            <div style="margin-bottom: 6px;">â€¢ <strong>Already Spent:</strong> ${actual_spent:,.2f} ({current_allocated:.1f}%)</div>
+                                            <div style="margin-bottom: 6px;">• <strong>Units:</strong> <span class="buying-guide-highlight" style="font-size: 1.15rem;">{int(estimated_units):,} units</span></div>
+                                            <div style="margin-bottom: 6px;">• <strong>Estimated Cost:</strong> ${deploy_amount:,.2f} (based on ${preview_price:,.2f}/unit)</div>
+                                            <div style="margin-bottom: 6px;">• <strong>Asset Target Budget:</strong> ${target_budget:,.2f} ({target_pct}% of ${prof['principal']:,.0f})</div>
+                                            <div style="margin-bottom: 6px;">• <strong>Already Spent:</strong> ${actual_spent:,.2f} ({current_allocated:.1f}%)</div>
                                         </div>
                                     ''', unsafe_allow_html=True)
                                     
@@ -5536,8 +5544,8 @@ else:
                                     st.markdown(f'''
                                         <div style="background: #f0fdf4; border: 1px solid #10b981; border-radius: 8px; padding: 12px; margin-top: 8px;">
                                             <div style="font-weight: 600; color: #065f46; margin-bottom: 4px;">âœ… Final Deployment:</div>
-                                            <div style="color: #047857;">â€¢ <strong>{int(estimated_units):,} units</strong> @ <strong>${actual_price:,.2f}</strong> = <strong>${actual_deploy_amount:,.2f}</strong></div>
-                                            <div style="color: #047857; font-size: 0.85rem;">â€¢ After deploy: ${new_total_spent_actual:,.2f} ({new_total_pct:.1f}% of target)</div>
+                                            <div style="color: #047857;">• <strong>{int(estimated_units):,} units</strong> @ <strong>${actual_price:,.2f}</strong> = <strong>${actual_deploy_amount:,.2f}</strong></div>
+                                            <div style="color: #047857; font-size: 0.85rem;">• After deploy: ${new_total_spent_actual:,.2f} ({new_total_pct:.1f}% of target)</div>
                                         </div>
                                     ''', unsafe_allow_html=True)
                                     
@@ -5794,7 +5802,7 @@ You have deployed MORE than your principal!
                     remaining_after = principal_amt - sum(d["amount"] for d in all_deployments[:i+1])
                     
                     icon = "ðŸ’°" if i == 0 else "ðŸ“Œ"
-                    st.caption(f"""{icon} **{deployment['date']}** â€¢ {deployment['ticker']}: {deployment['quantity']:.0f} units @ ${deployment['price']:.2f} = ${deployment['amount']:,.2f} â€¢ Cash left: ${remaining_after:,.0f}""")
+                    st.caption(f"""{icon} **{deployment['date']}** • {deployment['ticker']}: {deployment['quantity']:.0f} units @ ${deployment['price']:.2f} = ${deployment['amount']:,.2f} • Cash left: ${remaining_after:,.0f}""")
                 
                 if len(all_deployments) > 5:
                     st.caption(f"_... and {len(all_deployments) - 5} more deployments_")
@@ -7545,7 +7553,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
         col_title, col_refresh = st.columns([5, 1])
         with col_title:
             st.title(f"{p_flag} {st.session_state.active_profile}")
-            st.caption(f"Portfolio Manager â€¢ Inception: {prof.get('start_date', 'N/A')} â€¢ Drift Tolerance: {prof.get('drift_tolerance', 5.0)}%")
+            st.caption(f"Portfolio Manager • Inception: {prof.get('start_date', 'N/A')} • Drift Tolerance: {prof.get('drift_tolerance', 5.0)}%")
         with col_refresh:
             # Check if recently refreshed (prevent spam)
             last_refresh_key = f"last_refresh_{st.session_state.active_profile}"
@@ -8728,8 +8736,8 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
 st.divider()
 st.markdown(f"""
     <div style="text-align: center; color: #64748b; padding: 20px;">
-        <p><strong>Long Term Strategy Optimizer</strong> â€¢ v{VERSION} - {VERSION_NAME}</p>
-        <p style="font-size: 0.85rem;">Built: {VERSION_DATE} {VERSION_TIME} â€¢ Market data by Yahoo Finance</p>
+        <p><strong>Long Term Strategy Optimizer</strong> • v{VERSION} - {VERSION_NAME}</p>
+        <p style="font-size: 0.85rem;">Built: Built: 2026-02-06 21:40:41 EST • Market data by Yahoo Finance</p>
         <p style="font-size: 0.8rem;">For informational purposes only</p>
     </div>
 """, unsafe_allow_html=True)
