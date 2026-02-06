@@ -55,7 +55,7 @@ def save_db(data=None, bypass_version_increment=False):
     pass  # No-op for SQLite
 
 # ===== VERSION INFORMATION =====
-VERSION = "8.2.0"
+VERSION = "9.0.0"
 VERSION_DATE = "2026-02-05"
 VERSION_TIME = "15:00:00"  # EST
 VERSION_NAME = "SQLite Revolution - MAJOR"
@@ -1165,27 +1165,6 @@ def hash_password(password: str, salt: str = None) -> tuple:
     salted_password = f"{password}{salt}"
     hashed = hashlib.sha256(salted_password.encode()).hexdigest()
     return hashed, salt
-
-
-def authenticate_user(db, username: str, password: str) -> tuple:
-    """Authenticate user - hybrid database support."""
-    try:
-        # Check dict database
-        if isinstance(db, dict) and "users" in db and username in db["users"]:
-            user = db["users"][username]
-            if verify_password(password, user["password_hash"], user["password_salt"]):
-                return True, "Success", user
-        return False, "Invalid credentials", None
-    except Exception as e:
-        return False, str(e), None
-
-def log_system_event(db, event_type: str, details: dict):
-    """Log event - safe version."""
-    try:
-        if hasattr(db, 'log_event'):
-            db.log_event(event_type, details)
-    except:
-        pass
 
 def verify_password(password: str, stored_hash: str, salt: str) -> bool:
     """
@@ -4217,7 +4196,7 @@ def show_admin_dashboard(db, current_user):
     # 5 Main Tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "ðŸ“Š Overview",
-        "📝 Activity & Logs", 
+        "ðŸ“œ Activity & Logs", 
         "ðŸ“ˆ Analytics",
         "âš™ï¸ System",
         "ðŸ” Security"
@@ -4257,7 +4236,7 @@ def show_login_page():
             with col_login:
                 login_btn = st.form_submit_button("ðŸš€ Sign In", use_container_width=True, type="primary")
             with col_register:
-                register_btn = st.form_submit_button("📝 Create Account", use_container_width=True)
+                register_btn = st.form_submit_button("ðŸ“œ Create Account", use_container_width=True)
             
             if login_btn:
                 if not username or not password:
@@ -4298,7 +4277,7 @@ def show_registration_page():
             </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("### 📝 Register")
+        st.markdown("### ðŸ“œ Register")
         if not st.session_state.db.get("global_settings", {}).get("allow_registration", True):
             st.warning("âš ï¸ New registrations are currently disabled.")
             if st.button("â† Back to Login"):
@@ -6073,7 +6052,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
             
             # Activity Log
             st.divider()
-            st.markdown("### 📝 Activity Log")
+            st.markdown("### ðŸ“œ Activity Log")
             with st.expander("View Recent Activity", expanded=False):
                 all_logs = prof.get("rebalance_logs", [])
                 if all_logs:
@@ -6420,7 +6399,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     <div style="background: white; padding: 25px; border-radius: 12px; 
                                 border-left: 4px solid #8b5cf6; margin-bottom: 20px;
                                 box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                        <h3 style="margin: 0 0 12px 0; color: #1e293b;">📝 Complete History & Logs</h3>
+                        <h3 style="margin: 0 0 12px 0; color: #1e293b;">ðŸ“œ Complete History & Logs</h3>
                         <p style="margin: 0; color: #64748b; line-height: 1.6;">
                             Every rebalancing action, deployment, and adjustment is logged 
                             with timestamps for perfect record-keeping.
@@ -8701,7 +8680,7 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
             
             if rebalance_events:
                 st.divider()
-                st.markdown("## 📝 Rebalance History")
+                st.markdown("## ðŸ“œ Rebalance History")
                 st.caption("Complete history of all rebalancing events")
                 
                 with st.expander("â„¹ï¸ How to read rebalance history", expanded=False):
@@ -8748,7 +8727,7 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                     st.info(f"ðŸ’¡ {len(filtered_events) - events_per_page} more events available.")
             else:
                 st.divider()
-                st.info("📝 No rebalancing history yet.")
+                st.info("ðŸ“œ No rebalancing history yet.")
 
 # Footer
 st.divider()
@@ -8759,3 +8738,134 @@ st.markdown(f"""
         <p style="font-size: 0.8rem;">For informational purposes only</p>
     </div>
 """, unsafe_allow_html=True)
+
+# ===== AUTHENTICATION FUNCTIONS =====
+
+def hash_password(password: str, salt: str = None) -> tuple:
+    """Hash password with salt."""
+    import hashlib, secrets
+    if salt is None:
+        salt = secrets.token_hex(16)
+    password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+    return password_hash, salt
+
+def verify_password(password: str, stored_hash: str, salt: str) -> bool:
+    """Verify password."""
+    password_hash, _ = hash_password(password, salt)
+    return password_hash == stored_hash
+
+def save_db(data=None, bypass_version_increment=False):
+    """Save database (no-op)."""
+    pass
+
+def show_login_page():
+    """Login page."""
+    st.title("📊 Long Term Strategy")
+    st.markdown("*Institutional-Grade Portfolio Management*")
+    
+    with st.form("login"):
+        st.subheader("🔐 Sign In")
+        user = st.text_input("Username")
+        pwd = st.text_input("Password", type="password")
+        
+        c1, c2 = st.columns(2)
+        login_btn = c1.form_submit_button("🚀 Sign In", use_container_width=True)
+        reg_btn = c2.form_submit_button("📝 Create Account", use_container_width=True)
+        
+        if reg_btn:
+            st.session_state.page = "register"
+            st.rerun()
+        
+        if login_btn and user and pwd:
+            db = st.session_state.get("db", {"users": {}})
+            if user in db.get("users", {}):
+                u = db["users"][user]
+                if verify_password(pwd, u["password_hash"], u["password_salt"]):
+                    st.session_state.logged_in = True
+                    st.session_state.username = user
+                    st.session_state.user_data = u
+                    st.success("✅ Welcome!")
+                    st.rerun()
+                else:
+                    st.error("❌ Wrong password")
+            else:
+                st.error("❌ User not found. Click 'Create Account'")
+
+def show_registration_page():
+    """Registration page."""
+    st.title("📊 Long Term Strategy")
+    st.markdown("*Institutional-Grade Portfolio Management*")
+    
+    with st.form("register"):
+        st.subheader("📝 Register")
+        name = st.text_input("Display Name*")
+        user = st.text_input("Username*")
+        email = st.text_input("Email*")
+        c1, c2 = st.columns(2)
+        pwd = c1.text_input("Password*", type="password")
+        pwd2 = c2.text_input("Confirm*", type="password")
+        
+        c1, c2 = st.columns(2)
+        submit = c1.form_submit_button("✅ Create", use_container_width=True)
+        back = c2.form_submit_button("← Back", use_container_width=True)
+        
+        if back:
+            st.session_state.page = "login"
+            st.rerun()
+        
+        if submit:
+            if not all([name, user, email, pwd, pwd2]):
+                st.error("❌ All fields required")
+            elif pwd != pwd2:
+                st.error("❌ Passwords don't match")
+            elif len(pwd) < 8:
+                st.error("❌ Password min 8 chars")
+            else:
+                if "db" not in st.session_state:
+                    st.session_state.db = {"users": {}, "portfolios": {}}
+                
+                db = st.session_state.db
+                if user in db["users"]:
+                    st.error(f"❌ Username exists")
+                else:
+                    h, s = hash_password(pwd)
+                    is_admin = len(db["users"]) == 0
+                    
+                    db["users"][user] = {
+                        "display_name": name,
+                        "email": email,
+                        "password_hash": h,
+                        "password_salt": s,
+                        "is_admin": is_admin,
+                        "portfolios": []
+                    }
+                    
+                    st.success(f"✅ Created! {'(Admin)' if is_admin else ''}")
+                    st.info("Login now")
+                    import time
+                    time.sleep(2)
+                    st.session_state.page = "login"
+                    st.rerun()
+
+def main():
+    """Main entry."""
+    if "db" not in st.session_state:
+        st.session_state.db = {"users": {}, "portfolios": {}}
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+    if "page" not in st.session_state:
+        st.session_state.page = "login"
+    
+    if not st.session_state.logged_in:
+        if st.session_state.page == "register":
+            show_registration_page()
+        else:
+            show_login_page()
+    else:
+        st.success(f"Logged in as {st.session_state.username}")
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.rerun()
+
+if __name__ == "__main__":
+    main()
