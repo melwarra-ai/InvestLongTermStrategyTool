@@ -19,11 +19,17 @@ import sqlite3
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "8.0.2"
+VERSION = "8.0.3"
 VERSION_DATE = "2026-02-07"
-VERSION_TIME = "18:15:00"  # EST
-VERSION_NAME = "UX Enhancements"
+VERSION_TIME = "18:30:00"  # EST
+VERSION_NAME = "UX Enhancements (Fixed)"
 CHANGELOG = """
+v8.0.3 (2026-02-07 18:30 EST) - 🔧 BUG FIX
+- FIXED: NameError - removed duplicate user_profiles definition
+- ISSUE: Line 4757 was redefining user_profiles (already defined at 4659)
+- RESULT: Application now loads correctly without NameError
+- STATUS: Stable release ready for deployment
+
 v8.0.2 (2026-02-07 18:15 EST) - ✨ UX ENHANCEMENTS
 - ENH 1: Enhanced date picker with Today/Clear buttons
 - ENH 2: Collapsible sidebar sections (auto-collapse after completion)
@@ -4655,6 +4661,9 @@ else:
             except:
                 pass  # If any error, just skip progress tracker
         
+        # Get user profiles early (needed for Profile Creation logic)
+        user_profiles = get_user_profiles(st.session_state.db, current_user)
+        
         # Profile Creation
         st.markdown("### ① Strategy Setup")
         
@@ -4750,8 +4759,7 @@ else:
                         
                         st.rerun()
         
-        # Profile-specific sidebar
-        user_profiles = get_user_profiles(st.session_state.db, current_user)
+        # Profile-specific sidebar (user_profiles already defined above at line 4659)
         
         if view_mode == "Portfolio Manager" and user_profiles:
             st.divider()
