@@ -1,3 +1,27 @@
+"""
+AlphaStream Wealth Master - Portfolio Optimizer
+Version: 12.0.0 FINAL - Emoji-Safe Edition
+Build: 2026-02-07 18:30:00 EST
+"""
+
+# ============================================================================
+# UTF-8 ENFORCEMENT - MUST BE FIRST!
+# ============================================================================
+import sys
+import os
+
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+os.environ['LC_ALL'] = 'en_US.UTF-8'
+os.environ['LANG'] = 'en_US.UTF-8'
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
+print("✓ UTF-8 enforced")
+
+# ============================================================================
 import streamlit as st
 
 
@@ -119,7 +143,7 @@ def save_db(data=None, bypass_version_increment=False):
     pass  # No-op for SQLite
 
 # ===== VERSION INFORMATION =====
-VERSION = "11.7.0"
+VERSION = "12.0.0"
 VERSION_DATE = "2026-02-06"
 VERSION_TIME = "21:40:27"  # EST
 VERSION_NAME = "SQLite Revolution - MAJOR"
