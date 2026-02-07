@@ -8,6 +8,27 @@ PASSWORD_MIN_LENGTH = 8
 import hashlib
 import secrets
 
+
+def ensure_user_structure(user_data):
+    """Ensure user data has all required keys."""
+    defaults = {
+        "profiles": {},
+        "settings": {},
+        "preferences": {},
+        "email": "",
+        "display_name": "",
+        "is_admin": False,
+        "is_active": True,
+        "created_at": datetime.now().isoformat(),
+        "last_login": None
+    }
+    
+    for key, value in defaults.items():
+        if key not in user_data:
+            user_data[key] = value
+    
+    return user_data
+
 def hash_password(password: str, salt: str = None) -> tuple:
     """Hash password with salt using PBKDF2-HMAC-SHA256."""
     if salt is None:
@@ -98,7 +119,7 @@ def save_db(data=None, bypass_version_increment=False):
     pass  # No-op for SQLite
 
 # ===== VERSION INFORMATION =====
-VERSION = "11.5.2"
+VERSION = "11.7.0"
 VERSION_DATE = "2026-02-06"
 VERSION_TIME = "21:40:27"  # EST
 VERSION_NAME = "SQLite Revolution - MAJOR"
@@ -2134,6 +2155,7 @@ def authenticate_user(db, username: str, password: str) -> tuple:
     if username not in db["users"]:
         return False, "Invalid username or password", None
     user_data = db["users"][username]
+    user_data = ensure_user_structure(user_data)
     if not user_data.get("is_active", True):
         return False, "Account is deactivated. Contact administrator.", None
     is_locked, minutes = check_account_lockout(user_data)
@@ -2177,6 +2199,7 @@ def change_password(db, username: str, old_password: str, new_password: str) -> 
     if username not in db["users"]:
         return False, "User not found"
     user_data = db["users"][username]
+    user_data = ensure_user_structure(user_data)
     if not verify_password(old_password, user_data["password_hash"], user_data["password_salt"]):
         return False, "Current password is incorrect"
     is_valid, errors = validate_password_strength(new_password)
@@ -3677,7 +3700,7 @@ def show_analytics_tab(db, analytics):
                             if details:
                                 st.caption(f"â„¹ï¸ {details}")
                             if ip_address:
-                                st.caption(f"ðŸŒ IP: {ip_address}")
+                                st.caption(f"[+] IP: {ip_address}")
                         
                         with col_meta:
                             st.caption(f"**#{idx}**")
@@ -8780,7 +8803,7 @@ st.divider()
 st.markdown(f"""
     <div style="text-align: center; color: #64748b; padding: 20px;">
         <p><strong>Long Term Strategy Optimizer</strong> • v{VERSION} - {VERSION_NAME}</p>
-        <p style="font-size: 0.85rem;">Built: Built: 2026-02-06 22:25:55 EST • Market data by Yahoo Finance</p>
+        <p style="font-size: 0.85rem;">Built: Built: 2026-02-07 18:04:23 EST • Market data by Yahoo Finance</p>
         <p style="font-size: 0.8rem;">For informational purposes only</p>
     </div>
 """, unsafe_allow_html=True)
