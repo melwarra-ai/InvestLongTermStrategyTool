@@ -19,11 +19,22 @@ import sqlite3
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "8.0.0"
+VERSION = "8.0.1"
 VERSION_DATE = "2026-02-07"
-VERSION_TIME = "17:30:00"  # EST
-VERSION_NAME = "SQLite Migration"
+VERSION_TIME = "17:45:00"  # EST
+VERSION_NAME = "SQLite Migration + Auth Fix"
 CHANGELOG = """
+v8.0.1 (2026-02-07 17:45 EST) - 🔧 CRITICAL AUTH FIX
+- FIXED: Restored missing hash_password() function
+- FIXED: Restored missing verify_password() function
+- FIXED: Restored missing validate_password_strength() function
+- FIXED: Restored missing validate_email() function
+- FIXED: Restored missing generate_session_token() function
+- FIXED: Added password security configuration constants
+- ISSUE: These functions were accidentally removed during SQLite migration
+- RESULT: Login and registration now work correctly
+- STATUS: All authentication functionality restored
+
 v8.0.0 (2026-02-07 17:30 EST) - 🗄️ SQLITE MIGRATION
 - MAJOR: Replaced Google Sheets backend with SQLite database
 - REMOVED: All Google Sheets dependencies (gspread, google-auth)
@@ -1486,6 +1497,55 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ===== AUTHENTICATION SYSTEM =====
+# ===== AUTHENTICATION SYSTEM =====
+
+# Password Security Configuration
+PASSWORD_MIN_LENGTH = 8
+PASSWORD_REQUIRE_UPPERCASE = True
+PASSWORD_REQUIRE_LOWERCASE = True
+PASSWORD_REQUIRE_DIGIT = True
+PASSWORD_REQUIRE_SPECIAL = False
+SESSION_TIMEOUT_HOURS = 24
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_DURATION_MINUTES = 15
+
+def hash_password(password: str, salt: str = None) -> tuple:
+    """Hash password using SHA-256 with salt."""
+    if salt is None:
+        salt = secrets.token_hex(32)
+    salted_password = f"{password}{salt}"
+    hashed = hashlib.sha256(salted_password.encode()).hexdigest()
+    return hashed, salt
+
+def verify_password(password: str, stored_hash: str, salt: str) -> bool:
+    """Verify password against stored hash"""
+    computed_hash, _ = hash_password(password, salt)
+    return secrets.compare_digest(computed_hash, stored_hash)
+
+def validate_password_strength(password: str) -> tuple:
+    """Validate password meets security requirements."""
+    errors = []
+    if len(password) < PASSWORD_MIN_LENGTH:
+        errors.append(f"Password must be at least {PASSWORD_MIN_LENGTH} characters")
+    if PASSWORD_REQUIRE_UPPERCASE and not re.search(r'[A-Z]', password):
+        errors.append("Password must contain at least one uppercase letter")
+    if PASSWORD_REQUIRE_LOWERCASE and not re.search(r'[a-z]', password):
+        errors.append("Password must contain at least one lowercase letter")
+    if PASSWORD_REQUIRE_DIGIT and not re.search(r'\d', password):
+        errors.append("Password must contain at least one digit")
+    if errors:
+        return False, errors
+    return True, []
+
+def validate_email(email: str) -> bool:
+    """Validate email format"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def generate_session_token() -> str:
+    """Generate a secure session token"""
+    return secrets.token_urlsafe(32)
+
 # ===== SQLITE DATABASE CONFIGURATION =====
 DB_FILE = "alphastream.db"
 
