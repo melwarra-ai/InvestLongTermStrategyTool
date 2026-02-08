@@ -19,11 +19,28 @@ import sqlite3
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "8.0.9"
+VERSION = "8.1.0"
 VERSION_DATE = "2026-02-08"
-VERSION_TIME = "01:30:00"  # EST  
-VERSION_NAME = "Default Deploy 100%"
+VERSION_TIME = "02:00:00"  # EST  
+VERSION_NAME = "Force 100% Default Always"
 CHANGELOG = """
+v8.1.0 (2026-02-08 02:00 EST) - 🎯 FORCE 100% DEFAULT ALWAYS
+- REMOVED: Session state memory for last deployed percentage
+- FIXED: Deploy % now ALWAYS defaults to 100% (no memory of previous values)
+- IMPROVED: Clean, predictable default every time you deploy
+- BENEFIT: No more confusion from remembered old values like 1.10%
+
+**The Problem:**
+v8.0.9 defaulted to 100%, BUT if you previously deployed 1.10%, 
+the app "remembered" that value in session state and kept using it!
+
+**The Solution:**
+Completely removed session state memory. Deploy % ALWAYS starts at:
+- 100.0% if you haven't deployed any of this asset yet
+- Remaining % if you've partially deployed (e.g., 40% if 60% done)
+
+**No more surprises!** Every deployment starts fresh at 100%.
+
 v8.0.9 (2026-02-08 01:30 EST) - 📊 DEFAULT DEPLOY 100%
 - CHANGED: Deploy % (of asset's target) now defaults to 100%
 - IMPROVED: Simple, predictable default instead of complex calculation
@@ -5670,15 +5687,9 @@ else:
                                     # Calculate max % based on remaining asset budget
                                     max_deployable_pct = remaining_pct
                                     
-                                    # Default to 100% (or remaining % if less than 100%)
-                                    smart_default = min(100.0, remaining_pct) if remaining_pct > 0 else 0.1
-                                    
-                                    # Enhancement 6: Use last deployed % as default (override smart default if exists)
-                                    last_deploy_pct_key = f"last_deploy_pct_{selected_ticker}"
-                                    if last_deploy_pct_key in st.session_state:
-                                        default_pct = min(st.session_state[last_deploy_pct_key], remaining_pct)
-                                    else:
-                                        default_pct = smart_default
+                                    # ALWAYS default to 100% (or remaining % if less than 100%)
+                                    # No session state memory - clean default every time
+                                    default_pct = min(100.0, remaining_pct) if remaining_pct > 0 else 0.1
                                     
                                     deploy_pct = st.number_input("Deploy % (of asset's target)", 
                                                                 min_value=0.1, 
@@ -5687,9 +5698,6 @@ else:
                                                                 step=0.1, 
                                                                 key="deploy_pct_input",
                                                                 help="Percentage of this asset's target allocation to deploy")
-                                    
-                                    # Store for next time
-                                    st.session_state[last_deploy_pct_key] = deploy_pct
                                     
                                     portfolio_pct = (deploy_pct / 100) * target_pct
                                     deploy_amount = (portfolio_pct / 100) * prof['principal']
