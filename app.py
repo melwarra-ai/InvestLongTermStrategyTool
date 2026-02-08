@@ -19,11 +19,19 @@ import sqlite3
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "8.0.3"
+VERSION = "8.0.4"
 VERSION_DATE = "2026-02-07"
-VERSION_TIME = "18:30:00"  # EST
-VERSION_NAME = "UX Enhancements (Fixed)"
+VERSION_TIME = "18:45:00"  # EST
+VERSION_NAME = "Form Button Fix"
 CHANGELOG = """
+v8.0.4 (2026-02-07 18:45 EST) - 🔧 CRITICAL FORM FIX
+- FIXED: Cannot use st.button() inside st.form() error
+- ISSUE: enhanced_date_input() contains buttons, incompatible with forms
+- CHANGED: Replaced enhanced_date_input() with regular st.date_input() in profile creation form
+- RESULT: Profile creation form now works correctly
+- NOTE: Enhanced date pickers can only be used OUTSIDE of forms
+- STATUS: Stable release ready for deployment
+
 v8.0.3 (2026-02-07 18:30 EST) - 🔧 BUG FIX
 - FIXED: NameError - removed duplicate user_profiles definition
 - ISSUE: Line 4757 was redefining user_profiles (already defined at 4659)
@@ -4692,12 +4700,12 @@ else:
                                         step=0.5, min_value=0.0,
                                         help=f"Target annual return (default: {default_growth_goal}%)")
                 
-                st.markdown("**Inception Date***")
-                n_start = enhanced_date_input(
-                    "",
+                # NOTE: Cannot use enhanced_date_input() inside st.form() due to button restrictions
+                # Using regular date_input instead
+                n_start = st.date_input(
+                    "Inception Date*",
                     value=date.today() - timedelta(days=365),
                     max_value=date.today(),
-                    key="profile_inception_date",
                     help="When did you start this investment strategy?"
                 )
                 
