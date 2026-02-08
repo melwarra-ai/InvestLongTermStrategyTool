@@ -19,11 +19,28 @@ import sqlite3
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "8.0.8"
+VERSION = "8.0.9"
 VERSION_DATE = "2026-02-08"
-VERSION_TIME = "01:00:00"  # EST  
-VERSION_NAME = "Working Clear/Today Buttons"
+VERSION_TIME = "01:30:00"  # EST  
+VERSION_NAME = "Default Deploy 100%"
 CHANGELOG = """
+v8.0.9 (2026-02-08 01:30 EST) - 📊 DEFAULT DEPLOY 100%
+- CHANGED: Deploy % (of asset's target) now defaults to 100%
+- IMPROVED: Simple, predictable default instead of complex calculation
+- REMOVED: "Smart" default logic that could result in low values like 1.10%
+- BENEFIT: Users can now deploy full allocation with one click
+
+**Before:**
+Deploy % default: 1.10% (complex calculation based on affordable units)
+
+**After:**
+Deploy % default: 100.0% (or remaining %, whichever is smaller)
+
+**How It Works:**
+- First deployment of an asset → Defaults to 100%
+- Subsequent deployments → Uses last deployed % OR 100%, whichever applies
+- If only 30% remaining → Defaults to 30% (respects available amount)
+
 v8.0.8 (2026-02-08 01:00 EST) - ✅ WORKING CLEAR/TODAY BUTTONS
 - FIXED: enhanced_date_input() function completely rewritten to work without errors
 - FIXED: Clear and Today buttons now appear BELOW the date picker
@@ -5653,21 +5670,8 @@ else:
                                     # Calculate max % based on remaining asset budget
                                     max_deployable_pct = remaining_pct
                                     
-                                    # Enhancement 2: Calculate default % based on max whole units we can afford
-                                    if preview_price and actual_available_budget > 0:
-                                        # Calculate max whole units we can buy
-                                        max_units = int(actual_available_budget / preview_price)
-                                        if max_units >= 1:
-                                            # Calculate what % of target this represents
-                                            max_amount = max_units * preview_price
-                                            portfolio_pct_for_max = (max_amount / prof['principal']) * 100
-                                            default_pct_calculated = (portfolio_pct_for_max / target_pct) * 100 if target_pct > 0 else 0
-                                            # Cap at remaining %
-                                            smart_default = min(default_pct_calculated, remaining_pct)
-                                        else:
-                                            smart_default = min(25.0, remaining_pct) if remaining_pct > 0 else 0.1
-                                    else:
-                                        smart_default = min(25.0, remaining_pct) if remaining_pct > 0 else 0.1
+                                    # Default to 100% (or remaining % if less than 100%)
+                                    smart_default = min(100.0, remaining_pct) if remaining_pct > 0 else 0.1
                                     
                                     # Enhancement 6: Use last deployed % as default (override smart default if exists)
                                     last_deploy_pct_key = f"last_deploy_pct_{selected_ticker}"
