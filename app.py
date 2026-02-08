@@ -19,11 +19,42 @@ import sqlite3
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "8.0.1"
+VERSION = "8.0.3"
 VERSION_DATE = "2026-02-07"
-VERSION_TIME = "17:45:00"  # EST
-VERSION_NAME = "SQLite Migration + Auth Fix"
+VERSION_TIME = "18:30:00"  # EST
+VERSION_NAME = "UX Enhancements (Fixed)"
 CHANGELOG = """
+v8.0.3 (2026-02-07 18:30 EST) - 🔧 BUG FIX
+- FIXED: NameError - removed duplicate user_profiles definition
+- ISSUE: Line 4757 was redefining user_profiles (already defined at 4659)
+- RESULT: Application now loads correctly without NameError
+- STATUS: Stable release ready for deployment
+
+v8.0.2 (2026-02-07 18:15 EST) - ✨ UX ENHANCEMENTS
+- ENH 1: Enhanced date picker with Today/Clear buttons
+- ENH 2: Collapsible sidebar sections (auto-collapse after completion)
+- ENH 3: Cleaner sidebar organization with expanders
+- ENH 4: Better visual hierarchy in sidebar
+- IMPROVED: Date selection for Inception Date and Deployment Date
+- IMPROVED: Sidebar sections collapse when not in use
+- BENEFIT: Less scrolling, cleaner interface
+- BENEFIT: Faster navigation to active tasks
+
+**Enhancement 1: Better Date Pickers**
+Before: Basic date input
+After: Date input with "Today" and "Clear" buttons ✅
+- Quick access to today's date
+- Easy way to clear selection
+- Consistent across all date fields
+
+**Enhancement 2: Collapsible Sidebar Sections**
+Before: All sections always visible (lots of scrolling)
+After: Sections collapse after completion ✅
+- Profile Creation: Collapses after profile created
+- Portfolio Configuration: Collapses when complete
+- Asset Deployment: Collapses when fully deployed
+- Focus on current active task
+
 v8.0.1 (2026-02-07 17:45 EST) - 🔧 CRITICAL AUTH FIX
 - FIXED: Restored missing hash_password() function
 - FIXED: Restored missing verify_password() function
@@ -1545,6 +1576,39 @@ def validate_email(email: str) -> bool:
 def generate_session_token() -> str:
     """Generate a secure session token"""
     return secrets.token_urlsafe(32)
+
+def enhanced_date_input(label: str, value=None, min_value=None, max_value=None, key=None, help=None):
+    """
+    Enhanced date input with Today and Clear buttons
+    Returns: selected date or None
+    """
+    col_date, col_today, col_clear = st.columns([3, 1, 1])
+    
+    with col_date:
+        selected_date = st.date_input(
+            label,
+            value=value if value is not None else date.today(),
+            min_value=min_value,
+            max_value=max_value,
+            key=key,
+            help=help
+        )
+    
+    with col_today:
+        if st.button("Today", key=f"{key}_today" if key else None, use_container_width=True):
+            selected_date = date.today()
+            if key:
+                st.session_state[key] = date.today()
+            st.rerun()
+    
+    with col_clear:
+        if st.button("Clear", key=f"{key}_clear" if key else None, use_container_width=True):
+            selected_date = None
+            if key and key in st.session_state:
+                del st.session_state[key]
+            st.rerun()
+    
+    return selected_date
 
 # ===== SQLITE DATABASE CONFIGURATION =====
 DB_FILE = "alphastream.db"
@@ -4597,12 +4661,15 @@ else:
             except:
                 pass  # If any error, just skip progress tracker
         
+        # Get user profiles early (needed for Profile Creation logic)
+        user_profiles = get_user_profiles(st.session_state.db, current_user)
+        
         # Profile Creation
         st.markdown("### ① Strategy Setup")
         
-        # Check if we should auto-expand (from welcome page button)
-        should_expand = st.session_state.get("auto_expand_create_profile", False)
-        if should_expand:
+        # Check if we should auto-expand (from welcome page button or if no profiles exist)
+        should_expand = st.session_state.get("auto_expand_create_profile", False) or len(user_profiles) == 0
+        if st.session_state.get("auto_expand_create_profile", False):
             # Clear the flag after using it
             st.session_state.auto_expand_create_profile = False
         
@@ -4624,7 +4691,15 @@ else:
                                         value=default_growth_goal,  # Use global default! ✅
                                         step=0.5, min_value=0.0,
                                         help=f"Target annual return (default: {default_growth_goal}%)")
-                n_start = st.date_input("Inception Date*", value=date.today() - timedelta(days=365), max_value=date.today())
+                
+                st.markdown("**Inception Date***")
+                n_start = enhanced_date_input(
+                    "",
+                    value=date.today() - timedelta(days=365),
+                    max_value=date.today(),
+                    key="profile_inception_date",
+                    help="When did you start this investment strategy?"
+                )
                 
                 submitted = st.form_submit_button("🚀 Initialize Profile", use_container_width=True)
                 if submitted:
@@ -4684,8 +4759,7 @@ else:
                         
                         st.rerun()
         
-        # Profile-specific sidebar
-        user_profiles = get_user_profiles(st.session_state.db, current_user)
+        # Profile-specific sidebar (user_profiles already defined above at line 4659)
         
         if view_mode == "Portfolio Manager" and user_profiles:
             st.divider()
@@ -4798,77 +4872,87 @@ else:
             
             # Drift Strategy
             st.markdown("### ② Drift Strategy")
-            st.caption("Set tolerance threshold")
-            with st.expander("ℹ️ What is drift tolerance?", expanded=False):
-                st.markdown("""
-                **Drift tolerance** controls when you get rebalancing alerts.
-                - If an asset's current % differs from target % by more than this, you'll see an alert
-                - **Example:** 5% tolerance means AAPL at 30% (target 25%) triggers an alert
-                """)
             
-            new_tolerance = st.number_input("Drift Tolerance (%)", value=float(prof.get('drift_tolerance', 5.0)),
-                                           min_value=0.5, max_value=20.0, step=0.5, key="drift_tolerance_input")
-            if st.button("💾 Update Tolerance", use_container_width=True, key="update_tolerance"):
-                prof['drift_tolerance'] = new_tolerance
-                save_db(st.session_state.db)
-                log_profile(prof, f"Updated drift tolerance to {new_tolerance}%")
-                st.success("✅ Updated!")
-                st.rerun()
+            # Auto-expand if no drift tolerance set
+            drift_expand = prof.get('drift_tolerance', 5.0) == 5.0  # Default value means not customized
+            
+            with st.expander("⚙️ Configure Drift Tolerance", expanded=drift_expand):
+                st.caption("Set tolerance threshold")
+                with st.expander("ℹ️ What is drift tolerance?", expanded=False):
+                    st.markdown("""
+                    **Drift tolerance** controls when you get rebalancing alerts.
+                    - If an asset's current % differs from target % by more than this, you'll see an alert
+                    - **Example:** 5% tolerance means AAPL at 30% (target 25%) triggers an alert
+                    """)
+                
+                new_tolerance = st.number_input("Drift Tolerance (%)", value=float(prof.get('drift_tolerance', 5.0)),
+                                               min_value=0.5, max_value=20.0, step=0.5, key="drift_tolerance_input")
+                if st.button("💾 Update Tolerance", use_container_width=True, key="update_tolerance"):
+                    prof['drift_tolerance'] = new_tolerance
+                    save_db(st.session_state.db)
+                    log_profile(prof, f"Updated drift tolerance to {new_tolerance}%")
+                    st.success("✅ Updated!")
+                    st.rerun()
             
             st.divider()
             
             # Benchmark Selection
             st.markdown("### ③ Benchmark Comparison")
-            st.caption("Compare against market benchmarks (US & Canadian)")
-            with st.expander("ℹ️ Why use a benchmark?", expanded=False):
-                st.markdown("""
-                **Benchmarks** help evaluate performance.
-                - Chart shows 100% investment in each benchmark
-                - **Outperforming** = your strategy adds value
-                - Select multiple to compare different indices
+            
+            # Auto-expand if no benchmarks set
+            benchmark_expand = len(prof.get('benchmarks', [])) == 0 and prof.get('benchmark') is None
+            
+            with st.expander("📊 Configure Benchmarks", expanded=benchmark_expand):
+                st.caption("Compare against market benchmarks (US & Canadian)")
+                with st.expander("ℹ️ Why use a benchmark?", expanded=False):
+                    st.markdown("""
+                    **Benchmarks** help evaluate performance.
+                    - Chart shows 100% investment in each benchmark
+                    - **Outperforming** = your strategy adds value
+                    - Select multiple to compare different indices
+                    
+                    **🇺🇸 US Markets:** SPY, QQQ, VTI, IWM, DIA, BND  
+                    **🇨🇦 Canadian Markets:** XIU, XIC, ZCN, VCN
+                    """)
                 
-                **🇺🇸 US Markets:** SPY, QQQ, VTI, IWM, DIA, BND  
-                **🇨🇦 Canadian Markets:** XIU, XIC, ZCN, VCN
-                """)
-            
-            benchmark_options = {
-                # US Benchmarks
-                "🇺🇸 S&P 500 (SPY)": "SPY",
-                "🇺🇸 NASDAQ-100 (QQQ)": "QQQ",
-                "🇺🇸 Total Market (VTI)": "VTI",
-                "🇺🇸 Russell 2000 (IWM)": "IWM",
-                "🇺🇸 Dow Jones (DIA)": "DIA",
-                "🇺🇸 US Bonds (BND)": "BND",
-                # Canadian Benchmarks
-                "🇨🇦 TSX 60 (XIU)": "XIU",
-                "🇨🇦 TSX Composite (XIC)": "XIC",
-                "🇨🇦 TSX Capped Comp (ZCN)": "ZCN",
-                "🇨🇦 FTSE Canada (VCN)": "VCN"
-            }
-            current_benchmarks = prof.get('benchmarks', [])
-            # Migration: convert old single benchmark to list
-            if not current_benchmarks and prof.get('benchmark'):
-                current_benchmarks = [prof.get('benchmark')]
-            
-            # Get display names for current benchmarks
-            current_display = [k for k, v in benchmark_options.items() if v in current_benchmarks]
-            
-            selected_benchmarks = st.multiselect("Select Benchmarks", 
-                options=list(benchmark_options.keys()),
-                default=current_display,
-                key="benchmark_multiselect",
-                help="Select one or more benchmarks to compare"
-            )
-            
-            if st.button("💾 Save Benchmarks", use_container_width=True, key="save_benchmark"):
-                prof['benchmarks'] = [benchmark_options[b] for b in selected_benchmarks]
-                prof['benchmark'] = prof['benchmarks'][0] if prof['benchmarks'] else None  # Keep for backward compat
-                save_db(st.session_state.db)
-                st.success("✅ Saved!")
-                st.rerun()
-            
-            if prof.get('benchmarks'):
-                st.caption(f"📊 Active: {', '.join(prof['benchmarks'])}")
+                benchmark_options = {
+                    # US Benchmarks
+                    "🇺🇸 S&P 500 (SPY)": "SPY",
+                    "🇺🇸 NASDAQ-100 (QQQ)": "QQQ",
+                    "🇺🇸 Total Market (VTI)": "VTI",
+                    "🇺🇸 Russell 2000 (IWM)": "IWM",
+                    "🇺🇸 Dow Jones (DIA)": "DIA",
+                    "🇺🇸 US Bonds (BND)": "BND",
+                    # Canadian Benchmarks
+                    "🇨🇦 TSX 60 (XIU)": "XIU",
+                    "🇨🇦 TSX Composite (XIC)": "XIC",
+                    "🇨🇦 TSX Capped Comp (ZCN)": "ZCN",
+                    "🇨🇦 FTSE Canada (VCN)": "VCN"
+                }
+                current_benchmarks = prof.get('benchmarks', [])
+                # Migration: convert old single benchmark to list
+                if not current_benchmarks and prof.get('benchmark'):
+                    current_benchmarks = [prof.get('benchmark')]
+                
+                # Get display names for current benchmarks
+                current_display = [k for k, v in benchmark_options.items() if v in current_benchmarks]
+                
+                selected_benchmarks = st.multiselect("Select Benchmarks", 
+                    options=list(benchmark_options.keys()),
+                    default=current_display,
+                    key="benchmark_multiselect",
+                    help="Select one or more benchmarks to compare"
+                )
+                
+                if st.button("💾 Save Benchmarks", use_container_width=True, key="save_benchmark"):
+                    prof['benchmarks'] = [benchmark_options[b] for b in selected_benchmarks]
+                    prof['benchmark'] = prof['benchmarks'][0] if prof['benchmarks'] else None  # Keep for backward compat
+                    save_db(st.session_state.db)
+                    st.success("✅ Saved!")
+                    st.rerun()
+                
+                if prof.get('benchmarks'):
+                    st.caption(f"📊 Active: {', '.join(prof['benchmarks'])}")
             
             st.divider()
             
@@ -5147,62 +5231,67 @@ else:
             assets = prof.get("assets", {})
             total_allocation = sum(a.get('target', 0) for a in assets.values())
             is_complete = (total_allocation == 100.0 and len(assets) > 0)
+            is_locked = prof.get("asset_mix_locked", False)
             
-            # Debug info expander
-            with st.expander("🔧 Troubleshooting / Current State", expanded=False):
-                st.caption("**Portfolio Status:**")
-                st.json({
-                    "Total Allocation": f"{total_allocation:.1f}%",
-                    "Assets Defined": len(assets),
-                    "Mix Locked": prof.get("asset_mix_locked", False),
-                    "Any Deployments": any(a.get("allocated_pct", 0) > 0 for a in assets.values()),
-                    "Can Add Assets": not prof.get("asset_mix_locked", False) or (total_allocation < 100),
-                })
-                st.caption("**Assets:**")
-                for ticker, data in assets.items():
-                    st.caption(f"• {ticker}: {data.get('target', 0)}% target, {data.get('allocated_pct', 0):.1f}% deployed, {data.get('units', 0)} units")
-                
-                if st.button("🔄 Reset Portfolio (Emergency)", key="emergency_reset"):
-                    if st.button("⚠️ Confirm Reset - This will delete ALL data", key="confirm_reset", type="primary"):
-                        prof["assets"] = {}
-                        prof["asset_mix_locked"] = False
-                        save_db(st.session_state.db)
-                        log_profile(prof, "Emergency reset - all assets deleted")
-                        st.success("✅ Portfolio reset!")
-                        st.rerun()
+            # Auto-expand if not locked or not complete
+            lock_expand = not is_locked or not is_complete
             
-            if prof.get("asset_mix_locked", False):
-                st.success("✅ **Asset Mix Locked**")
-                st.caption(f"{len(assets)} assets defined. Ready for deployment.")
-                any_deployments = any(a.get("allocated_pct", 0) > 0 for a in assets.values())
-                
-                if st.button("🔓 Unlock Asset Mix", use_container_width=True, key="unlock_mix"):
-                    if any_deployments:
-                        # Show warning but allow
-                        st.warning("⚠️ You have deployments recorded. Unlocking will allow you to modify targets, but existing deployments remain unchanged.")
-                        if st.button("✅ Yes, Unlock Anyway", key="confirm_unlock", type="primary"):
+            with st.expander("🔒 Manage Asset Mix Lock", expanded=lock_expand):
+                # Debug info expander
+                with st.expander("🔧 Troubleshooting / Current State", expanded=False):
+                    st.caption("**Portfolio Status:**")
+                    st.json({
+                        "Total Allocation": f"{total_allocation:.1f}%",
+                        "Assets Defined": len(assets),
+                        "Mix Locked": prof.get("asset_mix_locked", False),
+                        "Any Deployments": any(a.get("allocated_pct", 0) > 0 for a in assets.values()),
+                        "Can Add Assets": not prof.get("asset_mix_locked", False) or (total_allocation < 100),
+                    })
+                    st.caption("**Assets:**")
+                    for ticker, data in assets.items():
+                        st.caption(f"• {ticker}: {data.get('target', 0)}% target, {data.get('allocated_pct', 0):.1f}% deployed, {data.get('units', 0)} units")
+                    
+                    if st.button("🔄 Reset Portfolio (Emergency)", key="emergency_reset"):
+                        if st.button("⚠️ Confirm Reset - This will delete ALL data", key="confirm_reset", type="primary"):
+                            prof["assets"] = {}
                             prof["asset_mix_locked"] = False
                             save_db(st.session_state.db)
-                            log_profile(prof, "Asset mix unlocked (with deployments)")
+                            log_profile(prof, "Emergency reset - all assets deleted")
+                            st.success("✅ Portfolio reset!")
+                            st.rerun()
+                
+                if prof.get("asset_mix_locked", False):
+                    st.success("✅ **Asset Mix Locked**")
+                    st.caption(f"{len(assets)} assets defined. Ready for deployment.")
+                    any_deployments = any(a.get("allocated_pct", 0) > 0 for a in assets.values())
+                    
+                    if st.button("🔓 Unlock Asset Mix", use_container_width=True, key="unlock_mix"):
+                        if any_deployments:
+                            # Show warning but allow
+                            st.warning("⚠️ You have deployments recorded. Unlocking will allow you to modify targets, but existing deployments remain unchanged.")
+                            if st.button("✅ Yes, Unlock Anyway", key="confirm_unlock", type="primary"):
+                                prof["asset_mix_locked"] = False
+                                save_db(st.session_state.db)
+                                log_profile(prof, "Asset mix unlocked (with deployments)")
+                                st.rerun()
+                        else:
+                            prof["asset_mix_locked"] = False
+                            save_db(st.session_state.db)
+                            log_profile(prof, "Asset mix unlocked")
+                            st.rerun()
+                else:
+                    if is_complete:
+                        st.warning("🔜 **Ready to Lock**")
+                        st.caption(f"{len(assets)} assets, {total_allocation:.1f}% allocated")
+                        if st.button("🔒 Lock Asset Mix", type="primary", use_container_width=True, key="lock_mix"):
+                            prof["asset_mix_locked"] = True
+                            save_db(st.session_state.db)
+                            log_profile(prof, f"Asset mix locked: {len(assets)} assets")
+                            st.success("✅ Asset mix locked!")
                             st.rerun()
                     else:
-                        prof["asset_mix_locked"] = False
-                        save_db(st.session_state.db)
-                        log_profile(prof, "Asset mix unlocked")
-                        st.rerun()
-            else:
-                if is_complete:
-                    st.warning("🔜 **Ready to Lock**")
-                    st.caption(f"{len(assets)} assets, {total_allocation:.1f}% allocated")
-                    if st.button("🔙 Lock Asset Mix", type="primary", use_container_width=True, key="lock_mix"):
-                        prof["asset_mix_locked"] = True
-                        save_db(st.session_state.db)
-                        log_profile(prof, f"Asset mix locked: {len(assets)} assets")
-                        st.success("✅ Asset mix locked!")
-                        st.rerun()
-                else:
-                    st.info("ℹ️ **Asset Mix Not Complete**")
-                    st.caption(f"Current: {total_allocation:.1f}% / 100%")
+                        st.info("ℹ️ **Asset Mix Not Complete**")
+                        st.caption(f"Current: {total_allocation:.1f}% / 100%")
             
             st.divider()
             
