@@ -19,11 +19,29 @@ import sqlite3
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "8.0.5"
+VERSION = "8.0.6"
 VERSION_DATE = "2026-02-07"
-VERSION_TIME = "22:00:00"  # EST  
-VERSION_NAME = "Complete UX Enhancements"
+VERSION_TIME = "23:00:00"  # EST  
+VERSION_NAME = "UX Fixes - Date Picker & Collapsible Sections"
 CHANGELOG = """
+v8.0.6 (2026-02-07 23:00 EST) - 🔧 CRITICAL UX FIXES
+- FIXED: Date picker now uses standard st.date_input with Clear/Today in calendar popup
+- FIXED: Quick Add buttons now properly hidden when asset mix is locked
+- FIXED: Session state error when clicking "Today" button (removed enhanced_date_input)
+- IMPROVED: Date selection uses Streamlit's built-in Clear/Today buttons in calendar
+- IMPROVED: Asset allocation section cleaner when locked (Quick Add hidden)
+- BENEFIT: No more errors, cleaner locked state, native date picker behavior
+
+**Fix 1: Date Picker (Image 2 Error)**
+Issue: enhanced_date_input() caused session state error
+Solution: Use standard st.date_input() - it ALREADY has Clear/Today buttons in the calendar popup!
+Result: No errors, native Streamlit behavior ✅
+
+**Fix 2: Asset Allocation Collapsing (Image 1)**
+Issue: Quick Add buttons still visible when asset mix locked
+Solution: Properly wrapped Quick Add buttons in `if not is_mix_locked:` conditional
+Result: Quick Add buttons hidden when locked, info message shown instead ✅
+
 v8.0.5 (2026-02-07 22:00 EST) - ✨ COMPLETE UX ENHANCEMENTS
 - ENH 1: Enhanced date picker with Today/Clear buttons in deployment section
 - ENH 2: Asset allocation UI hides when mix is locked (wrapped/collapsed)
@@ -5055,50 +5073,53 @@ else:
                 st.caption("💡 Enter ticker below to edit or add new asset")
                 st.divider()
             
-            # Check if asset mix is locked (show/hide asset management UI based on this)
+            # Check if asset mix is locked (show/hide Quick Add UI)
             is_mix_locked = prof.get("asset_mix_locked", False)
             
             if not is_mix_locked:
                 # Quick-add buttons for common tickers (user's specific assets)
                 st.markdown("**🚀 Quick Add:**")
-            col_q1, col_q2, col_q3, col_q4 = st.columns(4)
-            with col_q1:
-                if st.button("SPXL", key="quick_spxl", help="S&P 500 3X", use_container_width=True):
-                    # Clear all related widget states for clean slate
-                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
-                        if key in st.session_state:
-                            del st.session_state[key]
-                    # Set the ticker value
-                    st.session_state['ticker_input'] = "SPXL"
-                    st.session_state['_quick_add_used'] = True
-                    st.rerun()
-            with col_q2:
-                if st.button("GLD", key="quick_gld", help="Gold", use_container_width=True):
-                    # Clear all related widget states for clean slate
-                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
-                        if key in st.session_state:
-                            del st.session_state[key]
-                    st.session_state['ticker_input'] = "GLD"
-                    st.session_state['_quick_add_used'] = True
-                    st.rerun()
-            with col_q3:
-                if st.button("DBMF", key="quick_dbmf", help="Managed Futures", use_container_width=True):
-                    # Clear all related widget states for clean slate
-                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
-                        if key in st.session_state:
-                            del st.session_state[key]
-                    st.session_state['ticker_input'] = "DBMF"
-                    st.session_state['_quick_add_used'] = True
-                    st.rerun()
-            with col_q4:
-                if st.button("BIL", key="quick_bil", help="Short-Term Bonds", use_container_width=True):
-                    # Clear all related widget states for clean slate
-                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
-                        if key in st.session_state:
-                            del st.session_state[key]
-                    st.session_state['ticker_input'] = "BIL"
-                    st.session_state['_quick_add_used'] = True
-                    st.rerun()
+                col_q1, col_q2, col_q3, col_q4 = st.columns(4)
+                with col_q1:
+                    if st.button("SPXL", key="quick_spxl", help="S&P 500 3X", use_container_width=True):
+                        # Clear all related widget states for clean slate
+                        for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        # Set the ticker value
+                        st.session_state['ticker_input'] = "SPXL"
+                        st.session_state['_quick_add_used'] = True
+                        st.rerun()
+                with col_q2:
+                    if st.button("GLD", key="quick_gld", help="Gold", use_container_width=True):
+                        # Clear all related widget states for clean slate
+                        for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        st.session_state['ticker_input'] = "GLD"
+                        st.session_state['_quick_add_used'] = True
+                        st.rerun()
+                with col_q3:
+                    if st.button("DBMF", key="quick_dbmf", help="Managed Futures", use_container_width=True):
+                        # Clear all related widget states for clean slate
+                        for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        st.session_state['ticker_input'] = "DBMF"
+                        st.session_state['_quick_add_used'] = True
+                        st.rerun()
+                with col_q4:
+                    if st.button("BIL", key="quick_bil", help="Short-Term Bonds", use_container_width=True):
+                        # Clear all related widget states for clean slate
+                        for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        st.session_state['ticker_input'] = "BIL"
+                        st.session_state['_quick_add_used'] = True
+                        st.rerun()
+            else:
+                # Asset mix locked - show message instead of Quick Add buttons
+                st.info("🔒 **Asset mix is locked.** Quick Add buttons hidden. Unlock in section ⑤ below to modify assets.")
             
             # Determine default value for text input
             default_ticker = st.session_state.get('ticker_input', '')
@@ -5554,19 +5575,15 @@ else:
                                                         horizontal=True, key="deploy_method_radio",
                                                         label_visibility="collapsed")
                                 
-                                # Enhanced date selection with Clear and Today buttons (matching user's requested design)
+                                # Date selection - Streamlit's date_input has Clear and Today buttons in calendar popup
                                 st.markdown("#### Select Purchase Date")
-                                deploy_date = enhanced_date_input(
+                                deploy_date = st.date_input(
                                     "Deployment Date",
                                     value=date.today(),
                                     max_value=date.today(),
-                                    key="deploy_date_enhanced",
+                                    key="deploy_date_input",
                                     help="Date you purchased this asset"
                                 )
-                                
-                                # Handle None from Clear button
-                                if deploy_date is None:
-                                    deploy_date = date.today()
                                 
                                 # Fetch price for preview
                                 preview_price = None
