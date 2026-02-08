@@ -19,11 +19,36 @@ import sqlite3
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "8.0.4"
+VERSION = "8.0.5"
 VERSION_DATE = "2026-02-07"
-VERSION_TIME = "18:45:00"  # EST
-VERSION_NAME = "Form Button Fix"
+VERSION_TIME = "22:00:00"  # EST  
+VERSION_NAME = "Complete UX Enhancements"
 CHANGELOG = """
+v8.0.5 (2026-02-07 22:00 EST) - ✨ COMPLETE UX ENHANCEMENTS
+- ENH 1: Enhanced date picker with Today/Clear buttons in deployment section
+- ENH 2: Asset allocation UI hides when mix is locked (wrapped/collapsed)
+- ENH 3: Deployment section auto-expanded when active, shows success when complete
+- IMPROVED: Date selection with Clean/Today buttons (matches requested design)
+- IMPROVED: Sections wrap up after completion - no unnecessary buttons shown
+- BENEFIT: Cleaner interface, focused on current active tasks
+- BENEFIT: Less scrolling, less visual clutter
+
+**Enhancement 1: Deployment Date Picker**
+Before: Manual date entry with separate "Today" button
+After: Enhanced picker with Clear and Today buttons at bottom ✅
+
+**Enhancement 2: Asset Allocation Wrapping**
+Before: Quick Add buttons and ticker input always visible (even when locked)
+After: Management UI hidden when locked, shows info message instead ✅
+- When unlocked: Full asset management UI visible
+- When locked: Only shows summary + "unlock to modify" message
+
+**Enhancement 3: Deployment Section Behavior**
+Before: Section visible even when 100% deployed
+After: Shows success message when complete, hides deployment UI ✅
+- When deploying: Expander open with deployment form
+- When complete: Success message, deployment form hidden
+
 v8.0.4 (2026-02-07 18:45 EST) - 🔧 CRITICAL FORM FIX
 - FIXED: Cannot use st.button() inside st.form() error
 - ISSUE: enhanced_date_input() contains buttons, incompatible with forms
@@ -5030,8 +5055,12 @@ else:
                 st.caption("💡 Enter ticker below to edit or add new asset")
                 st.divider()
             
-            # Quick-add buttons for common tickers (user's specific assets)
-            st.markdown("**🚀 Quick Add:**")
+            # Check if asset mix is locked (show/hide asset management UI based on this)
+            is_mix_locked = prof.get("asset_mix_locked", False)
+            
+            if not is_mix_locked:
+                # Quick-add buttons for common tickers (user's specific assets)
+                st.markdown("**🚀 Quick Add:**")
             col_q1, col_q2, col_q3, col_q4 = st.columns(4)
             with col_q1:
                 if st.button("SPXL", key="quick_spxl", help="S&P 500 3X", use_container_width=True):
@@ -5230,6 +5259,9 @@ else:
                             save_db(st.session_state.db)
                             st.success(f"✅ Removed {a_sym}!")
                             st.rerun()
+            else:
+                # Asset mix is locked - show message instead of management UI
+                st.info("🔒 **Asset mix is locked.** All assets have been allocated. Unlock in section ⑤ below if you need to modify.")
             
             # Asset Mix Locking
             st.divider()
@@ -5394,7 +5426,8 @@ else:
                     else:
                         st.success("✅ **All assets 100% deployed!**")
                 else:
-                    with st.expander("➢ Record Asset Deployment", expanded=False):
+                    # Show expander collapsed by default - user expands when ready to deploy
+                    with st.expander("➢ Record Asset Deployment", expanded=True):
                         st.markdown("### Deploy Capital Into Assets")
                         st.markdown("**Record your actual purchases from your broker**")
                         
@@ -5521,30 +5554,19 @@ else:
                                                         horizontal=True, key="deploy_method_radio",
                                                         label_visibility="collapsed")
                                 
-                                # Date selection with Today button
+                                # Enhanced date selection with Clear and Today buttons (matching user's requested design)
                                 st.markdown("#### Select Purchase Date")
-                                col_date, col_today = st.columns([3, 1])
+                                deploy_date = enhanced_date_input(
+                                    "Deployment Date",
+                                    value=date.today(),
+                                    max_value=date.today(),
+                                    key="deploy_date_enhanced",
+                                    help="Date you purchased this asset"
+                                )
                                 
-                                # Initialize deploy_date_value if not exists
-                                if 'deploy_date_value' not in st.session_state:
-                                    st.session_state.deploy_date_value = date.today()
-                                
-                                with col_today:
-                                    st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-                                    if st.button("📅 Today", key="set_today_btn", use_container_width=True):
-                                        # Enhancement 2: Update to today and force widget refresh
-                                        st.session_state.deploy_date_value = date.today()
-                                        st.rerun()
-                                
-                                with col_date:
-                                    deploy_date = st.date_input("Deployment Date", 
-                                                               value=st.session_state.deploy_date_value,
-                                                               max_value=date.today(), 
-                                                               key="deploy_date_input")
-                                    
-                                    # Update session state when date changes manually
-                                    if deploy_date != st.session_state.deploy_date_value:
-                                        st.session_state.deploy_date_value = deploy_date
+                                # Handle None from Clear button
+                                if deploy_date is None:
+                                    deploy_date = date.today()
                                 
                                 # Fetch price for preview
                                 preview_price = None
