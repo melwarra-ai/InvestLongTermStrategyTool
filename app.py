@@ -19,55 +19,33 @@ import sqlite3
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "8.0.6"
-VERSION_DATE = "2026-02-07"
-VERSION_TIME = "23:00:00"  # EST  
-VERSION_NAME = "UX Fixes - Date Picker & Collapsible Sections"
+VERSION = "8.0.7"
+VERSION_DATE = "2026-02-08"
+VERSION_TIME = "00:00:00"  # EST  
+VERSION_NAME = "Complete Asset Allocation Hiding Fix"
 CHANGELOG = """
+v8.0.7 (2026-02-08 00:00 EST) - 🔧 COMPLETE UI HIDING FIX
+- FIXED: ALL asset management UI now properly hidden when mix is locked
+- FIXED: Removed duplicate info messages (was showing 2-3 messages)
+- FIXED: Ticker Symbol input HIDDEN when locked
+- FIXED: Target Allocation field HIDDEN when locked  
+- FIXED: Save Asset and Remove buttons HIDDEN when locked
+- IMPROVED: Single clear message when locked
+- BENEFIT: Clean, minimal UI when assets are locked
+
+**Complete Fix for Asset Allocation Section:**
+When locked, EVERYTHING is hidden:
+- ❌ Quick Add buttons (SPXL, GLD, DBMF, BIL)
+- ❌ Ticker Symbol input
+- ❌ Target Allocation % field
+- ❌ Save Asset button
+- ❌ Remove button
+
+Only shows:
+- ✅ Current assets list (SPXL, GLD, etc.)
+- ✅ One clear message: "Asset mix is locked"
+
 v8.0.6 (2026-02-07 23:00 EST) - 🔧 CRITICAL UX FIXES
-- FIXED: Date picker now uses standard st.date_input with Clear/Today in calendar popup
-- FIXED: Quick Add buttons now properly hidden when asset mix is locked
-- FIXED: Session state error when clicking "Today" button (removed enhanced_date_input)
-- IMPROVED: Date selection uses Streamlit's built-in Clear/Today buttons in calendar
-- IMPROVED: Asset allocation section cleaner when locked (Quick Add hidden)
-- BENEFIT: No more errors, cleaner locked state, native date picker behavior
-
-**Fix 1: Date Picker (Image 2 Error)**
-Issue: enhanced_date_input() caused session state error
-Solution: Use standard st.date_input() - it ALREADY has Clear/Today buttons in the calendar popup!
-Result: No errors, native Streamlit behavior ✅
-
-**Fix 2: Asset Allocation Collapsing (Image 1)**
-Issue: Quick Add buttons still visible when asset mix locked
-Solution: Properly wrapped Quick Add buttons in `if not is_mix_locked:` conditional
-Result: Quick Add buttons hidden when locked, info message shown instead ✅
-
-v8.0.5 (2026-02-07 22:00 EST) - ✨ COMPLETE UX ENHANCEMENTS
-- ENH 1: Enhanced date picker with Today/Clear buttons in deployment section
-- ENH 2: Asset allocation UI hides when mix is locked (wrapped/collapsed)
-- ENH 3: Deployment section auto-expanded when active, shows success when complete
-- IMPROVED: Date selection with Clean/Today buttons (matches requested design)
-- IMPROVED: Sections wrap up after completion - no unnecessary buttons shown
-- BENEFIT: Cleaner interface, focused on current active tasks
-- BENEFIT: Less scrolling, less visual clutter
-
-**Enhancement 1: Deployment Date Picker**
-Before: Manual date entry with separate "Today" button
-After: Enhanced picker with Clear and Today buttons at bottom ✅
-
-**Enhancement 2: Asset Allocation Wrapping**
-Before: Quick Add buttons and ticker input always visible (even when locked)
-After: Management UI hidden when locked, shows info message instead ✅
-- When unlocked: Full asset management UI visible
-- When locked: Only shows summary + "unlock to modify" message
-
-**Enhancement 3: Deployment Section Behavior**
-Before: Section visible even when 100% deployed
-After: Shows success message when complete, hides deployment UI ✅
-- When deploying: Expander open with deployment form
-- When complete: Success message, deployment form hidden
-
-v8.0.4 (2026-02-07 18:45 EST) - 🔧 CRITICAL FORM FIX
 - FIXED: Cannot use st.button() inside st.form() error
 - ISSUE: enhanced_date_input() contains buttons, incompatible with forms
 - CHANGED: Replaced enhanced_date_input() with regular st.date_input() in profile creation form
@@ -5073,7 +5051,7 @@ else:
                 st.caption("💡 Enter ticker below to edit or add new asset")
                 st.divider()
             
-            # Check if asset mix is locked (show/hide Quick Add UI)
+            # Check if asset mix is locked - hide all UI if locked
             is_mix_locked = prof.get("asset_mix_locked", False)
             
             if not is_mix_locked:
@@ -5117,172 +5095,170 @@ else:
                         st.session_state['ticker_input'] = "BIL"
                         st.session_state['_quick_add_used'] = True
                         st.rerun()
-            else:
-                # Asset mix locked - show message instead of Quick Add buttons
-                st.info("🔒 **Asset mix is locked.** Quick Add buttons hidden. Unlock in section ⑤ below to modify assets.")
             
-            # Determine default value for text input
-            default_ticker = st.session_state.get('ticker_input', '')
+                # Determine default value for text input
+                default_ticker = st.session_state.get('ticker_input', '')
             
-            # Enhancement 4: Show info message when asset mix is locked
-            is_mix_locked = prof.get("asset_mix_locked", False)
-            if is_mix_locked:
-                st.info("🔒 **Asset mix is locked.** Unlock below if you need to add or modify assets.")
+                # Enhancement 4: Show info message when asset mix is locked
+                is_mix_locked = prof.get("asset_mix_locked", False)
+                if is_mix_locked:
+                    st.info("🔒 **Asset mix is locked.** Unlock below if you need to add or modify assets.")
             
-            a_sym = st.text_input("Ticker Symbol", placeholder="e.g., AAPL", 
-                                 key="ticker_input", value=default_ticker,
-                                 disabled=is_mix_locked).upper().strip()
-            is_existing = a_sym in prof.get("assets", {})
+                a_sym = st.text_input("Ticker Symbol", placeholder="e.g., AAPL", 
+                                     key="ticker_input", value=default_ticker,
+                                     disabled=is_mix_locked).upper().strip()
+                is_existing = a_sym in prof.get("assets", {})
             
-            if is_existing:
-                other_allocs = current_alloc - prof["assets"][a_sym].get("target", 0)
-            else:
-                other_allocs = current_alloc
-            max_available = 100.0 - other_allocs
-            block_new = (not is_existing) and (max_available <= 0) and (a_sym != "")
+                if is_existing:
+                    other_allocs = current_alloc - prof["assets"][a_sym].get("target", 0)
+                else:
+                    other_allocs = current_alloc
+                max_available = 100.0 - other_allocs
+                block_new = (not is_existing) and (max_available <= 0) and (a_sym != "")
             
-            if block_new:
-                st.markdown('<div class="allocation-blocked">🚫 PORTFOLIO AT 100%<br>Remove assets first!</div>', unsafe_allow_html=True)
+                if block_new:
+                    st.markdown('<div class="allocation-blocked">🚫 PORTFOLIO AT 100%<br>Remove assets first!</div>', unsafe_allow_html=True)
             
-            valid_ticker = False
-            last_price = 1.0
-            ticker_name = ""
-            validation_error = None
-            
-            if prof.get("asset_mix_locked", False) and not is_existing and a_sym:
-                validation_error = "🔒 **Asset mix locked** - Cannot add new assets. Unlock first to add more."
                 valid_ticker = False
-            elif a_sym and not block_new:
-                # Show loading indicator
-                loading_placeholder = st.empty()
-                loading_placeholder.info(f"🔍 Validating {a_sym}... (checking Yahoo Finance)")
+                last_price = 1.0
+                ticker_name = ""
+                validation_error = None
+            
+                if prof.get("asset_mix_locked", False) and not is_existing and a_sym:
+                    validation_error = "🔒 **Asset mix locked** - Cannot add new assets. Unlock first to add more."
+                    valid_ticker = False
+                elif a_sym and not block_new:
+                    # Show loading indicator
+                    loading_placeholder = st.empty()
+                    loading_placeholder.info(f"🔍 Validating {a_sym}... (checking Yahoo Finance)")
                 
-                try:
-                    # Add timeout handling
-                    import signal
-                    
-                    def timeout_handler(signum, frame):
-                        raise TimeoutError("Ticker validation timed out")
-                    
-                    # Set 10 second timeout (only on Unix systems)
                     try:
-                        signal.signal(signal.SIGALRM, timeout_handler)
-                        signal.alarm(10)
-                    except:
-                        pass  # Windows doesn't support SIGALRM
+                        # Add timeout handling
+                        import signal
                     
-                    try:
-                        t_check = yf.Ticker(a_sym)
-                        hist = t_check.history(period="1d")
-                        
-                        # Cancel timeout
+                        def timeout_handler(signum, frame):
+                            raise TimeoutError("Ticker validation timed out")
+                    
+                        # Set 10 second timeout (only on Unix systems)
                         try:
-                            signal.alarm(0)
+                            signal.signal(signal.SIGALRM, timeout_handler)
+                            signal.alarm(10)
                         except:
-                            pass
+                            pass  # Windows doesn't support SIGALRM
+                    
+                        try:
+                            t_check = yf.Ticker(a_sym)
+                            hist = t_check.history(period="1d")
                         
-                        if not hist.empty:
-                            last_price = float(hist['Close'].iloc[-1])
+                            # Cancel timeout
                             try:
-                                ticker_info = t_check.info
-                                ticker_name = ticker_info.get('longName', a_sym)
+                                signal.alarm(0)
                             except:
-                                ticker_name = a_sym
+                                pass
+                        
+                            if not hist.empty:
+                                last_price = float(hist['Close'].iloc[-1])
+                                try:
+                                    ticker_info = t_check.info
+                                    ticker_name = ticker_info.get('longName', a_sym)
+                                except:
+                                    ticker_name = a_sym
                             
-                            # Enhancement 1: Show allocation message instead of price
-                            if is_existing:
-                                loading_placeholder.success(f"✅ **{ticker_name}** - Asset target allocated")
+                                # Enhancement 1: Show allocation message instead of price
+                                if is_existing:
+                                    loading_placeholder.success(f"✅ **{ticker_name}** - Asset target allocated")
+                                else:
+                                    loading_placeholder.success(f"✅ **{ticker_name}** - Ready to allocate")
+                                valid_ticker = True
                             else:
-                                loading_placeholder.success(f"✅ **{ticker_name}** - Ready to allocate")
-                            valid_ticker = True
-                        else:
-                            loading_placeholder.error(f"❌ No data found for '{a_sym}'")
-                            validation_error = f"Ticker '{a_sym}' exists but has no price data. Try another ticker."
+                                loading_placeholder.error(f"❌ No data found for '{a_sym}'")
+                                validation_error = f"Ticker '{a_sym}' exists but has no price data. Try another ticker."
                             
-                    except TimeoutError:
-                        loading_placeholder.error(f"⏱️ Timeout validating '{a_sym}'")
-                        validation_error = f"Yahoo Finance took too long to respond for '{a_sym}'. Try again or use Quick Add buttons."
+                        except TimeoutError:
+                            loading_placeholder.error(f"⏱️ Timeout validating '{a_sym}'")
+                            validation_error = f"Yahoo Finance took too long to respond for '{a_sym}'. Try again or use Quick Add buttons."
+                            try:
+                                signal.alarm(0)
+                            except:
+                                pass
+                        
+                    except Exception as e:
+                        loading_placeholder.error(f"❌ Error validating '{a_sym}'")
+                        validation_error = f"Could not validate ticker '{a_sym}'. Check spelling or network connection."
                         try:
                             signal.alarm(0)
                         except:
                             pass
-                        
-                except Exception as e:
-                    loading_placeholder.error(f"❌ Error validating '{a_sym}'")
-                    validation_error = f"Could not validate ticker '{a_sym}'. Check spelling or network connection."
-                    try:
-                        signal.alarm(0)
-                    except:
-                        pass
                 
-                # Show error details if validation failed
-                if validation_error and not valid_ticker:
-                    st.caption(f"💡 {validation_error}")
-                    st.caption("**Common tickers:** SPY (S&P 500), QQQ (Nasdaq), GLD (Gold), TLT (Bonds)")
+                    # Show error details if validation failed
+                    if validation_error and not valid_ticker:
+                        st.caption(f"💡 {validation_error}")
+                        st.caption("**Common tickers:** SPY (S&P 500), QQQ (Nasdaq), GLD (Gold), TLT (Bonds)")
 
             
-            if valid_ticker:
-                st.markdown("---")
-                default_target = prof.get("assets", {}).get(a_sym, {}).get("target", 0.0)
+                if valid_ticker:
+                    st.markdown("---")
+                    default_target = prof.get("assets", {}).get(a_sym, {}).get("target", 0.0)
                 
-                # Enhancement 5: Disable target editing when asset mix is locked (unless editing existing asset)
-                is_locked = prof.get("asset_mix_locked", False)
-                can_edit_target = not is_locked or is_existing
+                    # Enhancement 5: Disable target editing when asset mix is locked (unless editing existing asset)
+                    is_locked = prof.get("asset_mix_locked", False)
+                    can_edit_target = not is_locked or is_existing
                 
-                if is_locked and not is_existing:
-                    st.warning("🔒 Asset mix is locked. Unlock first to add new assets or change allocations.")
+                    if is_locked and not is_existing:
+                        st.warning("🔒 Asset mix is locked. Unlock first to add new assets or change allocations.")
                 
-                a_w = st.number_input("Target Allocation %", 
-                                     min_value=0.0, 
-                                     max_value=max_available,
-                                     value=min(float(default_target), max_available), 
-                                     step=0.5, 
-                                     help=f"Set the target % for {a_sym}. Max available: {max_available:.1f}%",
-                                     key="target_weight",
-                                     disabled=is_locked)
+                    a_w = st.number_input("Target Allocation %", 
+                                         min_value=0.0, 
+                                         max_value=max_available,
+                                         value=min(float(default_target), max_available), 
+                                         step=0.5, 
+                                         help=f"Set the target % for {a_sym}. Max available: {max_available:.1f}%",
+                                         key="target_weight",
+                                         disabled=is_locked)
                 
-                st.markdown("---")
-                col_b1, col_b2 = st.columns(2)
-                with col_b1:
-                    # CRITICAL FIX: Remove disabled logic entirely!
-                    # Button is ALWAYS enabled once ticker validates.
-                    # We validate allocation when button is clicked.
-                    # This fixes Quick Add issues with widget state synchronization.
+                    st.markdown("---")
+                    col_b1, col_b2 = st.columns(2)
+                    with col_b1:
+                        # CRITICAL FIX: Remove disabled logic entirely!
+                        # Button is ALWAYS enabled once ticker validates.
+                        # We validate allocation when button is clicked.
+                        # This fixes Quick Add issues with widget state synchronization.
                     
-                    if st.button("💾 Save Asset", use_container_width=True, type="primary", key="save_asset"):
-                        # Validate allocation when clicked
-                        if a_w <= 0:
-                            st.error("❌ Target allocation must be greater than 0%")
-                        elif a_w > max_available:
-                            st.error(f"❌ Target allocation exceeds available {max_available:.1f}%")
-                        else:
-                            # Validation passed - save the asset
-                            # Preserve existing units and purchases if updating
-                            existing_units = prof.get("assets", {}).get(a_sym, {}).get("units", 0.0)
-                            existing_allocated = prof.get("assets", {}).get(a_sym, {}).get("allocated_pct", 0.0)
-                            existing_purchases = prof.get("assets", {}).get(a_sym, {}).get("purchases", [])
+                        if st.button("💾 Save Asset", use_container_width=True, type="primary", key="save_asset"):
+                            # Validate allocation when clicked
+                            if a_w <= 0:
+                                st.error("❌ Target allocation must be greater than 0%")
+                            elif a_w > max_available:
+                                st.error(f"❌ Target allocation exceeds available {max_available:.1f}%")
+                            else:
+                                # Validation passed - save the asset
+                                # Preserve existing units and purchases if updating
+                                existing_units = prof.get("assets", {}).get(a_sym, {}).get("units", 0.0)
+                                existing_allocated = prof.get("assets", {}).get(a_sym, {}).get("allocated_pct", 0.0)
+                                existing_purchases = prof.get("assets", {}).get(a_sym, {}).get("purchases", [])
                             
-                            prof.setdefault("assets", {})[a_sym] = {
-                                "fund_name": ticker_name, "units": existing_units, "target": a_w,
-                                "allocated_pct": existing_allocated,
-                                "purchases": existing_purchases
-                            }
-                            action = "Updated" if is_existing else "Added"
-                            log_profile(prof, f"{action} {a_sym}: {a_w}% target")
-                            save_db(st.session_state.db)
-                            st.success(f"✅ {action} {a_sym}!")
-                            st.rerun()
-                with col_b2:
-                    if is_existing:
-                        if st.button("🗑️ Remove", use_container_width=True, key="remove_asset"):
-                            del prof["assets"][a_sym]
-                            log_profile(prof, f"Removed {a_sym}")
-                            save_db(st.session_state.db)
-                            st.success(f"✅ Removed {a_sym}!")
-                            st.rerun()
+                                prof.setdefault("assets", {})[a_sym] = {
+                                    "fund_name": ticker_name, "units": existing_units, "target": a_w,
+                                    "allocated_pct": existing_allocated,
+                                    "purchases": existing_purchases
+                                }
+                                action = "Updated" if is_existing else "Added"
+                                log_profile(prof, f"{action} {a_sym}: {a_w}% target")
+                                save_db(st.session_state.db)
+                                st.success(f"✅ {action} {a_sym}!")
+                                st.rerun()
+                    with col_b2:
+                        if is_existing:
+                            if st.button("🗑️ Remove", use_container_width=True, key="remove_asset"):
+                                del prof["assets"][a_sym]
+                                log_profile(prof, f"Removed {a_sym}")
+                                save_db(st.session_state.db)
+                                st.success(f"✅ Removed {a_sym}!")
+                                st.rerun()
+            
             else:
-                # Asset mix is locked - show message instead of management UI
-                st.info("🔒 **Asset mix is locked.** All assets have been allocated. Unlock in section ⑤ below if you need to modify.")
+                # Asset mix is locked - show message, hide all management UI
+                st.info("🔒 **Asset mix is locked.** All asset management controls are hidden. Unlock in section ⑤ below to modify assets.")
             
             # Asset Mix Locking
             st.divider()
@@ -5447,8 +5423,7 @@ else:
                     else:
                         st.success("✅ **All assets 100% deployed!**")
                 else:
-                    # Show expander collapsed by default - user expands when ready to deploy
-                    with st.expander("➢ Record Asset Deployment", expanded=True):
+                    with st.expander("➢ Record Asset Deployment", expanded=False):
                         st.markdown("### Deploy Capital Into Assets")
                         st.markdown("**Record your actual purchases from your broker**")
                         
@@ -5575,15 +5550,30 @@ else:
                                                         horizontal=True, key="deploy_method_radio",
                                                         label_visibility="collapsed")
                                 
-                                # Date selection - Streamlit's date_input has Clear and Today buttons in calendar popup
+                                # Date selection with Today button
                                 st.markdown("#### Select Purchase Date")
-                                deploy_date = st.date_input(
-                                    "Deployment Date",
-                                    value=date.today(),
-                                    max_value=date.today(),
-                                    key="deploy_date_input",
-                                    help="Date you purchased this asset"
-                                )
+                                col_date, col_today = st.columns([3, 1])
+                                
+                                # Initialize deploy_date_value if not exists
+                                if 'deploy_date_value' not in st.session_state:
+                                    st.session_state.deploy_date_value = date.today()
+                                
+                                with col_today:
+                                    st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                                    if st.button("📅 Today", key="set_today_btn", use_container_width=True):
+                                        # Enhancement 2: Update to today and force widget refresh
+                                        st.session_state.deploy_date_value = date.today()
+                                        st.rerun()
+                                
+                                with col_date:
+                                    deploy_date = st.date_input("Deployment Date", 
+                                                               value=st.session_state.deploy_date_value,
+                                                               max_value=date.today(), 
+                                                               key="deploy_date_input")
+                                    
+                                    # Update session state when date changes manually
+                                    if deploy_date != st.session_state.deploy_date_value:
+                                        st.session_state.deploy_date_value = deploy_date
                                 
                                 # Fetch price for preview
                                 preview_price = None
