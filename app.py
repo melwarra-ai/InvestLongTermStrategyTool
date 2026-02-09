@@ -15,15 +15,47 @@ import copy
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-import sqlite3
+import psycopg2
+from psycopg2 import pool
+from psycopg2.extras import RealDictCursor
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "8.1.0"
+VERSION = "9.0.0"
 VERSION_DATE = "2026-02-08"
-VERSION_TIME = "02:00:00"  # EST  
-VERSION_NAME = "Force 100% Default Always"
+VERSION_TIME = "03:00:00"  # EST  
+VERSION_NAME = "PostgreSQL Migration (Cloud Optimized)"
 CHANGELOG = """
+v9.0.0 (2026-02-08 03:00 EST) - 🚀 POSTGRESQL MIGRATION (CLOUD OPTIMIZED)
+- MIGRATED: Complete database backend from SQLite to PostgreSQL
+- ADDED: Streamlit Cloud-optimized connection using st.secrets
+- ADDED: Connection pooling for better performance and reliability
+- IMPROVED: Cloud-native deployment with persistent database storage
+- REMOVED: All SQLite dependencies and local file storage
+- BENEFIT: Production-ready for Streamlit Cloud with zero data loss on redeploy
+
+**Migration Details:**
+- Database: PostgreSQL (replaces SQLite)
+- Connection: psycopg2 with connection pooling
+- Secrets: Uses st.secrets["postgres"] for credentials
+- Schema: Updated to PostgreSQL syntax (SERIAL, VARCHAR, TIMESTAMP)
+- Placeholders: Changed from ? to %s for SQL queries
+- Tables: database_store (id SERIAL PRIMARY KEY, data_json TEXT, version INT, last_updated TIMESTAMP)
+
+**Required secrets.toml:**
+```toml
+[postgres]
+host = "your-host.postgres.database.azure.com"
+dbname = "your-database-name"
+user = "your-username"
+password = "your-password"
+port = "5432"
+```
+
+**100% Feature Parity:**
+All features, UI, UX, and logic remain identical to v8.1.0.
+Only the database backend has changed.
+
 v8.1.0 (2026-02-08 02:00 EST) - 🎯 FORCE 100% DEFAULT ALWAYS
 - REMOVED: Session state memory for last deployed percentage
 - FIXED: Deploy % now ALWAYS defaults to 100% (no memory of previous values)
@@ -1713,70 +1745,128 @@ def enhanced_date_input(label: str, value=None, min_value=None, max_value=None, 
     
     return st.session_state[state_key]
 
-# ===== SQLITE DATABASE CONFIGURATION =====
-DB_FILE = "alphastream.db"
+# ===== POSTGRESQL DATABASE CONFIGURATION =====
+
+# Connection pool for PostgreSQL (reuses connections for better performance)
+connection_pool = None
+
+def get_db_connection():
+    """Get PostgreSQL connection from pool using st.secrets"""
+    global connection_pool
+    
+    try:
+        # Initialize connection pool if not exists
+        if connection_pool is None:
+            connection_pool = psycopg2.pool.SimpleConnectionPool(
+                1,  # Minimum connections
+                10,  # Maximum connections
+                host=st.secrets["postgres"]["host"],
+                database=st.secrets["postgres"]["dbname"],
+                user=st.secrets["postgres"]["user"],
+                password=st.secrets["postgres"]["password"],
+                port=st.secrets["postgres"]["port"]
+            )
+        
+        # Get connection from pool
+        conn = connection_pool.getconn()
+        return conn
+    except Exception as e:
+        st.error(f"Database connection error: {e}")
+        return None
+
+def release_db_connection(conn):
+    """Return connection to pool"""
+    global connection_pool
+    if connection_pool and conn:
+        connection_pool.putconn(conn)
 
 def init_db():
-    """Initialize SQLite database with required schema"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
+    """Initialize PostgreSQL database with required schema"""
+    conn = get_db_connection()
+    if not conn:
+        return
     
-    # Create main database table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS database_store (
-            id INTEGER PRIMARY KEY,
-            data_json TEXT NOT NULL,
-            version INTEGER NOT NULL,
-            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    
-    conn.commit()
-    conn.close()
-
-def load_from_sqlite():
-    """Load database from SQLite"""
     try:
-        conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
+        # Create main database table with PostgreSQL syntax
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS database_store (
+                id SERIAL PRIMARY KEY,
+                data_json TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        conn.commit()
+        cursor.close()
+    except Exception as e:
+        st.error(f"Error initializing database: {e}")
+        conn.rollback()
+    finally:
+        release_db_connection(conn)
+
+def load_from_postgres():
+    """Load database from PostgreSQL"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return None, 0
+        
+        cursor = conn.cursor()
+        
+        # Use %s placeholder instead of ? for PostgreSQL
         cursor.execute("SELECT data_json, version FROM database_store WHERE id = 1")
         row = cursor.fetchone()
-        conn.close()
+        
+        cursor.close()
+        release_db_connection(conn)
         
         if row:
             data = json.loads(row[0])
             version = row[1]
             return data, version
         return None, 0
-    except sqlite3.Error as e:
-        st.error(f"Error loading from SQLite: {e}")
+    except Exception as e:
+        st.error(f"Error loading from PostgreSQL: {e}")
         return None, 0
 
-def save_to_sqlite(data, version):
-    """Save database to SQLite"""
+def save_to_postgres(data, version):
+    """Save database to PostgreSQL"""
     try:
-        conn = sqlite3.connect(DB_FILE)
+        conn = get_db_connection()
+        if not conn:
+            return False
+        
         cursor = conn.cursor()
         
         data_json = json.dumps(data, indent=2)
         
-        # Insert or replace the database record
+        # Use INSERT ... ON CONFLICT for PostgreSQL (equivalent to INSERT OR REPLACE)
         cursor.execute("""
-            INSERT OR REPLACE INTO database_store (id, data_json, version, last_updated)
-            VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO database_store (id, data_json, version, last_updated)
+            VALUES (1, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (id) DO UPDATE SET
+                data_json = EXCLUDED.data_json,
+                version = EXCLUDED.version,
+                last_updated = CURRENT_TIMESTAMP
         """, (data_json, version))
         
         conn.commit()
-        conn.close()
+        cursor.close()
+        release_db_connection(conn)
         return True
-    except sqlite3.Error as e:
-        st.error(f"Error saving to SQLite: {e}")
+    except Exception as e:
+        st.error(f"Error saving to PostgreSQL: {e}")
+        if conn:
+            conn.rollback()
+            release_db_connection(conn)
         return False
 
 
 def load_db():
-    """Load multi-user database from SQLite"""
+    """Load multi-user database from PostgreSQL"""
     # Initialize database if needed
     init_db()
     
@@ -1805,8 +1895,8 @@ def load_db():
         "system_logs": []
     }
     
-    # Try to load from SQLite
-    data, version = load_from_sqlite()
+    # Try to load from PostgreSQL
+    data, version = load_from_postgres()
     
     if data:
         # Store version in session for conflict detection
@@ -1927,7 +2017,7 @@ def load_db():
 
 def save_db(data, bypass_version_increment=False):
     """
-    Save database to SQLite with optimistic locking
+    Save database to PostgreSQL with optimistic locking
     
     Args:
         data: Database dictionary to save
@@ -1946,7 +2036,7 @@ def save_db(data, bypass_version_increment=False):
         )
         
         # Load current data from database
-        current_data, current_version = load_from_sqlite()
+        current_data, current_version = load_from_postgres()
         
         # Determine new version
         if bypass_version_increment:
@@ -1960,8 +2050,8 @@ def save_db(data, bypass_version_increment=False):
         data["metadata"]["last_save_by"] = current_user
         data["metadata"]["save_count"] = data["metadata"].get("save_count", 0) + 1
         
-        # Save to SQLite
-        if save_to_sqlite(data, new_version):
+        # Save to PostgreSQL
+        if save_to_postgres(data, new_version):
             st.session_state["data_version"] = new_version
             st.session_state["data_loaded_at"] = datetime.now()
             return True
@@ -2201,23 +2291,31 @@ def get_system_health(db):
     """Check system health metrics"""
     health = {"status": "healthy", "checks": []}
     
-    # Database size check
+    # Database connection check
     try:
-        # Check SQLite database file size
-        if os.path.exists(DB_FILE):
-            db_size = os.path.getsize(DB_FILE) / (1024 * 1024)  # Convert to MB
+        # Check PostgreSQL connection
+        conn = get_db_connection()
+        if conn:
+            # Get database size from PostgreSQL
+            cursor = conn.cursor()
+            cursor.execute("SELECT pg_database_size(current_database())")
+            db_size_bytes = cursor.fetchone()[0]
+            db_size_mb = db_size_bytes / (1024 * 1024)
+            cursor.close()
+            release_db_connection(conn)
+            
             health["checks"].append({
                 "name": "Database Size",
-                "value": f"{db_size:.2f} MB",
-                "status": "warning" if db_size > 50 else "healthy",
-                "icon": "🟡" if db_size > 50 else "🟢"
+                "value": f"{db_size_mb:.2f} MB",
+                "status": "warning" if db_size_mb > 50 else "healthy",
+                "icon": "🟡" if db_size_mb > 50 else "🟢"
             })
         else:
             health["checks"].append({
-                "name": "Database Size",
-                "value": "Database file not found",
-                "status": "warning",
-                "icon": "🟡"
+                "name": "Database Connection",
+                "value": "Unable to connect to PostgreSQL",
+                "status": "critical",
+                "icon": "🔴"
             })
     except Exception as e:
         health["checks"].append({
