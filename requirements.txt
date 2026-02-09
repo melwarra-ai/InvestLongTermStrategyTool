@@ -1,19 +1,31 @@
-# AlphaStream Wealth Master v8.0.0 - Requirements
-# Install with: pip install -r requirements.txt
+# AlphaStream Portfolio Manager - Python Dependencies
+# Version: 9.0.1
+# Last Updated: 2026-02-08
 
-# Core dependencies
-streamlit>=1.32.0
+# Core Framework
+streamlit>=1.28.0
+
+# Database
+psycopg2-binary>=2.9.9
+
+# Financial Data
+yfinance>=0.2.30
+
+# Data Processing
 pandas>=2.0.0
 numpy>=1.24.0
-plotly>=5.18.0
-yfinance>=0.2.36
 
-# Optional: AI Assistant
-anthropic>=0.18.0
+# Visualization
+plotly>=5.17.0
 
-# Optional: Google Drive backups
-google-api-python-client>=2.119.0
-google-auth>=2.27.0
-
-# Postgress
-psycopg2-binary>=2.9.9
+# Note: Standard library modules used (no additional dependencies required):
+# - json
+# - os
+# - hashlib
+# - secrets
+# - re
+# - smtplib
+# - time
+# - copy
+# - datetime
+# - email
