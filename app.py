@@ -21,11 +21,22 @@ from psycopg2.extras import RealDictCursor
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "9.0.0"
+VERSION = "9.0.1"
 VERSION_DATE = "2026-02-08"
-VERSION_TIME = "03:00:00"  # EST  
-VERSION_NAME = "PostgreSQL Migration (Cloud Optimized)"
+VERSION_TIME = "03:30:00"  # EST  
+VERSION_NAME = "PostgreSQL Migration - Bugfix"
 CHANGELOG = """
+v9.0.1 (2026-02-08 03:30 EST) - 🐛 CRITICAL BUGFIX
+- FIXED: Renamed remaining save_to_sqlite() calls to save_to_postgres()
+- FIXED: JSON migration now works correctly with PostgreSQL
+- FIXED: Base schema initialization uses PostgreSQL function
+- BUG: v9.0.0 crashed on first load with NameError: 'save_to_sqlite' is not defined
+- STATUS: Production-ready for Streamlit Cloud deployment
+
+**Changes:**
+Line 1986: save_to_sqlite() → save_to_postgres() (JSON migration)
+Line 2015: save_to_sqlite() → save_to_postgres() (base schema)
+
 v9.0.0 (2026-02-08 03:00 EST) - 🚀 POSTGRESQL MIGRATION (CLOUD OPTIMIZED)
 - MIGRATED: Complete database backend from SQLite to PostgreSQL
 - ADDED: Streamlit Cloud-optimized connection using st.secrets
@@ -1980,11 +1991,11 @@ def load_db():
                         "metadata": base_schema["metadata"]
                     }
                 
-                # Save to SQLite
+                # Save to PostgreSQL
                 migrated_data.setdefault("metadata", base_schema["metadata"])
                 migrated_data["metadata"]["version"] = 1
-                save_to_sqlite(migrated_data, 1)
-                st.success(f"✅ Migrated data from {json_file} to SQLite")
+                save_to_postgres(migrated_data, 1)
+                st.success(f"✅ Migrated data from {json_file} to PostgreSQL")
                 
                 # Backup old file
                 import shutil
@@ -2012,7 +2023,7 @@ def load_db():
     }
     
     base_schema["metadata"]["version"] = 1
-    save_to_sqlite(base_schema, 1)
+    save_to_postgres(base_schema, 1)
     return base_schema
 
 def save_db(data, bypass_version_increment=False):
