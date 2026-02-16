@@ -21,11 +21,32 @@ from psycopg2.extras import RealDictCursor
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "9.0.1"
-VERSION_DATE = "2026-02-08"
-VERSION_TIME = "03:30:00"  # EST  
-VERSION_NAME = "PostgreSQL Migration - Bugfix"
+VERSION = "9.0.2"
+VERSION_DATE = "2026-02-16"
+VERSION_TIME = "16:00:00"  # EST  
+VERSION_NAME = "Young Portfolio Metrics Fix"
 CHANGELOG = """
+v9.0.2 (2026-02-16 16:00 EST) - 📊 YOUNG PORTFOLIO METRICS FIX
+- FIXED: CAGR and Annualized metrics now show "< 90d" for portfolios under 90 days old
+- FIXED: Prevents astronomical numbers (e.g., 109407381524405329992.00%) for new portfolios
+- IMPROVED: User-friendly display instead of unreliable annualized calculations
+- ADDED: Explanatory caption showing portfolio age in days
+- BENEFIT: Cleaner, more professional metrics display for new portfolios
+
+**The Problem:**
+When portfolios are very young (< 90 days), calculating annualized returns produces
+unreliable, astronomical numbers due to division by very small time periods.
+Example: 16-day-old portfolio showed CAGR of +$18,017,646,404,597.57%
+
+**The Solution:**
+For portfolios under 90 days old:
+- CAGR displays as: "< 90d" (gray text)
+- Annualized displays as: "< 90d" (gray text)
+- ROI still shows accurate percentage (not time-dependent)
+- Caption explains: "Portfolio is only X days old (needs 90+ days)"
+
+After 90 days, normal CAGR and annualized metrics appear.
+
 v9.0.1 (2026-02-08 03:30 EST) - 🐛 CRITICAL BUGFIX
 - FIXED: Renamed remaining save_to_sqlite() calls to save_to_postgres()
 - FIXED: JSON migration now works correctly with PostgreSQL
@@ -8178,9 +8199,13 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     roi_pct = ((curr_v / total_deployed) - 1) * 100 if total_deployed > 0 else 0
                 
                 prof_start_date = datetime.strptime(prof.get('start_date', str(date.today())), '%Y-%m-%d')
-                prof_years = max((date.today() - prof_start_date.date()).days / 365.25, 0.01)
+                prof_days_elapsed = (date.today() - prof_start_date.date()).days
+                prof_years = max(prof_days_elapsed / 365.25, 0.01)
                 
-                if is_fully_deployed:
+                # For portfolios < 90 days, don't calculate CAGR (unreliable)
+                if prof_days_elapsed < 90:
+                    profile_cagr = None  # Will display as "< 90d"
+                elif is_fully_deployed:
                     profile_cagr = ((curr_v / start_val) ** (1 / prof_years) - 1) * 100 if start_val > 0 else 0
                 else:
                     profile_cagr = ((curr_v / total_deployed) ** (1 / prof_years) - 1) * 100 if total_deployed > 0 else 0
@@ -8285,20 +8310,31 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     st.markdown(f'<div class="stat-item"><div class="stat-label">{roi_label}</div><div class="stat-value" style="color: {"#10b981" if roi_pct >= 0 else "#ef4444"};">{roi_pct:+.2f}%</div></div>', unsafe_allow_html=True)
                 with col_s3:
                     cagr_label = "CAGR" if is_fully_deployed else "CAGR (Deployed)"
-                    st.markdown(f'<div class="stat-item"><div class="stat-label">{cagr_label}</div><div class="stat-value" style="color: {"#10b981" if profile_cagr >= 0 else "#ef4444"};">{profile_cagr:+.2f}%</div></div>', unsafe_allow_html=True)
+                    if profile_cagr is None:
+                        # Portfolio < 90 days - CAGR unreliable
+                        st.markdown(f'<div class="stat-item"><div class="stat-label">{cagr_label}</div><div class="stat-value" style="color: #6b7280;">< 90d</div></div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'<div class="stat-item"><div class="stat-label">{cagr_label}</div><div class="stat-value" style="color: {"#10b981" if profile_cagr >= 0 else "#ef4444"};">{profile_cagr:+.2f}%</div></div>', unsafe_allow_html=True)
                 with col_s4:
                     st.markdown(f'<div class="stat-item"><div class="stat-label">vs Target Path</div><div class="stat-value" style="color: {"#10b981" if perc_diff >= 0 else "#ef4444"};">{perc_diff:+.2f}%</div></div>', unsafe_allow_html=True)
                 with col_s5:
-                    if is_fully_deployed:
-                        annualized = ((curr_v / start_val) ** (1/years) - 1) * 100
-                    else:
-                        annualized = ((curr_v / total_deployed) ** (1/years) - 1) * 100 if total_deployed > 0 else 0
                     ann_label = "Annualized" if is_fully_deployed else "Ann. (Deployed)"
-                    st.markdown(f'<div class="stat-item"><div class="stat-label">{ann_label}</div><div class="stat-value" style="color: {"#10b981" if annualized >= 0 else "#ef4444"};">{annualized:.2f}%</div></div>', unsafe_allow_html=True)
+                    if prof_days_elapsed < 90:
+                        # Portfolio < 90 days - Annualized unreliable
+                        st.markdown(f'<div class="stat-item"><div class="stat-label">{ann_label}</div><div class="stat-value" style="color: #6b7280;">< 90d</div></div>', unsafe_allow_html=True)
+                    else:
+                        if is_fully_deployed:
+                            annualized = ((curr_v / start_val) ** (1/prof_years) - 1) * 100 if start_val > 0 else 0
+                        else:
+                            annualized = ((curr_v / total_deployed) ** (1/prof_years) - 1) * 100 if total_deployed > 0 else 0
+                        st.markdown(f'<div class="stat-item"><div class="stat-label">{ann_label}</div><div class="stat-value" style="color: {"#10b981" if annualized >= 0 else "#ef4444"};">{annualized:.2f}%</div></div>', unsafe_allow_html=True)
                 
-                # Note for partially deployed portfolios
+                # Note for partially deployed portfolios or young portfolios
                 if not is_fully_deployed:
                     st.caption(f"ℹ️ *Metrics calculated on deployed capital (${total_deployed:,.0f} of ${start_val:,.0f} = {deployment_pct:.1f}% deployed)*")
+                
+                if prof_days_elapsed < 90:
+                    st.caption(f"📅 *CAGR & Annualized returns not shown - portfolio is only {prof_days_elapsed} days old (needs 90+ days for reliable annualized metrics)*")
                 
                 st.divider()
                 
