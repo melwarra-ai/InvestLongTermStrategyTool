@@ -21,11 +21,29 @@ from psycopg2.extras import RealDictCursor
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "9.0.2"
+VERSION = "9.0.3"
 VERSION_DATE = "2026-02-16"
-VERSION_TIME = "16:00:00"  # EST  
-VERSION_NAME = "Young Portfolio Metrics Fix"
+VERSION_TIME = "17:00:00"  # EST  
+VERSION_NAME = "Complete Young Portfolio Fix"
 CHANGELOG = """
+v9.0.3 (2026-02-16 17:00 EST) - 🎯 COMPLETE YOUNG PORTFOLIO FIX
+- FIXED: Global Dashboard now shows "< 90d" for CAGR on portfolios under 90 days
+- FIXED: Rebalance Analysis error "unsupported format string passed to NoneType"
+- FIXED: All three locations now handle young portfolios correctly:
+  * Portfolio Analytics ✅
+  * Global Dashboard ✅
+  * Rebalance Analysis ✅
+- BENEFIT: Consistent, professional display across entire application
+
+**Bugs Fixed:**
+1. Global Dashboard cards showed astronomical CAGR (e.g., +$18,017,646,404,597.6%)
+2. Rebalance Analysis crashed with NoneType.format error
+3. Inconsistent handling of young portfolios across different views
+
+**Solution:**
+All CAGR displays now check portfolio age and show "< 90d" (gray text) 
+for portfolios under 90 days old, preventing unreliable annualized metrics.
+
 v9.0.2 (2026-02-16 16:00 EST) - 📊 YOUNG PORTFOLIO METRICS FIX
 - FIXED: CAGR and Annualized metrics now show "< 90d" for portfolios under 90 days old
 - FIXED: Prevents astronomical numbers (e.g., 109407381524405329992.00%) for new portfolios
@@ -7079,9 +7097,13 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     roi_pct = ((curr_v / p_deployed) - 1) * 100 if p_deployed > 0 else 0
                 
                 start_date = datetime.strptime(p_data.get('start_date', str(date.today())), '%Y-%m-%d')
-                years_elapsed = max((date.today() - start_date.date()).days / 365.25, 0.01)
+                days_elapsed = (date.today() - start_date.date()).days
+                years_elapsed = max(days_elapsed / 365.25, 0.01)
                 
-                if p_is_fully_deployed:
+                # For portfolios < 90 days, don't calculate CAGR (unreliable)
+                if days_elapsed < 90:
+                    cagr = None  # Will display as "< 90d"
+                elif p_is_fully_deployed:
                     cagr = ((curr_v / start_val) ** (1 / years_elapsed) - 1) * 100 if start_val > 0 else 0
                 else:
                     cagr = ((curr_v / p_deployed) ** (1 / years_elapsed) - 1) * 100 if p_deployed > 0 else 0
@@ -7129,7 +7151,7 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                                 </div>
                                 <div style="text-align: center;">
                                     <div style="font-size: 0.75rem; opacity: 0.8;">CAGR</div>
-                                    <div style="font-weight: 600; color: {'#10b981' if cagr >= 0 else '#ef4444'};">{cagr:+.1f}%</div>
+                                    <div style="font-weight: 600; color: {'#6b7280' if cagr is None else ('#10b981' if cagr >= 0 else '#ef4444')};">{'< 90d' if cagr is None else f'{cagr:+.1f}%'}</div>
                                 </div>
                                 <div style="text-align: right;">
                                     <div style="font-size: 0.75rem; opacity: 0.8;">ROI</div>
@@ -8913,7 +8935,10 @@ Your deployment efficiency of **{deployment_pct:.1f}%** is excellent!
                 
                 col_metric1, col_metric2 = st.columns(2)
                 with col_metric1:
-                    st.metric("CAGR", f"{profile_cagr:.2f}%")
+                    if profile_cagr is None:
+                        st.metric("CAGR", "< 90d")
+                    else:
+                        st.metric("CAGR", f"{profile_cagr:.2f}%")
                 with col_metric2:
                     st.metric("Total Trade Volume", f"${total_turnover:,.0f}")
                 
