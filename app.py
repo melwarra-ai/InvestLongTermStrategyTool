@@ -15,240 +15,24 @@ import copy
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-import psycopg2
-from psycopg2 import pool
-from psycopg2.extras import RealDictCursor
+# Google Sheets imports (optional - only if using Google Sheets storage)
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+    GOOGLE_SHEETS_AVAILABLE = True
+except ImportError:
+    GOOGLE_SHEETS_AVAILABLE = False
 
+# ===== STORAGE CONFIGURATION =====
+# Set to "google_sheets" to use Google Sheets, "json" for local JSON file
+STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "json")  # Default to JSON for backward compatibility
 
 # ===== VERSION INFORMATION =====
-VERSION = "9.0.2"
-VERSION_DATE = "2026-02-16"
-VERSION_TIME = "16:00:00"  # EST  
-VERSION_NAME = "Young Portfolio Metrics Fix"
+VERSION = "7.7.3"
+VERSION_DATE = "2026-02-02"
+VERSION_TIME = "22:30:00"  # EST
+VERSION_NAME = "4 UX Refinements"
 CHANGELOG = """
-v9.0.2 (2026-02-16 16:00 EST) - 📊 YOUNG PORTFOLIO METRICS FIX
-- FIXED: CAGR and Annualized metrics now show "< 90d" for portfolios under 90 days old
-- FIXED: Prevents astronomical numbers (e.g., 109407381524405329992.00%) for new portfolios
-- IMPROVED: User-friendly display instead of unreliable annualized calculations
-- ADDED: Explanatory caption showing portfolio age in days
-- BENEFIT: Cleaner, more professional metrics display for new portfolios
-
-**The Problem:**
-When portfolios are very young (< 90 days), calculating annualized returns produces
-unreliable, astronomical numbers due to division by very small time periods.
-Example: 16-day-old portfolio showed CAGR of +$18,017,646,404,597.57%
-
-**The Solution:**
-For portfolios under 90 days old:
-- CAGR displays as: "< 90d" (gray text)
-- Annualized displays as: "< 90d" (gray text)
-- ROI still shows accurate percentage (not time-dependent)
-- Caption explains: "Portfolio is only X days old (needs 90+ days)"
-
-After 90 days, normal CAGR and annualized metrics appear.
-
-v9.0.1 (2026-02-08 03:30 EST) - 🐛 CRITICAL BUGFIX
-- FIXED: Renamed remaining save_to_sqlite() calls to save_to_postgres()
-- FIXED: JSON migration now works correctly with PostgreSQL
-- FIXED: Base schema initialization uses PostgreSQL function
-- BUG: v9.0.0 crashed on first load with NameError: 'save_to_sqlite' is not defined
-- STATUS: Production-ready for Streamlit Cloud deployment
-
-**Changes:**
-Line 1986: save_to_sqlite() → save_to_postgres() (JSON migration)
-Line 2015: save_to_sqlite() → save_to_postgres() (base schema)
-
-v9.0.0 (2026-02-08 03:00 EST) - 🚀 POSTGRESQL MIGRATION (CLOUD OPTIMIZED)
-- MIGRATED: Complete database backend from SQLite to PostgreSQL
-- ADDED: Streamlit Cloud-optimized connection using st.secrets
-- ADDED: Connection pooling for better performance and reliability
-- IMPROVED: Cloud-native deployment with persistent database storage
-- REMOVED: All SQLite dependencies and local file storage
-- BENEFIT: Production-ready for Streamlit Cloud with zero data loss on redeploy
-
-**Migration Details:**
-- Database: PostgreSQL (replaces SQLite)
-- Connection: psycopg2 with connection pooling
-- Secrets: Uses st.secrets["postgres"] for credentials
-- Schema: Updated to PostgreSQL syntax (SERIAL, VARCHAR, TIMESTAMP)
-- Placeholders: Changed from ? to %s for SQL queries
-- Tables: database_store (id SERIAL PRIMARY KEY, data_json TEXT, version INT, last_updated TIMESTAMP)
-
-**Required secrets.toml:**
-```toml
-[postgres]
-host = "your-host.postgres.database.azure.com"
-dbname = "your-database-name"
-user = "your-username"
-password = "your-password"
-port = "5432"
-```
-
-**100% Feature Parity:**
-All features, UI, UX, and logic remain identical to v8.1.0.
-Only the database backend has changed.
-
-v8.1.0 (2026-02-08 02:00 EST) - 🎯 FORCE 100% DEFAULT ALWAYS
-- REMOVED: Session state memory for last deployed percentage
-- FIXED: Deploy % now ALWAYS defaults to 100% (no memory of previous values)
-- IMPROVED: Clean, predictable default every time you deploy
-- BENEFIT: No more confusion from remembered old values like 1.10%
-
-**The Problem:**
-v8.0.9 defaulted to 100%, BUT if you previously deployed 1.10%, 
-the app "remembered" that value in session state and kept using it!
-
-**The Solution:**
-Completely removed session state memory. Deploy % ALWAYS starts at:
-- 100.0% if you haven't deployed any of this asset yet
-- Remaining % if you've partially deployed (e.g., 40% if 60% done)
-
-**No more surprises!** Every deployment starts fresh at 100%.
-
-v8.0.9 (2026-02-08 01:30 EST) - 📊 DEFAULT DEPLOY 100%
-- CHANGED: Deploy % (of asset's target) now defaults to 100%
-- IMPROVED: Simple, predictable default instead of complex calculation
-- REMOVED: "Smart" default logic that could result in low values like 1.10%
-- BENEFIT: Users can now deploy full allocation with one click
-
-**Before:**
-Deploy % default: 1.10% (complex calculation based on affordable units)
-
-**After:**
-Deploy % default: 100.0% (or remaining %, whichever is smaller)
-
-**How It Works:**
-- First deployment of an asset → Defaults to 100%
-- Subsequent deployments → Uses last deployed % OR 100%, whichever applies
-- If only 30% remaining → Defaults to 30% (respects available amount)
-
-v8.0.8 (2026-02-08 01:00 EST) - ✅ WORKING CLEAR/TODAY BUTTONS
-- FIXED: enhanced_date_input() function completely rewritten to work without errors
-- FIXED: Clear and Today buttons now appear BELOW the date picker
-- FIXED: Deployment date picker now uses enhanced version with working buttons
-- IMPROVED: Buttons use emojis (🗑️ Clear | 📅 Today) for better UX
-- IMPROVED: Session state properly managed to avoid conflicts
-- BENEFIT: Clear/Today buttons finally work as requested!
-
-**How It Works Now:**
-Deployment Date Picker shows:
-┌────────────────────────────┐
-│ Deployment Date            │
-│ [Calendar: 2026/02/08]     │
-└────────────────────────────┘
-┌─────────────┬──────────────┐
-│ 🗑️ Clear    │  📅 Today    │
-└─────────────┴──────────────┘
-
-- Click "Today" → Sets to current date
-- Click "Clear" → Clears selection (defaults to today for deployment)
-- No session state errors!
-
-**Note:** Profile creation date (Inception Date) uses standard picker 
-because it's inside a form (forms can't have buttons). Enhanced picker 
-is used in deployment section which is NOT in a form.
-
-v8.0.7 (2026-02-08 00:00 EST) - 🔧 COMPLETE UI HIDING FIX
-- FIXED: ALL asset management UI now properly hidden when mix is locked
-- FIXED: Removed duplicate info messages (was showing 2-3 messages)
-- FIXED: Ticker Symbol input HIDDEN when locked
-- FIXED: Target Allocation field HIDDEN when locked  
-- FIXED: Save Asset and Remove buttons HIDDEN when locked
-- IMPROVED: Single clear message when locked
-- BENEFIT: Clean, minimal UI when assets are locked
-
-**Complete Fix for Asset Allocation Section:**
-When locked, EVERYTHING is hidden:
-- ❌ Quick Add buttons (SPXL, GLD, DBMF, BIL)
-- ❌ Ticker Symbol input
-- ❌ Target Allocation % field
-- ❌ Save Asset button
-- ❌ Remove button
-
-Only shows:
-- ✅ Current assets list (SPXL, GLD, etc.)
-- ✅ One clear message: "Asset mix is locked"
-
-v8.0.6 (2026-02-07 23:00 EST) - 🔧 CRITICAL UX FIXES
-- FIXED: Cannot use st.button() inside st.form() error
-- ISSUE: enhanced_date_input() contains buttons, incompatible with forms
-- CHANGED: Replaced enhanced_date_input() with regular st.date_input() in profile creation form
-- RESULT: Profile creation form now works correctly
-- NOTE: Enhanced date pickers can only be used OUTSIDE of forms
-- STATUS: Stable release ready for deployment
-
-v8.0.3 (2026-02-07 18:30 EST) - 🔧 BUG FIX
-- FIXED: NameError - removed duplicate user_profiles definition
-- ISSUE: Line 4757 was redefining user_profiles (already defined at 4659)
-- RESULT: Application now loads correctly without NameError
-- STATUS: Stable release ready for deployment
-
-v8.0.2 (2026-02-07 18:15 EST) - ✨ UX ENHANCEMENTS
-- ENH 1: Enhanced date picker with Today/Clear buttons
-- ENH 2: Collapsible sidebar sections (auto-collapse after completion)
-- ENH 3: Cleaner sidebar organization with expanders
-- ENH 4: Better visual hierarchy in sidebar
-- IMPROVED: Date selection for Inception Date and Deployment Date
-- IMPROVED: Sidebar sections collapse when not in use
-- BENEFIT: Less scrolling, cleaner interface
-- BENEFIT: Faster navigation to active tasks
-
-**Enhancement 1: Better Date Pickers**
-Before: Basic date input
-After: Date input with "Today" and "Clear" buttons ✅
-- Quick access to today's date
-- Easy way to clear selection
-- Consistent across all date fields
-
-**Enhancement 2: Collapsible Sidebar Sections**
-Before: All sections always visible (lots of scrolling)
-After: Sections collapse after completion ✅
-- Profile Creation: Collapses after profile created
-- Portfolio Configuration: Collapses when complete
-- Asset Deployment: Collapses when fully deployed
-- Focus on current active task
-
-v8.0.1 (2026-02-07 17:45 EST) - 🔧 CRITICAL AUTH FIX
-- FIXED: Restored missing hash_password() function
-- FIXED: Restored missing verify_password() function
-- FIXED: Restored missing validate_password_strength() function
-- FIXED: Restored missing validate_email() function
-- FIXED: Restored missing generate_session_token() function
-- FIXED: Added password security configuration constants
-- ISSUE: These functions were accidentally removed during SQLite migration
-- RESULT: Login and registration now work correctly
-- STATUS: All authentication functionality restored
-
-v8.0.0 (2026-02-07 17:30 EST) - 🗄️ SQLITE MIGRATION
-- MAJOR: Replaced Google Sheets backend with SQLite database
-- REMOVED: All Google Sheets dependencies (gspread, google-auth)
-- ADDED: Local SQLite database (alphastream.db)
-- ADDED: init_db() function for automatic schema creation
-- IMPROVED: Faster data access with local database
-- IMPROVED: No external API dependencies
-- IMPROVED: Eliminates UTF-8 encoding issues from Google Sheets
-- MAINTAINED: 100% feature parity with v7.7.3
-- MAINTAINED: All UI/UX elements unchanged
-- MAINTAINED: All emojis and special characters preserved
-
-**Tables Created:**
-- database_store: Main table storing complete database as JSON
-
-**Benefits:**
-- ✅ No Google Sheets API quota limits
-- ✅ Faster read/write operations
-- ✅ No network dependency for data access
-- ✅ Eliminates encoding corruption issues
-- ✅ Simpler deployment (no service account needed)
-- ✅ Built-in ACID transactions
-- ✅ Works offline
-
-**Migration Notes:**
-- This is a fresh install - no data migration needed
-- All existing functionality preserved
-- Database file: alphastream.db (auto-created on first run)
-- Backup recommended: export data regularly via Admin Dashboard
-
 v7.7.3 (2026-02-02 22:30 EST) - ✨ 4 UX REFINEMENTS
 - ENH 1: Deployment status shows "In Progress - 50% complete" (clearer)
 - ENH 2: Deploy % defaults to max whole units % (no fractional)
@@ -1681,7 +1465,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ===== AUTHENTICATION SYSTEM =====
-# ===== AUTHENTICATION SYSTEM =====
+DB_FILE = "alphastream_multiuser.json"
+
+# ===== GOOGLE SHEETS CONFIGURATION =====
+GOOGLE_SHEETS_NAME = "AlphaStream_Portfolio_Data"
+# Optional: Specify sheet URL directly (recommended for shared sheets)
+# Set this in Streamlit Secrets as: GOOGLE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit"
+GOOGLE_SHEETS_URL = os.environ.get("GOOGLE_SHEETS_URL", "")
+GOOGLE_SHEETS_SCOPES = [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive.file'
+]
 
 # Password Security Configuration
 PASSWORD_MIN_LENGTH = 8
@@ -1730,177 +1524,132 @@ def generate_session_token() -> str:
     """Generate a secure session token"""
     return secrets.token_urlsafe(32)
 
-def enhanced_date_input(label: str, value=None, min_value=None, max_value=None, key=None, help=None):
-    """
-    Enhanced date input with Today and Clear buttons displayed below the date picker.
-    
-    This creates a layout with:
-    - Date picker field (full width)
-    - Clear button (left) | Today button (right) below it
-    
-    Returns: selected date or None (if cleared)
-    """
-    # Use a state variable to track the current value
-    state_key = f"{key}_value" if key else "date_value_temp"
-    
-    # Initialize state if needed
-    if state_key not in st.session_state:
-        st.session_state[state_key] = value if value is not None else date.today()
-    
-    # Main date input field
-    selected_date = st.date_input(
-        label,
-        value=st.session_state[state_key],
-        min_value=min_value,
-        max_value=max_value,
-        key=f"{key}_input" if key else None,
-        help=help
-    )
-    
-    # Update state when date changes
-    if selected_date != st.session_state[state_key]:
-        st.session_state[state_key] = selected_date
-    
-    # Buttons row: Clear (left) and Today (right)
-    col_clear, col_today = st.columns(2)
-    
-    with col_clear:
-        if st.button("🗑️ Clear", key=f"{key}_clear" if key else None, use_container_width=True):
-            # Set to None - caller should handle this
-            st.session_state[state_key] = None
-            st.rerun()
-    
-    with col_today:
-        if st.button("📅 Today", key=f"{key}_today" if key else None, use_container_width=True):
-            st.session_state[state_key] = date.today()
-            st.rerun()
-    
-    return st.session_state[state_key]
+# ===== GOOGLE SHEETS STORAGE FUNCTIONS =====
 
-# ===== POSTGRESQL DATABASE CONFIGURATION =====
-
-# Connection pool for PostgreSQL (reuses connections for better performance)
-connection_pool = None
-
-def get_db_connection():
-    """Get PostgreSQL connection from pool using st.secrets"""
-    global connection_pool
+def get_google_sheets_client():
+    """Initialize and return Google Sheets client"""
+    if not GOOGLE_SHEETS_AVAILABLE:
+        raise ImportError("gspread and google-auth libraries not installed. Run: pip install gspread google-auth")
     
     try:
-        # Initialize connection pool if not exists
-        if connection_pool is None:
-            connection_pool = psycopg2.pool.SimpleConnectionPool(
-                1,  # Minimum connections
-                10,  # Maximum connections
-                host=st.secrets["postgres"]["host"],
-                database=st.secrets["postgres"]["dbname"],
-                user=st.secrets["postgres"]["user"],
-                password=st.secrets["postgres"]["password"],
-                port=st.secrets["postgres"]["port"]
-            )
+        # Try to get credentials from Streamlit secrets
+        if hasattr(st, 'secrets') and 'google_sheets' in st.secrets:
+            creds_dict = dict(st.secrets["google_sheets"])
+            credentials = Credentials.from_service_account_info(creds_dict, scopes=GOOGLE_SHEETS_SCOPES)
+        else:
+            # Fallback to local credentials file (for local development)
+            credentials = Credentials.from_service_account_file('credentials.json', scopes=GOOGLE_SHEETS_SCOPES)
         
-        # Get connection from pool
-        conn = connection_pool.getconn()
-        return conn
+        client = gspread.authorize(credentials)
+        return client
     except Exception as e:
-        st.error(f"Database connection error: {e}")
+        st.error(f"Failed to initialize Google Sheets client: {e}")
+        st.info("💡 Make sure you've added Google Sheets credentials to Streamlit secrets or credentials.json file")
         return None
 
-def release_db_connection(conn):
-    """Return connection to pool"""
-    global connection_pool
-    if connection_pool and conn:
-        connection_pool.putconn(conn)
+def load_from_google_sheets():
+    """Load database from Google Sheets"""
+    try:
+        client = get_google_sheets_client()
+        if not client:
+            return None
+        
+        # Open the spreadsheet
+        try:
+            # Try opening by URL first (works for shared sheets)
+            if GOOGLE_SHEETS_URL:
+                try:
+                    spreadsheet = client.open_by_url(GOOGLE_SHEETS_URL)
+                except:
+                    st.error(f"❌ Failed to open sheet by URL: {GOOGLE_SHEETS_URL}")
+                    st.info("💡 Make sure the sheet URL is correct and shared with the service account")
+                    return None
+            else:
+                # Fall back to opening by name (only works for owned sheets)
+                spreadsheet = client.open(GOOGLE_SHEETS_NAME)
+        except gspread.exceptions.SpreadsheetNotFound:
+            st.warning(f"📊 Google Sheet '{GOOGLE_SHEETS_NAME}' not found. Creating it...")
+            try:
+                spreadsheet = client.create(GOOGLE_SHEETS_NAME)
+                st.info(f"✅ Created new Google Sheet. Please share it with the service account email.")
+            except Exception as create_error:
+                st.error(f"❌ Failed to create sheet: {create_error}")
+                st.info("💡 **SOLUTION:** Create the sheet manually in YOUR Google Drive and add the URL to Streamlit Secrets")
+                st.code('GOOGLE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit"')
+                return None
+        
+        # Get or create the main data sheet
+        try:
+            worksheet = spreadsheet.worksheet("database")
+        except gspread.exceptions.WorksheetNotFound:
+            worksheet = spreadsheet.add_worksheet(title="database", rows=100, cols=5)
+        
+        # Get all data from cell A1
+        try:
+            data_json = worksheet.acell('A1').value
+            if data_json:
+                return json.loads(data_json)
+            else:
+                return None
+        except:
+            return None
+            
+    except Exception as e:
+        st.error(f"Error loading from Google Sheets: {e}")
+        return None
 
-def init_db():
-    """Initialize PostgreSQL database with required schema"""
-    conn = get_db_connection()
-    if not conn:
-        return
+def save_to_google_sheets(data):
+    """Save database to Google Sheets with retry logic"""
+    max_retries = 3
+    retry_delay = 1  # seconds
     
-    try:
-        cursor = conn.cursor()
-        
-        # Create main database table with PostgreSQL syntax
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS database_store (
-                id SERIAL PRIMARY KEY,
-                data_json TEXT NOT NULL,
-                version INTEGER NOT NULL,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        conn.commit()
-        cursor.close()
-    except Exception as e:
-        st.error(f"Error initializing database: {e}")
-        conn.rollback()
-    finally:
-        release_db_connection(conn)
-
-def load_from_postgres():
-    """Load database from PostgreSQL"""
-    try:
-        conn = get_db_connection()
-        if not conn:
-            return None, 0
-        
-        cursor = conn.cursor()
-        
-        # Use %s placeholder instead of ? for PostgreSQL
-        cursor.execute("SELECT data_json, version FROM database_store WHERE id = 1")
-        row = cursor.fetchone()
-        
-        cursor.close()
-        release_db_connection(conn)
-        
-        if row:
-            data = json.loads(row[0])
-            version = row[1]
-            return data, version
-        return None, 0
-    except Exception as e:
-        st.error(f"Error loading from PostgreSQL: {e}")
-        return None, 0
-
-def save_to_postgres(data, version):
-    """Save database to PostgreSQL"""
-    try:
-        conn = get_db_connection()
-        if not conn:
-            return False
-        
-        cursor = conn.cursor()
-        
-        data_json = json.dumps(data, indent=2)
-        
-        # Use INSERT ... ON CONFLICT for PostgreSQL (equivalent to INSERT OR REPLACE)
-        cursor.execute("""
-            INSERT INTO database_store (id, data_json, version, last_updated)
-            VALUES (1, %s, %s, CURRENT_TIMESTAMP)
-            ON CONFLICT (id) DO UPDATE SET
-                data_json = EXCLUDED.data_json,
-                version = EXCLUDED.version,
-                last_updated = CURRENT_TIMESTAMP
-        """, (data_json, version))
-        
-        conn.commit()
-        cursor.close()
-        release_db_connection(conn)
-        return True
-    except Exception as e:
-        st.error(f"Error saving to PostgreSQL: {e}")
-        if conn:
-            conn.rollback()
-            release_db_connection(conn)
-        return False
-
+    for attempt in range(max_retries):
+        try:
+            client = get_google_sheets_client()
+            if not client:
+                return False
+            
+            # Open the spreadsheet
+            try:
+                # Try opening by URL first (works for shared sheets)
+                if GOOGLE_SHEETS_URL:
+                    spreadsheet = client.open_by_url(GOOGLE_SHEETS_URL)
+                else:
+                    # Fall back to opening by name
+                    spreadsheet = client.open(GOOGLE_SHEETS_NAME)
+            except gspread.exceptions.SpreadsheetNotFound:
+                if GOOGLE_SHEETS_URL:
+                    st.error(f"❌ Sheet not found at URL: {GOOGLE_SHEETS_URL}")
+                    return False
+                else:
+                    spreadsheet = client.create(GOOGLE_SHEETS_NAME)
+            
+            # Get or create the main data sheet
+            try:
+                worksheet = spreadsheet.worksheet("database")
+            except gspread.exceptions.WorksheetNotFound:
+                worksheet = spreadsheet.add_worksheet(title="database", rows=100, cols=5)
+            
+            # Save data to cell A1 as JSON
+            data_json = json.dumps(data, indent=2)
+            worksheet.update_acell('A1', data_json)
+            
+            return True
+            
+        except Exception as e:
+            if attempt < max_retries - 1:
+                import time
+                time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
+                continue
+            else:
+                st.error(f"Failed to save to Google Sheets after {max_retries} attempts: {e}")
+                return False
+    
+    return False
 
 def load_db():
-    """Load multi-user database from PostgreSQL"""
-    # Initialize database if needed
-    init_db()
+    """Load multi-user database with migration support - supports JSON and Google Sheets"""
+    global STORAGE_TYPE  # Fix: Declare as global to avoid UnboundLocalError
     
     base_schema = {
         "metadata": {
@@ -1927,68 +1676,161 @@ def load_db():
         "system_logs": []
     }
     
-    # Try to load from PostgreSQL
-    data, version = load_from_postgres()
-    
-    if data:
-        # Store version in session for conflict detection
-        st.session_state["data_version"] = version
-        st.session_state["data_loaded_at"] = datetime.now()
+    # ==== GOOGLE SHEETS STORAGE ====
+    if STORAGE_TYPE == "google_sheets":
+        if not GOOGLE_SHEETS_AVAILABLE:
+            st.error("❌ Google Sheets storage selected but libraries not installed!")
+            st.info("Run: pip install gspread google-auth")
+            st.stop()
         
-        # Ensure schema integrity
-        data.setdefault("users", {})
-        data.setdefault("global_settings", base_schema["global_settings"])
-        data.setdefault("system_logs", [])
-        data.setdefault("metadata", base_schema["metadata"])
+        # Try to load from Google Sheets
+        data = load_from_google_sheets()
         
-        # Update global settings with any new fields
-        for key, value in base_schema["global_settings"].items():
-            data["global_settings"].setdefault(key, value)
-        
-        # Ensure user data integrity
-        for user_id, user_data in data["users"].items():
-            user_data.setdefault("profiles", {})
-            user_data.setdefault("settings", {})
-            user_data.setdefault("created_at", "")
-            user_data.setdefault("last_login", "")
-            user_data.setdefault("role", "user")
-            user_data.setdefault("is_active", True)
-            user_data.setdefault("login_attempts", 0)
-            user_data.setdefault("lockout_until", None)
+        if data:
+            # Migrate old data to new schema with metadata
+            if "metadata" not in data:
+                data["metadata"] = {
+                    "version": 1,
+                    "last_save_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "last_save_by": "system_migration",
+                    "save_count": 1
+                }
+                # Save migrated data
+                save_to_google_sheets(data)
             
-            for p_name, p_data in user_data["profiles"].items():
-                p_data.setdefault("drift_tolerance", 5.0)
-                p_data.setdefault("rebalance_stats", [])
-                p_data.setdefault("last_rebalanced", None)
-                p_data.setdefault("benchmark", None)
-                p_data.setdefault("benchmarks", [])
-                p_data.setdefault("bank_name", "")
-                p_data.setdefault("account_type", "")
-                p_data.setdefault("account_name", "")
-                p_data.setdefault("initialization_date", p_data.get("start_date", ""))
-                p_data.setdefault("asset_mix_locked", False)
+            # Store version in session for conflict detection
+            st.session_state['data_version'] = data.get('metadata', {}).get('version', 0)
+            st.session_state['data_loaded_at'] = datetime.now()
+            
+            # Ensure schema integrity
+            data.setdefault("users", {})
+            data.setdefault("global_settings", base_schema["global_settings"])
+            data.setdefault("system_logs", [])
+            
+            # Update global settings with any new fields
+            for key, value in base_schema["global_settings"].items():
+                data["global_settings"].setdefault(key, value)
+            
+            # Ensure user data integrity
+            for user_id, user_data in data["users"].items():
+                user_data.setdefault("profiles", {})
+                user_data.setdefault("settings", {})
+                user_data.setdefault("created_at", "")
+                user_data.setdefault("last_login", "")
+                user_data.setdefault("role", "user")
+                user_data.setdefault("is_active", True)
+                user_data.setdefault("login_attempts", 0)
+                user_data.setdefault("lockout_until", None)
                 
-                for asset_key, asset_data in p_data.get("assets", {}).items():
-                    asset_data.setdefault("fund_name", asset_key)
-                    asset_data.setdefault("allocated_pct", 0.0)
-                    asset_data.setdefault("purchases", [])
-        
-        return data
+                for p_name, p_data in user_data["profiles"].items():
+                    p_data.setdefault("drift_tolerance", 5.0)
+                    p_data.setdefault("rebalance_stats", [])
+                    p_data.setdefault("last_rebalanced", None)
+                    p_data.setdefault("benchmark", None)
+                    p_data.setdefault("benchmarks", [])
+                    p_data.setdefault("bank_name", "")
+                    p_data.setdefault("account_type", "")
+                    p_data.setdefault("account_name", "")
+                    p_data.setdefault("initialization_date", p_data.get("start_date", ""))
+                    p_data.setdefault("asset_mix_locked", False)
+                    
+                    for asset_key, asset_data in p_data.get("assets", {}).items():
+                        asset_data.setdefault("fund_name", asset_key)
+                        asset_data.setdefault("allocated_pct", 0.0)
+                        asset_data.setdefault("purchases", [])
+            
+            return data
+        else:
+            # Check if we should migrate from JSON to Google Sheets
+            if os.path.exists(DB_FILE):
+                st.info("📊 Migrating existing data from JSON to Google Sheets...")
+                try:
+                    with open(DB_FILE, "r") as f:
+                        json_data = json.load(f)
+                    
+                    # Save to Google Sheets
+                    if save_to_google_sheets(json_data):
+                        st.success("✅ Data successfully migrated to Google Sheets!")
+                        log_system_event(json_data, "migration", "Migrated data from JSON to Google Sheets", "system")
+                        # Optionally backup and remove JSON file
+                        import shutil
+                        shutil.copy(DB_FILE, f"{DB_FILE}.backup")
+                        return json_data
+                    else:
+                        st.error("❌ Migration to Google Sheets failed. Using JSON.")
+                        STORAGE_TYPE = "json"  # Fallback to JSON
+                except Exception as e:
+                    st.error(f"Migration error: {e}")
+            
+            # Create new database with default admin
+            admin_hash, admin_salt = hash_password("admin123")
+            base_schema["users"]["admin"] = {
+                "email": "admin@localhost",
+                "password_hash": admin_hash,
+                "password_salt": admin_salt,
+                "display_name": "Administrator",
+                "role": "admin",
+                "is_active": True,
+                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "last_login": "",
+                "login_attempts": 0,
+                "lockout_until": None,
+                "profiles": {},
+                "settings": {}
+            }
+            save_db(base_schema)
+            return base_schema
     
-    # No existing database - check for old JSON files to migrate
+    # ==== JSON STORAGE (ORIGINAL LOGIC) ====
+    # Check for old single-user database file
     OLD_DB_FILE = "alphastream_wealth.json"
-    NEW_JSON_DB = "alphastream_multiuser.json"
     
-    # Try to migrate from old JSON files
-    for json_file in [NEW_JSON_DB, OLD_DB_FILE]:
-        if os.path.exists(json_file):
-            try:
-                with open(json_file, "r", encoding="utf-8") as f:
-                    migrated_data = json.load(f)
+    # If new DB doesn't exist but old one does, migrate
+    if not os.path.exists(DB_FILE) and os.path.exists(OLD_DB_FILE):
+        try:
+            with open(OLD_DB_FILE, "r") as f:
+                old_data = json.load(f)
+                old_profiles = old_data.get("profiles", {})
                 
-                # Migrate old single-user format if needed
-                if "profiles" in migrated_data and "users" not in migrated_data:
-                    old_profiles = migrated_data.get("profiles", {})
+                # Create admin user with migrated profiles
+                admin_hash, admin_salt = hash_password("admin123")
+                migrated_data = {
+                    "users": {
+                        "admin": {
+                            "email": "admin@localhost",
+                            "password_hash": admin_hash,
+                            "password_salt": admin_salt,
+                            "display_name": "Administrator",
+                            "role": "admin",
+                            "is_active": True,
+                            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "last_login": "",
+                            "login_attempts": 0,
+                            "lockout_until": None,
+                            "profiles": old_profiles,
+                            "settings": {}
+                        }
+                    },
+                    "global_settings": base_schema["global_settings"],
+                    "system_logs": [{"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    "type": "migration", "message": f"Migrated {len(old_profiles)} profiles from single-user database", "user_id": "system"}]
+                }
+                save_db(migrated_data)
+                return migrated_data
+        except Exception as e:
+            pass  # Fall through to create new database
+    
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r") as f:
+                data = json.load(f)
+                
+                # Check if this is old single-user format (has "profiles" at root level)
+                if "profiles" in data and "users" not in data:
+                    # Migrate old data to new multi-user format
+                    old_profiles = data.get("profiles", {})
+                    
+                    # Create admin user with migrated profiles
                     admin_hash, admin_salt = hash_password("admin123")
                     migrated_data = {
                         "users": {
@@ -2008,25 +1850,54 @@ def load_db():
                             }
                         },
                         "global_settings": base_schema["global_settings"],
-                        "system_logs": [],
-                        "metadata": base_schema["metadata"]
+                        "system_logs": [{"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                        "type": "migration", "message": "Migrated from single-user to multi-user", "user_id": "system"}]
                     }
+                    save_db(migrated_data)
+                    return migrated_data
                 
-                # Save to PostgreSQL
-                migrated_data.setdefault("metadata", base_schema["metadata"])
-                migrated_data["metadata"]["version"] = 1
-                save_to_postgres(migrated_data, 1)
-                st.success(f"✅ Migrated data from {json_file} to PostgreSQL")
+                # Normal multi-user format - ensure schema integrity
+                data.setdefault("users", {})
+                data.setdefault("global_settings", base_schema["global_settings"])
+                data.setdefault("system_logs", [])
                 
-                # Backup old file
-                import shutil
-                shutil.copy(json_file, f"{json_file}.backup")
+                # Update global settings with any new fields
+                for key, value in base_schema["global_settings"].items():
+                    data["global_settings"].setdefault(key, value)
                 
-                return migrated_data
-            except Exception as e:
-                st.warning(f"Could not migrate {json_file}: {e}")
+                for user_id, user_data in data["users"].items():
+                    user_data.setdefault("profiles", {})
+                    user_data.setdefault("settings", {})
+                    user_data.setdefault("created_at", "")
+                    user_data.setdefault("last_login", "")
+                    user_data.setdefault("role", "user")
+                    user_data.setdefault("is_active", True)
+                    user_data.setdefault("login_attempts", 0)
+                    user_data.setdefault("lockout_until", None)
+                    
+                    for p_name, p_data in user_data["profiles"].items():
+                        p_data.setdefault("drift_tolerance", 5.0)
+                        p_data.setdefault("rebalance_stats", [])
+                        p_data.setdefault("last_rebalanced", None)
+                        p_data.setdefault("benchmark", None)
+                        p_data.setdefault("benchmarks", [])
+                        p_data.setdefault("bank_name", "")
+                        p_data.setdefault("account_type", "")
+                        p_data.setdefault("account_name", "")
+                        p_data.setdefault("initialization_date", p_data.get("start_date", ""))
+                        p_data.setdefault("asset_mix_locked", False)
+                        
+                        for asset_key, asset_data in p_data.get("assets", {}).items():
+                            asset_data.setdefault("fund_name", asset_key)
+                            asset_data.setdefault("allocated_pct", 0.0)
+                            asset_data.setdefault("purchases", [])
+                
+                return data
+        except Exception as e:
+            st.error(f"Database load error: {e}")
+            return base_schema
     
-    # No existing data - create new database with admin user
+    # Create default admin user
     admin_hash, admin_salt = hash_password("admin123")
     base_schema["users"]["admin"] = {
         "email": "admin@localhost",
@@ -2042,55 +1913,297 @@ def load_db():
         "profiles": {},
         "settings": {}
     }
-    
-    base_schema["metadata"]["version"] = 1
-    save_to_postgres(base_schema, 1)
+    save_db(base_schema)
     return base_schema
+
+
+
+def check_session_freshness():
+    """
+    Check if session data is stale and force reload if needed
+    Prevents using outdated cached data
+    """
+    if 'data_loaded_at' in st.session_state:
+        loaded_at = st.session_state['data_loaded_at']
+        age_seconds = (datetime.now() - loaded_at).total_seconds()
+        
+        # If data older than 5 minutes, force reload
+        if age_seconds > 300:  # 5 minutes
+            st.info("🔄 Session data is stale. Reloading from database...")
+            fresh_data = load_db()
+            if 'db' in st.session_state:
+                st.session_state['db'] = fresh_data
+            return fresh_data
+    
+    return None
+
+
+
+
+def optimize_database_size(data):
+    """
+    Optimize database size to stay under Google Sheets 50,000 character limit
+    v7.2.1: Critical fix for APIError 400
+    """
+    import copy
+    optimized = copy.deepcopy(data)
+    
+    # 1. Trim activity logs (keep last 100)
+    if 'activity_logs' in optimized:
+        optimized['activity_logs'] = optimized['activity_logs'][:100]
+    
+    # 2. Trim system logs (keep last 50)
+    if 'system_logs' in optimized:
+        optimized['system_logs'] = optimized['system_logs'][:50]
+    
+    # 3. Trim rebalance logs per profile (keep last 20)
+    for user_id, user_data in optimized.get('users', {}).items():
+        for profile_name, profile_data in user_data.get('profiles', {}).items():
+            if 'rebalance_logs' in profile_data:
+                profile_data['rebalance_logs'] = profile_data['rebalance_logs'][:20]
+    
+    # 4. Remove empty profiles (profiles with no assets and no initialization_date)
+    for user_id, user_data in optimized.get('users', {}).items():
+        if 'profiles' in user_data:
+            user_data['profiles'] = {
+                name: prof for name, prof in user_data['profiles'].items()
+                if prof.get('assets') or prof.get('initialization_date')
+            }
+    
+    return optimized
+
+
+
+
+def optimize_database_size(data):
+    """
+    Optimize database size to stay under Google Sheets 50K character limit
+    Trims logs and removes unnecessary data
+    v7.2.1 HOTFIX: More aggressive trimming to handle large databases
+    """
+    # Trim activity logs (keep last 50 only - reduced from 100)
+    if 'activity_logs' in data and isinstance(data['activity_logs'], list):
+        if len(data['activity_logs']) > 50:
+            data['activity_logs'] = data['activity_logs'][:50]
+    
+    # Trim system logs (keep last 30 only - reduced from 50)
+    if 'system_logs' in data and isinstance(data['system_logs'], list):
+        if len(data['system_logs']) > 30:
+            data['system_logs'] = data['system_logs'][:30]
+    
+    # Optimize user profiles
+    for user_id, user_data in data.get('users', {}).items():
+        if 'profiles' in user_data and isinstance(user_data['profiles'], dict):
+            # Remove empty profiles (no assets, no transactions)
+            profiles_to_keep = {}
+            for profile_name, profile_data in user_data['profiles'].items():
+                has_assets = bool(profile_data.get('assets', {}))
+                has_logs = bool(profile_data.get('rebalance_logs', []))
+                has_date = bool(profile_data.get('initialization_date'))
+                
+                # Keep if it has assets, logs, or is recently created
+                if has_assets or has_logs or has_date:
+                    # Trim rebalance logs MORE AGGRESSIVELY (keep last 10 per profile - reduced from 20)
+                    if 'rebalance_logs' in profile_data and isinstance(profile_data['rebalance_logs'], list):
+                        if len(profile_data['rebalance_logs']) > 10:
+                            profile_data['rebalance_logs'] = profile_data['rebalance_logs'][:10]
+                    
+                    # NEW: Trim rebalance_stats if exists
+                    if 'rebalance_stats' in profile_data and isinstance(profile_data['rebalance_stats'], list):
+                        if len(profile_data['rebalance_stats']) > 5:
+                            profile_data['rebalance_stats'] = profile_data['rebalance_stats'][:5]
+                    
+                    profiles_to_keep[profile_name] = profile_data
+            
+            user_data['profiles'] = profiles_to_keep
+    
+    # NEW: Trim security logs if they exist
+    if 'security_logs' in data and isinstance(data['security_logs'], list):
+        if len(data['security_logs']) > 20:
+            data['security_logs'] = data['security_logs'][:20]
+    
+    return data
+
 
 def save_db(data, bypass_version_increment=False):
     """
-    Save database to PostgreSQL with optimistic locking
+    Save database with optimistic locking + size optimization - prevents concurrent session overwrites
     
     Args:
         data: Database dictionary to save
-        bypass_version_increment: If True, uses data's existing version
+        bypass_version_increment: If True, uses data's existing version (for reset operations)
     """
-    try:
-        # Get current version
-        expected_version = st.session_state.get("data_version", 0)
+    global STORAGE_TYPE
+    
+    if STORAGE_TYPE == "google_sheets":
+        if not GOOGLE_SHEETS_AVAILABLE:
+            st.error("❌ Google Sheets storage selected but libraries not installed!")
+            return False
         
-        # Get current user
+        # === SIZE OPTIMIZATION (v7.2.1) ===
+        # Trim logs to prevent exceeding 50,000 character limit
+        data = optimize_database_size(data)
+        
+        # Get current session's expected version
+        expected_version = st.session_state.get('data_version', 0)
+        
+        # Try multiple keys to find username (v7.2.1 fix)
         current_user = (
-            st.session_state.get("username") or 
-            st.session_state.get("current_user") or 
-            st.session_state.get("user") or 
-            "system"
+            st.session_state.get('username') or 
+            st.session_state.get('current_user') or 
+            st.session_state.get('user') or 
+            'system'
         )
         
-        # Load current data from database
-        current_data, current_version = load_from_postgres()
+        # Save with conflict detection (unless bypassing for reset)
+        success, new_version = save_with_conflict_detection(data, expected_version, current_user, bypass_version_increment)
         
-        # Determine new version
-        if bypass_version_increment:
-            new_version = data.get("metadata", {}).get("version", 1)
+        if success:
+            # Update session version
+            st.session_state['data_version'] = new_version
+            st.session_state['data_loaded_at'] = datetime.now()
+        elif new_version is not None:
+            # Conflict detected but resolved - show info
+            st.info(f"🔄 Data was updated by another session. Changes merged successfully.")
+            st.session_state['data_version'] = new_version
+            st.session_state['data_loaded_at'] = datetime.now()
         else:
-            new_version = current_version + 1
+            st.warning("⚠️ Failed to save to Google Sheets. Data may not persist.")
         
-        # Update metadata
-        data["metadata"]["version"] = new_version
-        data["metadata"]["last_save_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        data["metadata"]["last_save_by"] = current_user
-        data["metadata"]["save_count"] = data["metadata"].get("save_count", 0) + 1
-        
-        # Save to PostgreSQL
-        if save_to_postgres(data, new_version):
-            st.session_state["data_version"] = new_version
-            st.session_state["data_loaded_at"] = datetime.now()
+        return success
+    else:
+        # JSON storage (original logic)
+        try:
+            with open(DB_FILE, "w") as f:
+                json.dump(data, f, indent=2)
             return True
-        return False
-    except Exception as e:
-        st.error(f"Error saving database: {e}")
-        return False
+        except Exception as e:
+            st.error(f"Error saving database: {e}")
+            return False
+
+
+def save_with_conflict_detection(new_data, expected_version, current_user, bypass_version_increment=False):
+    """
+    Save data with optimistic locking
+    
+    Args:
+        bypass_version_increment: If True, preserve new_data's existing version (for reset operations)
+    
+    Returns: (success: bool, new_version: int or None)
+    """
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            # CRITICAL: Always load current state from Google Sheets
+            # This ensures we have the latest version number
+            current_data = load_from_google_sheets()
+            
+            if not current_data:
+                # First save - initialize metadata
+                new_data['metadata'] = {
+                    'version': 1,
+                    'last_save_timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'last_save_by': current_user,
+                    'save_count': 1
+                }
+                if save_to_google_sheets(new_data):
+                    st.success("✅ Data saved successfully (Version 1)")
+                    return True, 1
+                else:
+                    continue
+            
+            # Get current version from database
+            current_version = current_data.get('metadata', {}).get('version', 0)
+            
+            # ALWAYS show version info for debugging
+            if attempt == 0:
+                st.info(f"💾 Saving... Expected version: {expected_version}, Current DB version: {current_version}")
+            
+            # Check for conflicts
+            if current_version != expected_version and expected_version != 0:
+                # CONFLICT DETECTED!
+                last_save_by = current_data.get('metadata', {}).get('last_save_by', 'unknown')
+                last_save_time = current_data.get('metadata', {}).get('last_save_timestamp', 'unknown')
+                
+                st.warning(f"⚠️ DATA CONFLICT DETECTED!")
+                st.warning(f"📊 Your session version: {expected_version}")
+                st.warning(f"📊 Current database version: {current_version}")
+                st.warning(f"👤 Last modified by: {last_save_by} at {last_save_time}")
+                st.info(f"🔄 Merging changes automatically...")
+                
+                # Try to merge changes intelligently
+                merged_data = merge_data_changes(current_data, new_data, current_user)
+                new_data = merged_data
+                expected_version = current_version  # Update expected version
+                
+                # CRITICAL (v7.2.1): Re-optimize after merge to prevent 50K limit
+                st.info(f"📊 Optimizing merged data size...")
+                new_data = optimize_database_size(new_data)
+                
+                # Check size after optimization
+                size_check = len(json.dumps(new_data))
+                st.info(f"📏 Optimized data size: {size_check:,} characters")
+                if size_check > 45000:
+                    st.warning(f"⚠️ Data size still large ({size_check:,} chars). May fail.")
+            
+            # ALWAYS optimize before save (even without conflict)
+            new_data = optimize_database_size(new_data)
+            
+            # Final size check
+            final_size = len(json.dumps(new_data))
+            if final_size > 50000:
+                st.error(f"❌ CRITICAL: Data is {final_size:,} characters (limit: 50,000)")
+                st.error(f"❌ Optimization failed. Manual intervention required.")
+                return False, None
+            elif final_size > 45000:
+                st.warning(f"⚠️ Data size: {final_size:,} chars (close to 50K limit)")
+            else:
+                st.success(f"✅ Data size: {final_size:,} chars (safe)")
+            
+            # No conflict or conflict resolved - proceed with save
+            if bypass_version_increment:
+                # For reset operations: preserve the version in new_data
+                reset_version = new_data.get('metadata', {}).get('version', 1)
+                new_data['metadata'] = {
+                    'version': reset_version,
+                    'last_save_timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'last_save_by': current_user,
+                    'save_count': 1  # Reset save count too
+                }
+            else:
+                # Normal operation: increment version
+                new_data['metadata'] = {
+                    'version': current_version + 1,
+                    'last_save_timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'last_save_by': current_user,
+                    'save_count': current_data.get('metadata', {}).get('save_count', 0) + 1
+                }
+            
+            # Attempt save
+            if save_to_google_sheets(new_data):
+                final_version = new_data['metadata']['version']
+                if bypass_version_increment:
+                    st.success(f"✅ Database reset! Version: {final_version}, Save count: 1")
+                else:
+                    st.success(f"✅ Saved successfully! Database version: {current_version} → {final_version}")
+                return True, final_version
+            
+            # Save failed - retry
+            if attempt < max_retries - 1:
+                st.warning(f"⚠️ Save attempt {attempt + 1} failed. Retrying...")
+                time.sleep(retry_delay * (2 ** attempt))
+                continue
+            
+        except Exception as e:
+            st.error(f"❌ Error during save (attempt {attempt + 1}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay * (2 ** attempt))
+                continue
+    
+    st.error("❌ Failed to save after 3 attempts")
+    return False, None
 
 
 def merge_data_changes(base_data, user_changes, current_user):
@@ -2323,37 +2436,35 @@ def get_system_health(db):
     """Check system health metrics"""
     health = {"status": "healthy", "checks": []}
     
-    # Database connection check
+    # Database size check (handle both JSON and Google Sheets)
     try:
-        # Check PostgreSQL connection
-        conn = get_db_connection()
-        if conn:
-            # Get database size from PostgreSQL
-            cursor = conn.cursor()
-            cursor.execute("SELECT pg_database_size(current_database())")
-            db_size_bytes = cursor.fetchone()[0]
-            db_size_mb = db_size_bytes / (1024 * 1024)
-            cursor.close()
-            release_db_connection(conn)
+        if STORAGE_TYPE == "google_sheets":
+            # For Google Sheets, calculate size from JSON serialization
+            import json
+            db_json = json.dumps(db)
+            db_size_chars = len(db_json)
+            db_size_kb = db_size_chars / 1024
             
             health["checks"].append({
                 "name": "Database Size",
-                "value": f"{db_size_mb:.2f} MB",
-                "status": "warning" if db_size_mb > 50 else "healthy",
-                "icon": "🟡" if db_size_mb > 50 else "🟢"
+                "value": f"{db_size_chars:,} chars ({db_size_kb:.1f} KB)",
+                "status": "error" if db_size_chars > 50000 else ("warning" if db_size_chars > 45000 else "healthy"),
+                "icon": "🔴" if db_size_chars > 50000 else ("🟡" if db_size_chars > 45000 else "🟢")
             })
         else:
+            # For JSON file storage
+            db_size = os.path.getsize(DB_FILE) / (1024 * 1024)
             health["checks"].append({
-                "name": "Database Connection",
-                "value": "Unable to connect to PostgreSQL",
-                "status": "critical",
-                "icon": "🔴"
+                "name": "Database Size",
+                "value": f"{db_size:.2f} MB",
+                "status": "warning" if db_size > 50 else "healthy",
+                "icon": "🟡" if db_size > 50 else "🟢"
             })
     except Exception as e:
         health["checks"].append({
             "name": "Database Size",
             "value": f"Error: {str(e)[:50]}",
-            "status": "warning",
+            "status": "warning",  # Changed from "error" to "warning" 
             "icon": "🟡"
         })
     
@@ -4894,15 +5005,12 @@ else:
             except:
                 pass  # If any error, just skip progress tracker
         
-        # Get user profiles early (needed for Profile Creation logic)
-        user_profiles = get_user_profiles(st.session_state.db, current_user)
-        
         # Profile Creation
         st.markdown("### ① Strategy Setup")
         
-        # Check if we should auto-expand (from welcome page button or if no profiles exist)
-        should_expand = st.session_state.get("auto_expand_create_profile", False) or len(user_profiles) == 0
-        if st.session_state.get("auto_expand_create_profile", False):
+        # Check if we should auto-expand (from welcome page button)
+        should_expand = st.session_state.get("auto_expand_create_profile", False)
+        if should_expand:
             # Clear the flag after using it
             st.session_state.auto_expand_create_profile = False
         
@@ -4924,15 +5032,7 @@ else:
                                         value=default_growth_goal,  # Use global default! ✅
                                         step=0.5, min_value=0.0,
                                         help=f"Target annual return (default: {default_growth_goal}%)")
-                
-                # NOTE: Cannot use enhanced_date_input() inside st.form() due to button restrictions
-                # Using regular date_input instead
-                n_start = st.date_input(
-                    "Inception Date*",
-                    value=date.today() - timedelta(days=365),
-                    max_value=date.today(),
-                    help="When did you start this investment strategy?"
-                )
+                n_start = st.date_input("Inception Date*", value=date.today() - timedelta(days=365), max_value=date.today())
                 
                 submitted = st.form_submit_button("🚀 Initialize Profile", use_container_width=True)
                 if submitted:
@@ -4992,7 +5092,8 @@ else:
                         
                         st.rerun()
         
-        # Profile-specific sidebar (user_profiles already defined above at line 4659)
+        # Profile-specific sidebar
+        user_profiles = get_user_profiles(st.session_state.db, current_user)
         
         if view_mode == "Portfolio Manager" and user_profiles:
             st.divider()
@@ -5105,87 +5206,77 @@ else:
             
             # Drift Strategy
             st.markdown("### ② Drift Strategy")
+            st.caption("Set tolerance threshold")
+            with st.expander("ℹ️ What is drift tolerance?", expanded=False):
+                st.markdown("""
+                **Drift tolerance** controls when you get rebalancing alerts.
+                - If an asset's current % differs from target % by more than this, you'll see an alert
+                - **Example:** 5% tolerance means AAPL at 30% (target 25%) triggers an alert
+                """)
             
-            # Auto-expand if no drift tolerance set
-            drift_expand = prof.get('drift_tolerance', 5.0) == 5.0  # Default value means not customized
-            
-            with st.expander("⚙️ Configure Drift Tolerance", expanded=drift_expand):
-                st.caption("Set tolerance threshold")
-                with st.expander("ℹ️ What is drift tolerance?", expanded=False):
-                    st.markdown("""
-                    **Drift tolerance** controls when you get rebalancing alerts.
-                    - If an asset's current % differs from target % by more than this, you'll see an alert
-                    - **Example:** 5% tolerance means AAPL at 30% (target 25%) triggers an alert
-                    """)
-                
-                new_tolerance = st.number_input("Drift Tolerance (%)", value=float(prof.get('drift_tolerance', 5.0)),
-                                               min_value=0.5, max_value=20.0, step=0.5, key="drift_tolerance_input")
-                if st.button("💾 Update Tolerance", use_container_width=True, key="update_tolerance"):
-                    prof['drift_tolerance'] = new_tolerance
-                    save_db(st.session_state.db)
-                    log_profile(prof, f"Updated drift tolerance to {new_tolerance}%")
-                    st.success("✅ Updated!")
-                    st.rerun()
+            new_tolerance = st.number_input("Drift Tolerance (%)", value=float(prof.get('drift_tolerance', 5.0)),
+                                           min_value=0.5, max_value=20.0, step=0.5, key="drift_tolerance_input")
+            if st.button("💾 Update Tolerance", use_container_width=True, key="update_tolerance"):
+                prof['drift_tolerance'] = new_tolerance
+                save_db(st.session_state.db)
+                log_profile(prof, f"Updated drift tolerance to {new_tolerance}%")
+                st.success("✅ Updated!")
+                st.rerun()
             
             st.divider()
             
             # Benchmark Selection
             st.markdown("### ③ Benchmark Comparison")
+            st.caption("Compare against market benchmarks (US & Canadian)")
+            with st.expander("ℹ️ Why use a benchmark?", expanded=False):
+                st.markdown("""
+                **Benchmarks** help evaluate performance.
+                - Chart shows 100% investment in each benchmark
+                - **Outperforming** = your strategy adds value
+                - Select multiple to compare different indices
+                
+                **🇺🇸 US Markets:** SPY, QQQ, VTI, IWM, DIA, BND  
+                **🇨🇦 Canadian Markets:** XIU, XIC, ZCN, VCN
+                """)
             
-            # Auto-expand if no benchmarks set
-            benchmark_expand = len(prof.get('benchmarks', [])) == 0 and prof.get('benchmark') is None
+            benchmark_options = {
+                # US Benchmarks
+                "🇺🇸 S&P 500 (SPY)": "SPY",
+                "🇺🇸 NASDAQ-100 (QQQ)": "QQQ",
+                "🇺🇸 Total Market (VTI)": "VTI",
+                "🇺🇸 Russell 2000 (IWM)": "IWM",
+                "🇺🇸 Dow Jones (DIA)": "DIA",
+                "🇺🇸 US Bonds (BND)": "BND",
+                # Canadian Benchmarks
+                "🇨🇦 TSX 60 (XIU)": "XIU",
+                "🇨🇦 TSX Composite (XIC)": "XIC",
+                "🇨🇦 TSX Capped Comp (ZCN)": "ZCN",
+                "🇨🇦 FTSE Canada (VCN)": "VCN"
+            }
+            current_benchmarks = prof.get('benchmarks', [])
+            # Migration: convert old single benchmark to list
+            if not current_benchmarks and prof.get('benchmark'):
+                current_benchmarks = [prof.get('benchmark')]
             
-            with st.expander("📊 Configure Benchmarks", expanded=benchmark_expand):
-                st.caption("Compare against market benchmarks (US & Canadian)")
-                with st.expander("ℹ️ Why use a benchmark?", expanded=False):
-                    st.markdown("""
-                    **Benchmarks** help evaluate performance.
-                    - Chart shows 100% investment in each benchmark
-                    - **Outperforming** = your strategy adds value
-                    - Select multiple to compare different indices
-                    
-                    **🇺🇸 US Markets:** SPY, QQQ, VTI, IWM, DIA, BND  
-                    **🇨🇦 Canadian Markets:** XIU, XIC, ZCN, VCN
-                    """)
-                
-                benchmark_options = {
-                    # US Benchmarks
-                    "🇺🇸 S&P 500 (SPY)": "SPY",
-                    "🇺🇸 NASDAQ-100 (QQQ)": "QQQ",
-                    "🇺🇸 Total Market (VTI)": "VTI",
-                    "🇺🇸 Russell 2000 (IWM)": "IWM",
-                    "🇺🇸 Dow Jones (DIA)": "DIA",
-                    "🇺🇸 US Bonds (BND)": "BND",
-                    # Canadian Benchmarks
-                    "🇨🇦 TSX 60 (XIU)": "XIU",
-                    "🇨🇦 TSX Composite (XIC)": "XIC",
-                    "🇨🇦 TSX Capped Comp (ZCN)": "ZCN",
-                    "🇨🇦 FTSE Canada (VCN)": "VCN"
-                }
-                current_benchmarks = prof.get('benchmarks', [])
-                # Migration: convert old single benchmark to list
-                if not current_benchmarks and prof.get('benchmark'):
-                    current_benchmarks = [prof.get('benchmark')]
-                
-                # Get display names for current benchmarks
-                current_display = [k for k, v in benchmark_options.items() if v in current_benchmarks]
-                
-                selected_benchmarks = st.multiselect("Select Benchmarks", 
-                    options=list(benchmark_options.keys()),
-                    default=current_display,
-                    key="benchmark_multiselect",
-                    help="Select one or more benchmarks to compare"
-                )
-                
-                if st.button("💾 Save Benchmarks", use_container_width=True, key="save_benchmark"):
-                    prof['benchmarks'] = [benchmark_options[b] for b in selected_benchmarks]
-                    prof['benchmark'] = prof['benchmarks'][0] if prof['benchmarks'] else None  # Keep for backward compat
-                    save_db(st.session_state.db)
-                    st.success("✅ Saved!")
-                    st.rerun()
-                
-                if prof.get('benchmarks'):
-                    st.caption(f"📊 Active: {', '.join(prof['benchmarks'])}")
+            # Get display names for current benchmarks
+            current_display = [k for k, v in benchmark_options.items() if v in current_benchmarks]
+            
+            selected_benchmarks = st.multiselect("Select Benchmarks", 
+                options=list(benchmark_options.keys()),
+                default=current_display,
+                key="benchmark_multiselect",
+                help="Select one or more benchmarks to compare"
+            )
+            
+            if st.button("💾 Save Benchmarks", use_container_width=True, key="save_benchmark"):
+                prof['benchmarks'] = [benchmark_options[b] for b in selected_benchmarks]
+                prof['benchmark'] = prof['benchmarks'][0] if prof['benchmarks'] else None  # Keep for backward compat
+                save_db(st.session_state.db)
+                st.success("✅ Saved!")
+                st.rerun()
+            
+            if prof.get('benchmarks'):
+                st.caption(f"📊 Active: {', '.join(prof['benchmarks'])}")
             
             st.divider()
             
@@ -5255,214 +5346,206 @@ else:
                 st.caption("💡 Enter ticker below to edit or add new asset")
                 st.divider()
             
-            # Check if asset mix is locked - hide all UI if locked
+            # Quick-add buttons for common tickers (user's specific assets)
+            st.markdown("**🚀 Quick Add:**")
+            col_q1, col_q2, col_q3, col_q4 = st.columns(4)
+            with col_q1:
+                if st.button("SPXL", key="quick_spxl", help="S&P 500 3X", use_container_width=True):
+                    # Clear all related widget states for clean slate
+                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    # Set the ticker value
+                    st.session_state['ticker_input'] = "SPXL"
+                    st.session_state['_quick_add_used'] = True
+                    st.rerun()
+            with col_q2:
+                if st.button("GLD", key="quick_gld", help="Gold", use_container_width=True):
+                    # Clear all related widget states for clean slate
+                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.session_state['ticker_input'] = "GLD"
+                    st.session_state['_quick_add_used'] = True
+                    st.rerun()
+            with col_q3:
+                if st.button("DBMF", key="quick_dbmf", help="Managed Futures", use_container_width=True):
+                    # Clear all related widget states for clean slate
+                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.session_state['ticker_input'] = "DBMF"
+                    st.session_state['_quick_add_used'] = True
+                    st.rerun()
+            with col_q4:
+                if st.button("BIL", key="quick_bil", help="Short-Term Bonds", use_container_width=True):
+                    # Clear all related widget states for clean slate
+                    for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.session_state['ticker_input'] = "BIL"
+                    st.session_state['_quick_add_used'] = True
+                    st.rerun()
+            
+            # Determine default value for text input
+            default_ticker = st.session_state.get('ticker_input', '')
+            
+            # Enhancement 4: Show info message when asset mix is locked
             is_mix_locked = prof.get("asset_mix_locked", False)
+            if is_mix_locked:
+                st.info("🔒 **Asset mix is locked.** Unlock below if you need to add or modify assets.")
             
-            if not is_mix_locked:
-                # Quick-add buttons for common tickers (user's specific assets)
-                st.markdown("**🚀 Quick Add:**")
-                col_q1, col_q2, col_q3, col_q4 = st.columns(4)
-                with col_q1:
-                    if st.button("SPXL", key="quick_spxl", help="S&P 500 3X", use_container_width=True):
-                        # Clear all related widget states for clean slate
-                        for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
-                            if key in st.session_state:
-                                del st.session_state[key]
-                        # Set the ticker value
-                        st.session_state['ticker_input'] = "SPXL"
-                        st.session_state['_quick_add_used'] = True
-                        st.rerun()
-                with col_q2:
-                    if st.button("GLD", key="quick_gld", help="Gold", use_container_width=True):
-                        # Clear all related widget states for clean slate
-                        for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
-                            if key in st.session_state:
-                                del st.session_state[key]
-                        st.session_state['ticker_input'] = "GLD"
-                        st.session_state['_quick_add_used'] = True
-                        st.rerun()
-                with col_q3:
-                    if st.button("DBMF", key="quick_dbmf", help="Managed Futures", use_container_width=True):
-                        # Clear all related widget states for clean slate
-                        for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
-                            if key in st.session_state:
-                                del st.session_state[key]
-                        st.session_state['ticker_input'] = "DBMF"
-                        st.session_state['_quick_add_used'] = True
-                        st.rerun()
-                with col_q4:
-                    if st.button("BIL", key="quick_bil", help="Short-Term Bonds", use_container_width=True):
-                        # Clear all related widget states for clean slate
-                        for key in ['ticker_input', 'target_weight', 'quick_ticker_clicked']:
-                            if key in st.session_state:
-                                del st.session_state[key]
-                        st.session_state['ticker_input'] = "BIL"
-                        st.session_state['_quick_add_used'] = True
-                        st.rerun()
+            a_sym = st.text_input("Ticker Symbol", placeholder="e.g., AAPL", 
+                                 key="ticker_input", value=default_ticker,
+                                 disabled=is_mix_locked).upper().strip()
+            is_existing = a_sym in prof.get("assets", {})
             
-                # Determine default value for text input
-                default_ticker = st.session_state.get('ticker_input', '')
+            if is_existing:
+                other_allocs = current_alloc - prof["assets"][a_sym].get("target", 0)
+            else:
+                other_allocs = current_alloc
+            max_available = 100.0 - other_allocs
+            block_new = (not is_existing) and (max_available <= 0) and (a_sym != "")
             
-                # Enhancement 4: Show info message when asset mix is locked
-                is_mix_locked = prof.get("asset_mix_locked", False)
-                if is_mix_locked:
-                    st.info("🔒 **Asset mix is locked.** Unlock below if you need to add or modify assets.")
+            if block_new:
+                st.markdown('<div class="allocation-blocked">🚫 PORTFOLIO AT 100%<br>Remove assets first!</div>', unsafe_allow_html=True)
             
-                a_sym = st.text_input("Ticker Symbol", placeholder="e.g., AAPL", 
-                                     key="ticker_input", value=default_ticker,
-                                     disabled=is_mix_locked).upper().strip()
-                is_existing = a_sym in prof.get("assets", {})
+            valid_ticker = False
+            last_price = 1.0
+            ticker_name = ""
+            validation_error = None
             
-                if is_existing:
-                    other_allocs = current_alloc - prof["assets"][a_sym].get("target", 0)
-                else:
-                    other_allocs = current_alloc
-                max_available = 100.0 - other_allocs
-                block_new = (not is_existing) and (max_available <= 0) and (a_sym != "")
-            
-                if block_new:
-                    st.markdown('<div class="allocation-blocked">🚫 PORTFOLIO AT 100%<br>Remove assets first!</div>', unsafe_allow_html=True)
-            
+            if prof.get("asset_mix_locked", False) and not is_existing and a_sym:
+                validation_error = "🔒 **Asset mix locked** - Cannot add new assets. Unlock first to add more."
                 valid_ticker = False
-                last_price = 1.0
-                ticker_name = ""
-                validation_error = None
-            
-                if prof.get("asset_mix_locked", False) and not is_existing and a_sym:
-                    validation_error = "🔒 **Asset mix locked** - Cannot add new assets. Unlock first to add more."
-                    valid_ticker = False
-                elif a_sym and not block_new:
-                    # Show loading indicator
-                    loading_placeholder = st.empty()
-                    loading_placeholder.info(f"🔍 Validating {a_sym}... (checking Yahoo Finance)")
+            elif a_sym and not block_new:
+                # Show loading indicator
+                loading_placeholder = st.empty()
+                loading_placeholder.info(f"🔍 Validating {a_sym}... (checking Yahoo Finance)")
                 
+                try:
+                    # Add timeout handling
+                    import signal
+                    
+                    def timeout_handler(signum, frame):
+                        raise TimeoutError("Ticker validation timed out")
+                    
+                    # Set 10 second timeout (only on Unix systems)
                     try:
-                        # Add timeout handling
-                        import signal
+                        signal.signal(signal.SIGALRM, timeout_handler)
+                        signal.alarm(10)
+                    except:
+                        pass  # Windows doesn't support SIGALRM
                     
-                        def timeout_handler(signum, frame):
-                            raise TimeoutError("Ticker validation timed out")
-                    
-                        # Set 10 second timeout (only on Unix systems)
-                        try:
-                            signal.signal(signal.SIGALRM, timeout_handler)
-                            signal.alarm(10)
-                        except:
-                            pass  # Windows doesn't support SIGALRM
-                    
-                        try:
-                            t_check = yf.Ticker(a_sym)
-                            hist = t_check.history(period="1d")
+                    try:
+                        t_check = yf.Ticker(a_sym)
+                        hist = t_check.history(period="1d")
                         
-                            # Cancel timeout
-                            try:
-                                signal.alarm(0)
-                            except:
-                                pass
-                        
-                            if not hist.empty:
-                                last_price = float(hist['Close'].iloc[-1])
-                                try:
-                                    ticker_info = t_check.info
-                                    ticker_name = ticker_info.get('longName', a_sym)
-                                except:
-                                    ticker_name = a_sym
-                            
-                                # Enhancement 1: Show allocation message instead of price
-                                if is_existing:
-                                    loading_placeholder.success(f"✅ **{ticker_name}** - Asset target allocated")
-                                else:
-                                    loading_placeholder.success(f"✅ **{ticker_name}** - Ready to allocate")
-                                valid_ticker = True
-                            else:
-                                loading_placeholder.error(f"❌ No data found for '{a_sym}'")
-                                validation_error = f"Ticker '{a_sym}' exists but has no price data. Try another ticker."
-                            
-                        except TimeoutError:
-                            loading_placeholder.error(f"⏱️ Timeout validating '{a_sym}'")
-                            validation_error = f"Yahoo Finance took too long to respond for '{a_sym}'. Try again or use Quick Add buttons."
-                            try:
-                                signal.alarm(0)
-                            except:
-                                pass
-                        
-                    except Exception as e:
-                        loading_placeholder.error(f"❌ Error validating '{a_sym}'")
-                        validation_error = f"Could not validate ticker '{a_sym}'. Check spelling or network connection."
+                        # Cancel timeout
                         try:
                             signal.alarm(0)
                         except:
                             pass
+                        
+                        if not hist.empty:
+                            last_price = float(hist['Close'].iloc[-1])
+                            try:
+                                ticker_info = t_check.info
+                                ticker_name = ticker_info.get('longName', a_sym)
+                            except:
+                                ticker_name = a_sym
+                            
+                            # Enhancement 1: Show allocation message instead of price
+                            if is_existing:
+                                loading_placeholder.success(f"✅ **{ticker_name}** - Asset target allocated")
+                            else:
+                                loading_placeholder.success(f"✅ **{ticker_name}** - Ready to allocate")
+                            valid_ticker = True
+                        else:
+                            loading_placeholder.error(f"❌ No data found for '{a_sym}'")
+                            validation_error = f"Ticker '{a_sym}' exists but has no price data. Try another ticker."
+                            
+                    except TimeoutError:
+                        loading_placeholder.error(f"⏱️ Timeout validating '{a_sym}'")
+                        validation_error = f"Yahoo Finance took too long to respond for '{a_sym}'. Try again or use Quick Add buttons."
+                        try:
+                            signal.alarm(0)
+                        except:
+                            pass
+                        
+                except Exception as e:
+                    loading_placeholder.error(f"❌ Error validating '{a_sym}'")
+                    validation_error = f"Could not validate ticker '{a_sym}'. Check spelling or network connection."
+                    try:
+                        signal.alarm(0)
+                    except:
+                        pass
                 
-                    # Show error details if validation failed
-                    if validation_error and not valid_ticker:
-                        st.caption(f"💡 {validation_error}")
-                        st.caption("**Common tickers:** SPY (S&P 500), QQQ (Nasdaq), GLD (Gold), TLT (Bonds)")
+                # Show error details if validation failed
+                if validation_error and not valid_ticker:
+                    st.caption(f"💡 {validation_error}")
+                    st.caption("**Common tickers:** SPY (S&P 500), QQQ (Nasdaq), GLD (Gold), TLT (Bonds)")
 
             
-                if valid_ticker:
-                    st.markdown("---")
-                    default_target = prof.get("assets", {}).get(a_sym, {}).get("target", 0.0)
+            if valid_ticker:
+                st.markdown("---")
+                default_target = prof.get("assets", {}).get(a_sym, {}).get("target", 0.0)
                 
-                    # Enhancement 5: Disable target editing when asset mix is locked (unless editing existing asset)
-                    is_locked = prof.get("asset_mix_locked", False)
-                    can_edit_target = not is_locked or is_existing
+                # Enhancement 5: Disable target editing when asset mix is locked (unless editing existing asset)
+                is_locked = prof.get("asset_mix_locked", False)
+                can_edit_target = not is_locked or is_existing
                 
-                    if is_locked and not is_existing:
-                        st.warning("🔒 Asset mix is locked. Unlock first to add new assets or change allocations.")
+                if is_locked and not is_existing:
+                    st.warning("🔒 Asset mix is locked. Unlock first to add new assets or change allocations.")
                 
-                    a_w = st.number_input("Target Allocation %", 
-                                         min_value=0.0, 
-                                         max_value=max_available,
-                                         value=min(float(default_target), max_available), 
-                                         step=0.5, 
-                                         help=f"Set the target % for {a_sym}. Max available: {max_available:.1f}%",
-                                         key="target_weight",
-                                         disabled=is_locked)
+                a_w = st.number_input("Target Allocation %", 
+                                     min_value=0.0, 
+                                     max_value=max_available,
+                                     value=min(float(default_target), max_available), 
+                                     step=0.5, 
+                                     help=f"Set the target % for {a_sym}. Max available: {max_available:.1f}%",
+                                     key="target_weight",
+                                     disabled=is_locked)
                 
-                    st.markdown("---")
-                    col_b1, col_b2 = st.columns(2)
-                    with col_b1:
-                        # CRITICAL FIX: Remove disabled logic entirely!
-                        # Button is ALWAYS enabled once ticker validates.
-                        # We validate allocation when button is clicked.
-                        # This fixes Quick Add issues with widget state synchronization.
+                st.markdown("---")
+                col_b1, col_b2 = st.columns(2)
+                with col_b1:
+                    # CRITICAL FIX: Remove disabled logic entirely!
+                    # Button is ALWAYS enabled once ticker validates.
+                    # We validate allocation when button is clicked.
+                    # This fixes Quick Add issues with widget state synchronization.
                     
-                        if st.button("💾 Save Asset", use_container_width=True, type="primary", key="save_asset"):
-                            # Validate allocation when clicked
-                            if a_w <= 0:
-                                st.error("❌ Target allocation must be greater than 0%")
-                            elif a_w > max_available:
-                                st.error(f"❌ Target allocation exceeds available {max_available:.1f}%")
-                            else:
-                                # Validation passed - save the asset
-                                # Preserve existing units and purchases if updating
-                                existing_units = prof.get("assets", {}).get(a_sym, {}).get("units", 0.0)
-                                existing_allocated = prof.get("assets", {}).get(a_sym, {}).get("allocated_pct", 0.0)
-                                existing_purchases = prof.get("assets", {}).get(a_sym, {}).get("purchases", [])
+                    if st.button("💾 Save Asset", use_container_width=True, type="primary", key="save_asset"):
+                        # Validate allocation when clicked
+                        if a_w <= 0:
+                            st.error("❌ Target allocation must be greater than 0%")
+                        elif a_w > max_available:
+                            st.error(f"❌ Target allocation exceeds available {max_available:.1f}%")
+                        else:
+                            # Validation passed - save the asset
+                            # Preserve existing units and purchases if updating
+                            existing_units = prof.get("assets", {}).get(a_sym, {}).get("units", 0.0)
+                            existing_allocated = prof.get("assets", {}).get(a_sym, {}).get("allocated_pct", 0.0)
+                            existing_purchases = prof.get("assets", {}).get(a_sym, {}).get("purchases", [])
                             
-                                prof.setdefault("assets", {})[a_sym] = {
-                                    "fund_name": ticker_name, "units": existing_units, "target": a_w,
-                                    "allocated_pct": existing_allocated,
-                                    "purchases": existing_purchases
-                                }
-                                action = "Updated" if is_existing else "Added"
-                                log_profile(prof, f"{action} {a_sym}: {a_w}% target")
-                                save_db(st.session_state.db)
-                                st.success(f"✅ {action} {a_sym}!")
-                                st.rerun()
-                    with col_b2:
-                        if is_existing:
-                            if st.button("🗑️ Remove", use_container_width=True, key="remove_asset"):
-                                del prof["assets"][a_sym]
-                                log_profile(prof, f"Removed {a_sym}")
-                                save_db(st.session_state.db)
-                                st.success(f"✅ Removed {a_sym}!")
-                                st.rerun()
-            
-            else:
-                # Asset mix is locked - show message, hide all management UI
-                st.info("🔒 **Asset mix is locked.** All asset management controls are hidden. Unlock in section ⑤ below to modify assets.")
+                            prof.setdefault("assets", {})[a_sym] = {
+                                "fund_name": ticker_name, "units": existing_units, "target": a_w,
+                                "allocated_pct": existing_allocated,
+                                "purchases": existing_purchases
+                            }
+                            action = "Updated" if is_existing else "Added"
+                            log_profile(prof, f"{action} {a_sym}: {a_w}% target")
+                            save_db(st.session_state.db)
+                            st.success(f"✅ {action} {a_sym}!")
+                            st.rerun()
+                with col_b2:
+                    if is_existing:
+                        if st.button("🗑️ Remove", use_container_width=True, key="remove_asset"):
+                            del prof["assets"][a_sym]
+                            log_profile(prof, f"Removed {a_sym}")
+                            save_db(st.session_state.db)
+                            st.success(f"✅ Removed {a_sym}!")
+                            st.rerun()
             
             # Asset Mix Locking
             st.divider()
@@ -5472,67 +5555,62 @@ else:
             assets = prof.get("assets", {})
             total_allocation = sum(a.get('target', 0) for a in assets.values())
             is_complete = (total_allocation == 100.0 and len(assets) > 0)
-            is_locked = prof.get("asset_mix_locked", False)
             
-            # Auto-expand if not locked or not complete
-            lock_expand = not is_locked or not is_complete
-            
-            with st.expander("🔒 Manage Asset Mix Lock", expanded=lock_expand):
-                # Debug info expander
-                with st.expander("🔧 Troubleshooting / Current State", expanded=False):
-                    st.caption("**Portfolio Status:**")
-                    st.json({
-                        "Total Allocation": f"{total_allocation:.1f}%",
-                        "Assets Defined": len(assets),
-                        "Mix Locked": prof.get("asset_mix_locked", False),
-                        "Any Deployments": any(a.get("allocated_pct", 0) > 0 for a in assets.values()),
-                        "Can Add Assets": not prof.get("asset_mix_locked", False) or (total_allocation < 100),
-                    })
-                    st.caption("**Assets:**")
-                    for ticker, data in assets.items():
-                        st.caption(f"• {ticker}: {data.get('target', 0)}% target, {data.get('allocated_pct', 0):.1f}% deployed, {data.get('units', 0)} units")
-                    
-                    if st.button("🔄 Reset Portfolio (Emergency)", key="emergency_reset"):
-                        if st.button("⚠️ Confirm Reset - This will delete ALL data", key="confirm_reset", type="primary"):
-                            prof["assets"] = {}
-                            prof["asset_mix_locked"] = False
-                            save_db(st.session_state.db)
-                            log_profile(prof, "Emergency reset - all assets deleted")
-                            st.success("✅ Portfolio reset!")
-                            st.rerun()
+            # Debug info expander
+            with st.expander("🔧 Troubleshooting / Current State", expanded=False):
+                st.caption("**Portfolio Status:**")
+                st.json({
+                    "Total Allocation": f"{total_allocation:.1f}%",
+                    "Assets Defined": len(assets),
+                    "Mix Locked": prof.get("asset_mix_locked", False),
+                    "Any Deployments": any(a.get("allocated_pct", 0) > 0 for a in assets.values()),
+                    "Can Add Assets": not prof.get("asset_mix_locked", False) or (total_allocation < 100),
+                })
+                st.caption("**Assets:**")
+                for ticker, data in assets.items():
+                    st.caption(f"• {ticker}: {data.get('target', 0)}% target, {data.get('allocated_pct', 0):.1f}% deployed, {data.get('units', 0)} units")
                 
-                if prof.get("asset_mix_locked", False):
-                    st.success("✅ **Asset Mix Locked**")
-                    st.caption(f"{len(assets)} assets defined. Ready for deployment.")
-                    any_deployments = any(a.get("allocated_pct", 0) > 0 for a in assets.values())
-                    
-                    if st.button("🔓 Unlock Asset Mix", use_container_width=True, key="unlock_mix"):
-                        if any_deployments:
-                            # Show warning but allow
-                            st.warning("⚠️ You have deployments recorded. Unlocking will allow you to modify targets, but existing deployments remain unchanged.")
-                            if st.button("✅ Yes, Unlock Anyway", key="confirm_unlock", type="primary"):
-                                prof["asset_mix_locked"] = False
-                                save_db(st.session_state.db)
-                                log_profile(prof, "Asset mix unlocked (with deployments)")
-                                st.rerun()
-                        else:
+                if st.button("🔄 Reset Portfolio (Emergency)", key="emergency_reset"):
+                    if st.button("⚠️ Confirm Reset - This will delete ALL data", key="confirm_reset", type="primary"):
+                        prof["assets"] = {}
+                        prof["asset_mix_locked"] = False
+                        save_db(st.session_state.db)
+                        log_profile(prof, "Emergency reset - all assets deleted")
+                        st.success("✅ Portfolio reset!")
+                        st.rerun()
+            
+            if prof.get("asset_mix_locked", False):
+                st.success("✅ **Asset Mix Locked**")
+                st.caption(f"{len(assets)} assets defined. Ready for deployment.")
+                any_deployments = any(a.get("allocated_pct", 0) > 0 for a in assets.values())
+                
+                if st.button("🔓 Unlock Asset Mix", use_container_width=True, key="unlock_mix"):
+                    if any_deployments:
+                        # Show warning but allow
+                        st.warning("⚠️ You have deployments recorded. Unlocking will allow you to modify targets, but existing deployments remain unchanged.")
+                        if st.button("✅ Yes, Unlock Anyway", key="confirm_unlock", type="primary"):
                             prof["asset_mix_locked"] = False
                             save_db(st.session_state.db)
-                            log_profile(prof, "Asset mix unlocked")
-                            st.rerun()
-                else:
-                    if is_complete:
-                        st.warning("🔜 **Ready to Lock**")
-                        st.caption(f"{len(assets)} assets, {total_allocation:.1f}% allocated")
-                        if st.button("🔒 Lock Asset Mix", type="primary", use_container_width=True, key="lock_mix"):
-                            prof["asset_mix_locked"] = True
-                            save_db(st.session_state.db)
-                            log_profile(prof, f"Asset mix locked: {len(assets)} assets")
-                            st.success("✅ Asset mix locked!")
+                            log_profile(prof, "Asset mix unlocked (with deployments)")
                             st.rerun()
                     else:
-                        st.info("ℹ️ **Asset Mix Not Complete**")
-                        st.caption(f"Current: {total_allocation:.1f}% / 100%")
+                        prof["asset_mix_locked"] = False
+                        save_db(st.session_state.db)
+                        log_profile(prof, "Asset mix unlocked")
+                        st.rerun()
+            else:
+                if is_complete:
+                    st.warning("🔜 **Ready to Lock**")
+                    st.caption(f"{len(assets)} assets, {total_allocation:.1f}% allocated")
+                    if st.button("🔙 Lock Asset Mix", type="primary", use_container_width=True, key="lock_mix"):
+                        prof["asset_mix_locked"] = True
+                        save_db(st.session_state.db)
+                        log_profile(prof, f"Asset mix locked: {len(assets)} assets")
+                        st.success("✅ Asset mix locked!")
+                        st.rerun()
+                else:
+                    st.info("ℹ️ **Asset Mix Not Complete**")
+                    st.caption(f"Current: {total_allocation:.1f}% / 100%")
             
             st.divider()
             
@@ -5754,19 +5832,30 @@ else:
                                                         horizontal=True, key="deploy_method_radio",
                                                         label_visibility="collapsed")
                                 
-                                # Enhanced date selection with Clear and Today buttons
+                                # Date selection with Today button
                                 st.markdown("#### Select Purchase Date")
-                                deploy_date = enhanced_date_input(
-                                    "Deployment Date",
-                                    value=date.today(),
-                                    max_value=date.today(),
-                                    key="deploy_date",
-                                    help="Date you purchased this asset"
-                                )
+                                col_date, col_today = st.columns([3, 1])
                                 
-                                # Handle None (from Clear button) - default to today
-                                if deploy_date is None:
-                                    deploy_date = date.today()
+                                # Initialize deploy_date_value if not exists
+                                if 'deploy_date_value' not in st.session_state:
+                                    st.session_state.deploy_date_value = date.today()
+                                
+                                with col_today:
+                                    st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                                    if st.button("📅 Today", key="set_today_btn", use_container_width=True):
+                                        # Enhancement 2: Update to today and force widget refresh
+                                        st.session_state.deploy_date_value = date.today()
+                                        st.rerun()
+                                
+                                with col_date:
+                                    deploy_date = st.date_input("Deployment Date", 
+                                                               value=st.session_state.deploy_date_value,
+                                                               max_value=date.today(), 
+                                                               key="deploy_date_input")
+                                    
+                                    # Update session state when date changes manually
+                                    if deploy_date != st.session_state.deploy_date_value:
+                                        st.session_state.deploy_date_value = deploy_date
                                 
                                 # Fetch price for preview
                                 preview_price = None
@@ -5817,9 +5906,28 @@ else:
                                     # Calculate max % based on remaining asset budget
                                     max_deployable_pct = remaining_pct
                                     
-                                    # ALWAYS default to 100% (or remaining % if less than 100%)
-                                    # No session state memory - clean default every time
-                                    default_pct = min(100.0, remaining_pct) if remaining_pct > 0 else 0.1
+                                    # Enhancement 2: Calculate default % based on max whole units we can afford
+                                    if preview_price and actual_available_budget > 0:
+                                        # Calculate max whole units we can buy
+                                        max_units = int(actual_available_budget / preview_price)
+                                        if max_units >= 1:
+                                            # Calculate what % of target this represents
+                                            max_amount = max_units * preview_price
+                                            portfolio_pct_for_max = (max_amount / prof['principal']) * 100
+                                            default_pct_calculated = (portfolio_pct_for_max / target_pct) * 100 if target_pct > 0 else 0
+                                            # Cap at remaining %
+                                            smart_default = min(default_pct_calculated, remaining_pct)
+                                        else:
+                                            smart_default = min(25.0, remaining_pct) if remaining_pct > 0 else 0.1
+                                    else:
+                                        smart_default = min(25.0, remaining_pct) if remaining_pct > 0 else 0.1
+                                    
+                                    # Enhancement 6: Use last deployed % as default (override smart default if exists)
+                                    last_deploy_pct_key = f"last_deploy_pct_{selected_ticker}"
+                                    if last_deploy_pct_key in st.session_state:
+                                        default_pct = min(st.session_state[last_deploy_pct_key], remaining_pct)
+                                    else:
+                                        default_pct = smart_default
                                     
                                     deploy_pct = st.number_input("Deploy % (of asset's target)", 
                                                                 min_value=0.1, 
@@ -5828,6 +5936,9 @@ else:
                                                                 step=0.1, 
                                                                 key="deploy_pct_input",
                                                                 help="Percentage of this asset's target allocation to deploy")
+                                    
+                                    # Store for next time
+                                    st.session_state[last_deploy_pct_key] = deploy_pct
                                     
                                     portfolio_pct = (deploy_pct / 100) * target_pct
                                     deploy_amount = (portfolio_pct / 100) * prof['principal']
@@ -8199,13 +8310,9 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     roi_pct = ((curr_v / total_deployed) - 1) * 100 if total_deployed > 0 else 0
                 
                 prof_start_date = datetime.strptime(prof.get('start_date', str(date.today())), '%Y-%m-%d')
-                prof_days_elapsed = (date.today() - prof_start_date.date()).days
-                prof_years = max(prof_days_elapsed / 365.25, 0.01)
+                prof_years = max((date.today() - prof_start_date.date()).days / 365.25, 0.01)
                 
-                # For portfolios < 90 days, don't calculate CAGR (unreliable)
-                if prof_days_elapsed < 90:
-                    profile_cagr = None  # Will display as "< 90d"
-                elif is_fully_deployed:
+                if is_fully_deployed:
                     profile_cagr = ((curr_v / start_val) ** (1 / prof_years) - 1) * 100 if start_val > 0 else 0
                 else:
                     profile_cagr = ((curr_v / total_deployed) ** (1 / prof_years) - 1) * 100 if total_deployed > 0 else 0
@@ -8310,31 +8417,20 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     st.markdown(f'<div class="stat-item"><div class="stat-label">{roi_label}</div><div class="stat-value" style="color: {"#10b981" if roi_pct >= 0 else "#ef4444"};">{roi_pct:+.2f}%</div></div>', unsafe_allow_html=True)
                 with col_s3:
                     cagr_label = "CAGR" if is_fully_deployed else "CAGR (Deployed)"
-                    if profile_cagr is None:
-                        # Portfolio < 90 days - CAGR unreliable
-                        st.markdown(f'<div class="stat-item"><div class="stat-label">{cagr_label}</div><div class="stat-value" style="color: #6b7280;">< 90d</div></div>', unsafe_allow_html=True)
-                    else:
-                        st.markdown(f'<div class="stat-item"><div class="stat-label">{cagr_label}</div><div class="stat-value" style="color: {"#10b981" if profile_cagr >= 0 else "#ef4444"};">{profile_cagr:+.2f}%</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stat-item"><div class="stat-label">{cagr_label}</div><div class="stat-value" style="color: {"#10b981" if profile_cagr >= 0 else "#ef4444"};">{profile_cagr:+.2f}%</div></div>', unsafe_allow_html=True)
                 with col_s4:
                     st.markdown(f'<div class="stat-item"><div class="stat-label">vs Target Path</div><div class="stat-value" style="color: {"#10b981" if perc_diff >= 0 else "#ef4444"};">{perc_diff:+.2f}%</div></div>', unsafe_allow_html=True)
                 with col_s5:
-                    ann_label = "Annualized" if is_fully_deployed else "Ann. (Deployed)"
-                    if prof_days_elapsed < 90:
-                        # Portfolio < 90 days - Annualized unreliable
-                        st.markdown(f'<div class="stat-item"><div class="stat-label">{ann_label}</div><div class="stat-value" style="color: #6b7280;">< 90d</div></div>', unsafe_allow_html=True)
+                    if is_fully_deployed:
+                        annualized = ((curr_v / start_val) ** (1/years) - 1) * 100
                     else:
-                        if is_fully_deployed:
-                            annualized = ((curr_v / start_val) ** (1/prof_years) - 1) * 100 if start_val > 0 else 0
-                        else:
-                            annualized = ((curr_v / total_deployed) ** (1/prof_years) - 1) * 100 if total_deployed > 0 else 0
-                        st.markdown(f'<div class="stat-item"><div class="stat-label">{ann_label}</div><div class="stat-value" style="color: {"#10b981" if annualized >= 0 else "#ef4444"};">{annualized:.2f}%</div></div>', unsafe_allow_html=True)
+                        annualized = ((curr_v / total_deployed) ** (1/years) - 1) * 100 if total_deployed > 0 else 0
+                    ann_label = "Annualized" if is_fully_deployed else "Ann. (Deployed)"
+                    st.markdown(f'<div class="stat-item"><div class="stat-label">{ann_label}</div><div class="stat-value" style="color: {"#10b981" if annualized >= 0 else "#ef4444"};">{annualized:.2f}%</div></div>', unsafe_allow_html=True)
                 
-                # Note for partially deployed portfolios or young portfolios
+                # Note for partially deployed portfolios
                 if not is_fully_deployed:
                     st.caption(f"ℹ️ *Metrics calculated on deployed capital (${total_deployed:,.0f} of ${start_val:,.0f} = {deployment_pct:.1f}% deployed)*")
-                
-                if prof_days_elapsed < 90:
-                    st.caption(f"📅 *CAGR & Annualized returns not shown - portfolio is only {prof_days_elapsed} days old (needs 90+ days for reliable annualized metrics)*")
                 
                 st.divider()
                 
