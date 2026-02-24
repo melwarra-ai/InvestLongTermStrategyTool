@@ -21,11 +21,42 @@ from psycopg2.extras import RealDictCursor
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "9.1.1"
+VERSION = "9.1.2"
 VERSION_DATE = "2026-02-19"
-VERSION_TIME = "13:00:00"  # EST  
-VERSION_NAME = "Strategy Display Hotfix"
+VERSION_TIME = "14:00:00"  # EST  
+VERSION_NAME = "Professional UI Polish"
 CHANGELOG = """
+v9.1.2 (2026-02-19 14:00 EST) - ✨ PROFESSIONAL UI POLISH
+- IMPROVED: Strategy section visual design with gradient background
+- IMPROVED: Asset pills now have depth with subtle box shadows
+- IMPROVED: Better spacing and padding throughout strategy section
+- IMPROVED: Added chart icon (📊) before strategy name
+- IMPROVED: Pills are larger, bolder, more prominent
+- IMPROVED: Container has professional shadow and gradient
+- BENEFIT: Much more polished, professional financial app appearance
+
+**Visual Improvements:**
+Strategy Container:
+- Gradient background (white → light slate)
+- Subtle box shadow for depth
+- Larger padding (16px vs 12px)
+- Better border radius (12px vs 8px)
+
+Strategy Label:
+- Added 📊 icon for visual interest
+- Better letter spacing (1px vs 0.5px)
+- Centered alignment
+
+Asset Pills:
+- Larger padding (8px 16px vs 6px 12px)
+- Bolder font weight (700 vs 600)
+- Slightly larger font (0.9rem vs 0.85rem)
+- Added box shadow for 3D depth effect
+- Better border radius (20px vs 16px)
+- Increased margin for better spacing
+
+Result: Professional, modern financial application UI! 💼
+
 v9.1.1 (2026-02-19 13:00 EST) - 🔧 STRATEGY DISPLAY HOTFIX
 - FIXED: HTML rendering issue causing raw code to display instead of styled pills
 - FIXED: Removed HTML comments that were interfering with Streamlit rendering
@@ -7291,19 +7322,19 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             target_pct = asset_data.get('target', 0)
                             if target_pct > 0:
                                 color_gradient = get_asset_color(ticker)
-                                pills.append(f'<span style="background: {color_gradient}; color: white; padding: 6px 12px; border-radius: 16px; font-size: 0.85rem; font-weight: 600; display: inline-block; margin: 4px 4px 4px 0;">{ticker} {target_pct:.0f}%</span>')
+                                pills.append(f'<span style="background: {color_gradient}; color: white; padding: 8px 16px; border-radius: 20px; font-size: 0.9rem; font-weight: 700; display: inline-block; margin: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.1); transition: transform 0.2s;">{ticker} {target_pct:.0f}%</span>')
                         asset_pills_html = ''.join(pills)
                     
                     st.markdown(f'''
                         <div class="{tile_class}" style="padding: 24px; margin-bottom: 8px;">
                             <div class="profile-tile-header">{p_flag} {name}</div>
                             <div style="margin-bottom: 16px; text-align: center;">{status_badge}</div>
-                            <div style="background: rgba(255,255,255,0.5); padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(226, 232, 240, 0.8);">
-                                <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">
-                                    Strategy: {strategy_name}
+                            <div style="background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%); padding: 16px; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(226, 232, 240, 0.6); box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                                <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 1px; text-align: center;">
+                                    <span style="opacity: 0.6;">📊</span> {strategy_name}
                                 </div>
-                                <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
-                                    {asset_pills_html if asset_pills_html else '<span style="color: #94a3b8; font-size: 0.85rem;">No assets allocated</span>'}
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                                    {asset_pills_html if asset_pills_html else '<span style="color: #94a3b8; font-size: 0.9rem; font-style: italic;">No assets allocated</span>'}
                                 </div>
                             </div>
                             <div style="margin: 20px 0; text-align: center;">
