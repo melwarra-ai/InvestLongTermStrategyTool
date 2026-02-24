@@ -21,11 +21,35 @@ from psycopg2.extras import RealDictCursor
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "9.2.0"
+VERSION = "9.2.1"
 VERSION_DATE = "2026-02-19"
-VERSION_TIME = "15:00:00"  # EST  
-VERSION_NAME = "Modern Portfolio Tiles"
+VERSION_TIME = "15:30:00"  # EST  
+VERSION_NAME = "Modern Tiles Rendering Hotfix"
 CHANGELOG = """
+v9.2.1 (2026-02-19 15:30 EST) - 🔧 RENDERING HOTFIX
+- FIXED: HTML rendering issue causing raw code to display instead of styled elements
+- FIXED: Compacted all HTML to single lines to prevent whitespace issues
+- IMPROVED: Allocation bar, metrics grid, and hero value now render correctly
+- BENEFIT: All modern tile improvements from v9.2.0 now visible!
+
+**Bug Fixed:**
+The v9.2.0 tile HTML was displaying as raw code:
+  <div class="portfolio-value-hero">
+  <div class="stat-label">PORTFOLIO VALUE</div>
+  ...
+
+Instead of rendering as styled elements. This was caused by multi-line
+f-strings with excessive indentation (same issue as v9.1.1).
+
+**Solution:**
+Compacted all HTML to single-line format. Now renders perfectly!
+
+**Result:**
+✅ Portfolio value displays as hero (2.5rem, centered)
+✅ Allocation bar renders as horizontal progress bar
+✅ Metrics grid displays in 3 columns
+✅ All styling and colors work correctly
+
 v9.2.0 (2026-02-19 15:00 EST) - 🎨 MODERN PORTFOLIO TILES REDESIGN
 - REDESIGNED: Complete portfolio tile layout for better visual hierarchy
 - ADDED: Horizontal allocation bar (Bloomberg-style professional visualization)
@@ -7522,45 +7546,8 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                         allocation_bar_html = ''.join(bar_segments)
                         allocation_labels_html = ''.join(label_items)
                     
-                    # Build the modern tile HTML
-                    st.markdown(f'''
-                        <div class="{tile_class}" style="padding: 24px; margin-bottom: 8px;">
-                            <div class="profile-tile-header">{p_flag} {name}</div>
-                            <div style="margin-bottom: 16px; text-align: center;">{status_badge}</div>
-                            
-                            <div class="portfolio-value-hero">
-                                <div class="stat-label">PORTFOLIO VALUE</div>
-                                <div class="stat-value">${curr_v:,.0f}</div>
-                            </div>
-                            
-                            <div class="allocation-container">
-                                <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px; text-align: center;">
-                                    📊 {strategy_name}
-                                </div>
-                                <div class="allocation-bar">
-                                    {allocation_bar_html if allocation_bar_html else '<div style="width: 100%; background: #e2e8f0;"></div>'}
-                                </div>
-                                <div class="allocation-labels">
-                                    {allocation_labels_html if allocation_labels_html else '<span style="color: #94a3b8; font-size: 0.85rem; font-style: italic;">No assets allocated</span>'}
-                                </div>
-                            </div>
-                            
-                            <div class="metrics-grid-modern">
-                                <div class="metric-cell-modern">
-                                    <div class="stat-label">Goal</div>
-                                    <div class="stat-value">{p_data['yearly_goal_pct']:.1f}%/yr</div>
-                                </div>
-                                <div class="metric-cell-modern">
-                                    <div class="stat-label">CAGR</div>
-                                    <div class="stat-value {'metric-value-positive' if (cagr is not None and cagr >= 0) else 'metric-value-negative' if cagr is not None else ''}">{'< 90d' if cagr is None else f'{cagr:+.1f}%'}</div>
-                                </div>
-                                <div class="metric-cell-modern">
-                                    <div class="stat-label">ROI</div>
-                                    <div class="stat-value {'metric-value-positive' if roi_pct >= 0 else 'metric-value-negative'}">{roi_pct:+.1f}%</div>
-                                </div>
-                            </div>
-                        </div>
-                    ''', unsafe_allow_html=True)
+                    # Build the modern tile HTML (COMPACT - no multi-line strings!)
+                    st.markdown(f'<div class="{tile_class}" style="padding: 24px; margin-bottom: 8px;"><div class="profile-tile-header">{p_flag} {name}</div><div style="margin-bottom: 16px; text-align: center;">{status_badge}</div><div class="portfolio-value-hero"><div class="stat-label">PORTFOLIO VALUE</div><div class="stat-value">${curr_v:,.0f}</div></div><div class="allocation-container"><div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px; text-align: center;">📊 {strategy_name}</div><div class="allocation-bar">{allocation_bar_html if allocation_bar_html else '<div style="width: 100%; background: #e2e8f0;"></div>'}</div><div class="allocation-labels">{allocation_labels_html if allocation_labels_html else '<span style="color: #94a3b8; font-size: 0.85rem; font-style: italic;">No assets allocated</span>'}</div></div><div class="metrics-grid-modern"><div class="metric-cell-modern"><div class="stat-label">Goal</div><div class="stat-value">{p_data['yearly_goal_pct']:.1f}%/yr</div></div><div class="metric-cell-modern"><div class="stat-label">CAGR</div><div class="stat-value {'metric-value-positive' if (cagr is not None and cagr >= 0) else 'metric-value-negative' if cagr is not None else ''}">{'< 90d' if cagr is None else f'{cagr:+.1f}%'}</div></div><div class="metric-cell-modern"><div class="stat-label">ROI</div><div class="stat-value {'metric-value-positive' if roi_pct >= 0 else 'metric-value-negative'}">{roi_pct:+.1f}%</div></div></div></div>', unsafe_allow_html=True)
                     
                     if st.button(f"📊 Open {name}", key=f"open_{name}", use_container_width=True):
                         st.session_state.active_profile = name
