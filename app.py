@@ -21,11 +21,41 @@ from psycopg2.extras import RealDictCursor
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "9.0.3"
-VERSION_DATE = "2026-02-16"
-VERSION_TIME = "17:00:00"  # EST  
-VERSION_NAME = "Complete Young Portfolio Fix"
+VERSION = "9.1.0"
+VERSION_DATE = "2026-02-19"
+VERSION_TIME = "12:00:00"  # EST  
+VERSION_NAME = "Strategy Display Enhancement"
 CHANGELOG = """
+v9.1.0 (2026-02-19 12:00 EST) - 🎨 STRATEGY DISPLAY ENHANCEMENT
+- ADDED: Portfolio strategy display on Global Dashboard tiles
+- ADDED: Asset allocation pills showing tickers and percentages
+- ADDED: Color-coded asset types (stocks=blue, bonds=green, gold=orange, etc.)
+- ADDED: Auto-generated strategy names (e.g., "60/40 Aggressive", "3-Fund Portfolio")
+- IMPROVED: Instant visual differentiation between portfolios
+- BENEFIT: Users can immediately see what strategy each portfolio uses
+
+**New Features:**
+Strategy Section on Each Tile:
+- Strategy name (auto-generated from allocation)
+- Asset pills with ticker + percentage
+- Color-coded by asset type:
+  * Stocks (SPY, QQQ, SPXL): Blue gradient
+  * Bonds (TLT, AGG, BND): Green gradient
+  * Gold (GLD, IAU): Orange gradient
+  * Real Estate (VNQ): Purple gradient
+  * International (VXUS, EFA): Teal gradient
+  * Cash/Other: Gray gradient
+
+**Example Display:**
+Portfolio Tile:
+├─ Status Badge
+├─ Strategy: 60/40 Aggressive Growth
+│  └─ [SPXL 60%] [GLD 40%]  ← Color-coded pills
+├─ Portfolio Value: $324,527
+└─ Goal / CAGR / ROI
+
+Users can now instantly distinguish between portfolios at a glance!
+
 v9.0.3 (2026-02-16 17:00 EST) - 🎯 COMPLETE YOUNG PORTFOLIO FIX
 - FIXED: Global Dashboard now shows "< 90d" for CAGR on portfolios under 90 days
 - FIXED: Rebalance Analysis error "unsupported format string passed to NoneType"
@@ -2716,6 +2746,102 @@ def check_recently_rebalanced(last_rebalanced_str):
         return hours_since < 24
     except:
         return False
+
+def generate_strategy_name(assets_dict):
+    """
+    Auto-generate a descriptive strategy name based on asset allocation.
+    
+    Examples:
+    - 60/40 → "60/40 Aggressive"
+    - 50/30/20 → "3-Fund Balanced"
+    - 100% single asset → "100% [Ticker]"
+    """
+    if not assets_dict:
+        return "No Strategy Set"
+    
+    # Get assets sorted by target percentage (descending)
+    sorted_assets = sorted(assets_dict.items(), key=lambda x: x[1].get('target', 0), reverse=True)
+    
+    # Get allocation percentages
+    allocations = [int(asset[1].get('target', 0)) for asset in sorted_assets if asset[1].get('target', 0) > 0]
+    
+    if not allocations:
+        return "Strategy Setup"
+    
+    # Single asset strategy
+    if len(allocations) == 1 and allocations[0] == 100:
+        ticker = sorted_assets[0][0]
+        return f"100% {ticker}"
+    
+    # Two-asset strategy (e.g., 60/40)
+    if len(allocations) == 2:
+        alloc_str = f"{allocations[0]}/{allocations[1]}"
+        if allocations[0] >= 70:
+            return f"{alloc_str} Aggressive"
+        elif allocations[0] >= 55:
+            return f"{alloc_str} Growth"
+        else:
+            return f"{alloc_str} Balanced"
+    
+    # Three-asset strategy (classic 3-fund)
+    if len(allocations) == 3:
+        alloc_str = f"{allocations[0]}/{allocations[1]}/{allocations[2]}"
+        # Check if it's a classic 3-fund portfolio pattern
+        tickers = [asset[0] for asset in sorted_assets[:3]]
+        if any(t in tickers for t in ['VTI', 'VTSAX', 'SPY', 'VOO']):
+            return f"3-Fund Portfolio"
+        return f"{alloc_str} Diversified"
+    
+    # Four or more assets
+    if len(allocations) >= 4:
+        return f"{len(allocations)}-Asset Diversified"
+    
+    return "Custom Strategy"
+
+def get_asset_color(ticker):
+    """
+    Get color gradient for asset pills based on asset type.
+    Returns CSS gradient string.
+    """
+    ticker = ticker.upper()
+    
+    # Stocks - Blue gradient
+    stocks = ['SPY', 'QQQ', 'SPXL', 'VOO', 'VTI', 'VTSAX', 'IVV', 'UPRO', 'TQQQ', 'VUG', 'VTV']
+    if ticker in stocks:
+        return "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)"
+    
+    # Bonds - Green gradient
+    bonds = ['TLT', 'AGG', 'BND', 'VBTLX', 'TIP', 'LQD', 'HYG', 'SHY', 'IEF', 'BIV']
+    if ticker in bonds:
+        return "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+    
+    # Gold/Commodities - Orange gradient
+    gold = ['GLD', 'IAU', 'SGOL', 'DBC', 'GSG', 'PDBC', 'GDX', 'SLV']
+    if ticker in gold:
+        return "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+    
+    # Real Estate - Purple gradient
+    realestate = ['VNQ', 'VNQI', 'IYR', 'SCHH', 'RWR', 'REIT']
+    if ticker in realestate:
+        return "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)"
+    
+    # International - Teal gradient
+    international = ['VXUS', 'EFA', 'VEA', 'VTIAX', 'VWO', 'IEMG', 'IXUS', 'SCHF']
+    if ticker in international:
+        return "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)"
+    
+    # Canadian Stocks - Red gradient (Canadian flag colors)
+    canadian = ['XIU', 'XIC', 'VCN', 'ZCN', 'XEF', 'XAW']
+    if ticker in canadian or ticker.endswith('.TO'):
+        return "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
+    
+    # Cash/Money Market - Gray gradient
+    cash = ['VMFXX', 'SPAXX', 'FDRXX', 'CASH', 'SGOV', 'BIL']
+    if ticker in cash:
+        return "linear-gradient(135deg, #64748b 0%, #475569 100%)"
+    
+    # Default - Slate gradient
+    return "linear-gradient(135deg, #64748b 0%, #475569 100%)"
 
 def check_deployment_status(profile_data):
     """
@@ -7136,10 +7262,58 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
                 
                 with cols[i % 2]:
+                    # Generate strategy name and pills
+                    strategy_name = generate_strategy_name(p_assets)
+                    asset_pills_html = ""
+                    if p_assets:
+                        pills = []
+                        # Sort assets by target percentage (descending)
+                        sorted_assets = sorted(p_assets.items(), key=lambda x: x[1].get('target', 0), reverse=True)
+                        for ticker, asset_data in sorted_assets:
+                            target_pct = asset_data.get('target', 0)
+                            if target_pct > 0:
+                                color_gradient = get_asset_color(ticker)
+                                pills.append(f'''
+                                    <span style="background: {color_gradient}; 
+                                                 color: white; 
+                                                 padding: 6px 12px; 
+                                                 border-radius: 16px; 
+                                                 font-size: 0.85rem; 
+                                                 font-weight: 600;
+                                                 display: inline-block;
+                                                 margin: 4px 4px 4px 0;">
+                                        {ticker} {target_pct:.0f}%
+                                    </span>
+                                ''')
+                        asset_pills_html = ''.join(pills)
+                    
                     st.markdown(f'''
                         <div class="{tile_class}" style="padding: 24px; margin-bottom: 8px;">
                             <div class="profile-tile-header">{p_flag} {name}</div>
                             <div style="margin-bottom: 16px; text-align: center;">{status_badge}</div>
+                            
+                            <!-- STRATEGY SECTION (NEW!) -->
+                            <div style="background: rgba(255,255,255,0.5); 
+                                        padding: 12px; 
+                                        border-radius: 8px; 
+                                        margin-bottom: 16px;
+                                        border: 1px solid rgba(226, 232, 240, 0.8);">
+                                <div style="font-size: 0.75rem; 
+                                            color: #64748b; 
+                                            font-weight: 600; 
+                                            text-transform: uppercase; 
+                                            margin-bottom: 8px;
+                                            letter-spacing: 0.5px;">
+                                    Strategy: {strategy_name}
+                                </div>
+                                <div style="display: flex; 
+                                            gap: 6px; 
+                                            flex-wrap: wrap;
+                                            justify-content: center;">
+                                    {asset_pills_html if asset_pills_html else '<span style="color: #94a3b8; font-size: 0.85rem;">No assets allocated</span>'}
+                                </div>
+                            </div>
+                            
                             <div style="margin: 20px 0; text-align: center;">
                                 <div class="stat-label">Portfolio Value</div>
                                 <div class="stat-value" style="font-size: 2rem;">${curr_v:,.0f}</div>
