@@ -21,11 +21,29 @@ from psycopg2.extras import RealDictCursor
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "9.1.0"
+VERSION = "9.1.1"
 VERSION_DATE = "2026-02-19"
-VERSION_TIME = "12:00:00"  # EST  
-VERSION_NAME = "Strategy Display Enhancement"
+VERSION_TIME = "13:00:00"  # EST  
+VERSION_NAME = "Strategy Display Hotfix"
 CHANGELOG = """
+v9.1.1 (2026-02-19 13:00 EST) - 🔧 STRATEGY DISPLAY HOTFIX
+- FIXED: HTML rendering issue causing raw code to display instead of styled pills
+- FIXED: Removed HTML comments that were interfering with Streamlit rendering
+- FIXED: Compacted HTML to single lines to prevent whitespace issues
+- IMPROVED: Strategy pills now render correctly with proper colors and styling
+
+**Bug Fixed:**
+The strategy section was displaying raw HTML code like:
+  <div style="background: rgba(255,255,255,0.5)...
+  
+Instead of rendered color-coded pills. This was caused by multi-line
+HTML strings with excessive indentation. Fixed by:
+1. Converting pill HTML to single-line format
+2. Removing HTML comments
+3. Compacting style attributes
+
+**Result:** Strategy pills now display beautifully with proper colors!
+
 v9.1.0 (2026-02-19 12:00 EST) - 🎨 STRATEGY DISPLAY ENHANCEMENT
 - ADDED: Portfolio strategy display on Global Dashboard tiles
 - ADDED: Asset allocation pills showing tickers and percentages
@@ -7273,47 +7291,21 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                             target_pct = asset_data.get('target', 0)
                             if target_pct > 0:
                                 color_gradient = get_asset_color(ticker)
-                                pills.append(f'''
-                                    <span style="background: {color_gradient}; 
-                                                 color: white; 
-                                                 padding: 6px 12px; 
-                                                 border-radius: 16px; 
-                                                 font-size: 0.85rem; 
-                                                 font-weight: 600;
-                                                 display: inline-block;
-                                                 margin: 4px 4px 4px 0;">
-                                        {ticker} {target_pct:.0f}%
-                                    </span>
-                                ''')
+                                pills.append(f'<span style="background: {color_gradient}; color: white; padding: 6px 12px; border-radius: 16px; font-size: 0.85rem; font-weight: 600; display: inline-block; margin: 4px 4px 4px 0;">{ticker} {target_pct:.0f}%</span>')
                         asset_pills_html = ''.join(pills)
                     
                     st.markdown(f'''
                         <div class="{tile_class}" style="padding: 24px; margin-bottom: 8px;">
                             <div class="profile-tile-header">{p_flag} {name}</div>
                             <div style="margin-bottom: 16px; text-align: center;">{status_badge}</div>
-                            
-                            <!-- STRATEGY SECTION (NEW!) -->
-                            <div style="background: rgba(255,255,255,0.5); 
-                                        padding: 12px; 
-                                        border-radius: 8px; 
-                                        margin-bottom: 16px;
-                                        border: 1px solid rgba(226, 232, 240, 0.8);">
-                                <div style="font-size: 0.75rem; 
-                                            color: #64748b; 
-                                            font-weight: 600; 
-                                            text-transform: uppercase; 
-                                            margin-bottom: 8px;
-                                            letter-spacing: 0.5px;">
+                            <div style="background: rgba(255,255,255,0.5); padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(226, 232, 240, 0.8);">
+                                <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">
                                     Strategy: {strategy_name}
                                 </div>
-                                <div style="display: flex; 
-                                            gap: 6px; 
-                                            flex-wrap: wrap;
-                                            justify-content: center;">
+                                <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
                                     {asset_pills_html if asset_pills_html else '<span style="color: #94a3b8; font-size: 0.85rem;">No assets allocated</span>'}
                                 </div>
                             </div>
-                            
                             <div style="margin: 20px 0; text-align: center;">
                                 <div class="stat-label">Portfolio Value</div>
                                 <div class="stat-value" style="font-size: 2rem;">${curr_v:,.0f}</div>
