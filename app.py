@@ -21,11 +21,64 @@ from psycopg2.extras import RealDictCursor
 
 
 # ===== VERSION INFORMATION =====
-VERSION = "9.1.2"
+VERSION = "9.2.0"
 VERSION_DATE = "2026-02-19"
-VERSION_TIME = "14:00:00"  # EST  
-VERSION_NAME = "Professional UI Polish"
+VERSION_TIME = "15:00:00"  # EST  
+VERSION_NAME = "Modern Portfolio Tiles"
 CHANGELOG = """
+v9.2.0 (2026-02-19 15:00 EST) - 🎨 MODERN PORTFOLIO TILES REDESIGN
+- REDESIGNED: Complete portfolio tile layout for better visual hierarchy
+- ADDED: Horizontal allocation bar (Bloomberg-style professional visualization)
+- ADDED: Grid-based metrics footer for easy Goal/CAGR/ROI comparison
+- IMPROVED: Portfolio value as hero element (2.5rem, centered, prominent)
+- IMPROVED: Tabular numbers for perfect digit alignment
+- IMPROVED: Color-coded allocation segments (slate gradients)
+- IMPROVED: Allocation labels with colored dots matching asset types
+- BENEFIT: Professional financial dashboard aesthetic matching industry standards
+
+**New Portfolio Tile Layout:**
+┌─────────────────────────────────┐
+│ Header: Name + Status Badge     │
+│                                 │
+│ Hero: Portfolio Value (large)   │
+│                                 │
+│ Allocation Bar:                 │
+│ ████████████░░░░░░░░░░░░░░░   │
+│ RPAR 33%  NTSX 33%  AOM 33%    │
+│                                 │
+│ Metrics Grid:                   │
+│ Goal | CAGR | ROI               │
+└─────────────────────────────────┘
+
+**Visual Improvements:**
+Allocation Visualization:
+- Horizontal progress bar (space-efficient, professional)
+- Gradient segments (slate colors for sophistication)
+- Labels with colored dots (matches asset type colors)
+- Hover effects on segments (interactive feedback)
+
+Metrics Grid:
+- 3-column layout (easy at-a-glance comparison)
+- White background cells (clean, readable)
+- Tabular numbers (perfect alignment)
+- Color-coded values (green positive, red negative)
+
+Portfolio Value:
+- 2.5rem font size (hero element)
+- Tabular numbers (alignment)
+- Centered layout (focus)
+- Clear hierarchy (most important metric)
+
+**Design Consistency:**
+✅ Maintains existing gradient backgrounds
+✅ Maintains existing box shadows
+✅ Maintains existing border-left accents
+✅ Maintains existing color palette
+✅ Maintains existing hover animations
+✅ Maintains existing transition effects
+
+**Result:** Professional, Bloomberg-terminal-quality portfolio tiles! 💼
+
 v9.1.2 (2026-02-19 14:00 EST) - ✨ PROFESSIONAL UI POLISH
 - IMPROVED: Strategy section visual design with gradient background
 - IMPROVED: Asset pills now have depth with subtle box shadows
@@ -1649,6 +1702,130 @@ st.markdown("""
         font-size: 1.1rem;
         text-align: center;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Modern Allocation Bar Styles */
+    .allocation-container {
+        background: white;
+        padding: 16px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        margin: 16px 0;
+    }
+    
+    .allocation-bar {
+        display: flex;
+        height: 12px;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 12px;
+    }
+    
+    .bar-segment {
+        transition: all 0.3s ease;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .bar-segment:hover {
+        opacity: 0.85;
+        transform: scaleY(1.3);
+    }
+    
+    .allocation-labels {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #475569;
+    }
+    
+    .allocation-label-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .allocation-color-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    
+    /* Modern Metrics Grid Styles */
+    .metrics-grid-modern {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-top: 20px;
+    }
+    
+    .metric-cell-modern {
+        background: white;
+        padding: 16px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .metric-cell-modern:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .metric-cell-modern .stat-label {
+        font-size: 0.7rem;
+        color: #64748b;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+    }
+    
+    .metric-cell-modern .stat-value {
+        font-size: 1.15rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: #1e293b;
+    }
+    
+    .metric-value-positive {
+        color: #10b981 !important;
+    }
+    
+    .metric-value-negative {
+        color: #ef4444 !important;
+    }
+    
+    /* Hero Portfolio Value */
+    .portfolio-value-hero {
+        text-align: center;
+        padding: 24px 0 16px 0;
+    }
+    
+    .portfolio-value-hero .stat-label {
+        font-size: 0.7rem;
+        color: #64748b;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 1.5px;
+        margin-bottom: 8px;
+    }
+    
+    .portfolio-value-hero .stat-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: #1e293b;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
     }
     
     /* Authentication Styling */
@@ -7311,48 +7488,75 @@ You can't buy partial shares at brokers. The cheapest asset costs ${cheapest_ass
                     status_badge = '<span style="background: #94a3b8; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">⚪ New</span>'
                 
                 with cols[i % 2]:
-                    # Generate strategy name and pills
+                    # Generate strategy name
                     strategy_name = generate_strategy_name(p_assets)
-                    asset_pills_html = ""
+                    
+                    # Generate allocation bar HTML
+                    allocation_bar_html = ""
+                    allocation_labels_html = ""
                     if p_assets:
-                        pills = []
-                        # Sort assets by target percentage (descending)
                         sorted_assets = sorted(p_assets.items(), key=lambda x: x[1].get('target', 0), reverse=True)
-                        for ticker, asset_data in sorted_assets:
+                        bar_segments = []
+                        label_items = []
+                        
+                        # Define gradient colors for segments (slate gradients)
+                        segment_colors = [
+                            "linear-gradient(135deg, #64748b, #475569)",
+                            "linear-gradient(135deg, #475569, #334155)",
+                            "linear-gradient(135deg, #334155, #1e293b)",
+                            "linear-gradient(135deg, #1e293b, #0f172a)",
+                            "linear-gradient(135deg, #0f172a, #020617)"
+                        ]
+                        
+                        for idx, (ticker, asset_data) in enumerate(sorted_assets):
                             target_pct = asset_data.get('target', 0)
                             if target_pct > 0:
-                                color_gradient = get_asset_color(ticker)
-                                pills.append(f'<span style="background: {color_gradient}; color: white; padding: 8px 16px; border-radius: 20px; font-size: 0.9rem; font-weight: 700; display: inline-block; margin: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.1); transition: transform 0.2s;">{ticker} {target_pct:.0f}%</span>')
-                        asset_pills_html = ''.join(pills)
+                                color_idx = idx % len(segment_colors)
+                                segment_color = segment_colors[color_idx]
+                                bar_segments.append(f'<div class="bar-segment" style="width: {target_pct}%; background: {segment_color};"></div>')
+                                
+                                # Use asset-specific color for the dot
+                                asset_color = get_asset_color(ticker)
+                                label_items.append(f'<span class="allocation-label-item"><span class="allocation-color-dot" style="background: {asset_color};"></span>{ticker} {target_pct:.0f}%</span>')
+                        
+                        allocation_bar_html = ''.join(bar_segments)
+                        allocation_labels_html = ''.join(label_items)
                     
+                    # Build the modern tile HTML
                     st.markdown(f'''
                         <div class="{tile_class}" style="padding: 24px; margin-bottom: 8px;">
                             <div class="profile-tile-header">{p_flag} {name}</div>
                             <div style="margin-bottom: 16px; text-align: center;">{status_badge}</div>
-                            <div style="background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%); padding: 16px; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(226, 232, 240, 0.6); box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                                <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 1px; text-align: center;">
-                                    <span style="opacity: 0.6;">📊</span> {strategy_name}
+                            
+                            <div class="portfolio-value-hero">
+                                <div class="stat-label">PORTFOLIO VALUE</div>
+                                <div class="stat-value">${curr_v:,.0f}</div>
+                            </div>
+                            
+                            <div class="allocation-container">
+                                <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px; text-align: center;">
+                                    📊 {strategy_name}
                                 </div>
-                                <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
-                                    {asset_pills_html if asset_pills_html else '<span style="color: #94a3b8; font-size: 0.9rem; font-style: italic;">No assets allocated</span>'}
+                                <div class="allocation-bar">
+                                    {allocation_bar_html if allocation_bar_html else '<div style="width: 100%; background: #e2e8f0;"></div>'}
+                                </div>
+                                <div class="allocation-labels">
+                                    {allocation_labels_html if allocation_labels_html else '<span style="color: #94a3b8; font-size: 0.85rem; font-style: italic;">No assets allocated</span>'}
                                 </div>
                             </div>
-                            <div style="margin: 20px 0; text-align: center;">
-                                <div class="stat-label">Portfolio Value</div>
-                                <div class="stat-value" style="font-size: 2rem;">${curr_v:,.0f}</div>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; color: #64748b;">
-                                <div>
-                                    <div style="font-size: 0.75rem; opacity: 0.8;">Goal</div>
-                                    <div style="font-weight: 600;">{p_data['yearly_goal_pct']}%/yr</div>
+                            
+                            <div class="metrics-grid-modern">
+                                <div class="metric-cell-modern">
+                                    <div class="stat-label">Goal</div>
+                                    <div class="stat-value">{p_data['yearly_goal_pct']:.1f}%/yr</div>
                                 </div>
-                                <div style="text-align: center;">
-                                    <div style="font-size: 0.75rem; opacity: 0.8;">CAGR</div>
-                                    <div style="font-weight: 600; color: {'#6b7280' if cagr is None else ('#10b981' if cagr >= 0 else '#ef4444')};">{'< 90d' if cagr is None else f'{cagr:+.1f}%'}</div>
+                                <div class="metric-cell-modern">
+                                    <div class="stat-label">CAGR</div>
+                                    <div class="stat-value {'metric-value-positive' if (cagr is not None and cagr >= 0) else 'metric-value-negative' if cagr is not None else ''}">{'< 90d' if cagr is None else f'{cagr:+.1f}%'}</div>
                                 </div>
-                                <div style="text-align: right;">
-                                    <div style="font-size: 0.75rem; opacity: 0.8;">ROI</div>
-                                    <div style="font-weight: 600; color: {'#10b981' if roi_pct >= 0 else '#ef4444'};">{roi_pct:+.1f}%</div>
+                                <div class="metric-cell-modern">
+                                    <div class="stat-label">ROI</div>
+                                    <div class="stat-value {'metric-value-positive' if roi_pct >= 0 else 'metric-value-negative'}">{roi_pct:+.1f}%</div>
                                 </div>
                             </div>
                         </div>
